@@ -29,6 +29,10 @@ import bittensor as bt
 
 # import this repo
 import template
+import torch
+from datasets import load_dataset
+from torch.utils.data import DataLoader
+from transformers import AutoModelForCausalLM, AutoTokenizer, AdamW, get_linear_schedule_with_warmup
 
 def get_config():
     # Step 2: Set up the configuration parser
@@ -144,6 +148,80 @@ def main( config ):
         # Below: simple template logic: return the input value multiplied by 2.
         # If you change this, your miner will lose emission in the network incentive landscape.
         synapse.dummy_output = synapse.dummy_input * 2
+
+        # # Use CUDA if available, otherwise use CPU
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # Load pre-trained model and tokenizer
+        # model_name = 'sshleifer/tiny-gpt2'
+        model = AutoModelForCausalLM.from_pretrained(synapse.model_name)
+        tokenizer = AutoTokenizer.from_pretrained(synapse.model_name)
+        
+        # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
+        tokenizer.pad_token = tokenizer.eos_token
+
+        # Move the model to the appropriate device
+        model.to(device)
+
+        # synapse.gradients = [1,2]
+
+        # Load optimized and scheduler
+        if synapse.optimizer_name == "adam":
+            optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-5)
+        else:
+            optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-5)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=100, num_training_steps=1)  
+
+        # Load dataset
+        dataset = load_dataset(synapse.dataset_name, 'wikitext-2-v1', split='test', streaming=True)
+
+        # Define encoding function
+        def encode(examples):
+            return tokenizer(examples['text'], truncation=True, max_length=1024, padding='max_length', return_tensors='pt')
+
+        # Encode the dataset
+        encoded_dataset = dataset.map(encode, batched=True)
+
+        # Create a PyTorch DataLoader
+        dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size)
+
+        # Train data for one epoch
+        for batch in dataloader:
+            
+            # Move batch to device
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+
+            # Forward pass
+            outputs = model(
+                input_ids = batch["input_ids"].to(device), 
+                attention_mask = batch["attention_mask"].to(device),
+                labels = batch["input_ids"].to(device)
+            )     
+            
+            # Backward pass    
+            loss = outputs.loss
+            # synpase.loss = loss
+            loss.backward()
+
+            # Store gradients
+            synapse.gradients = []
+            for name, w in model.named_parameters():
+                bt.logging.info(f"Synapse Gradients {synapse.gradients}")
+                bt.logging.info(f"Name {name}")
+                bt.logging.info(f"w {w}")
+                synapse.gradients.append(w.grad)
+
+            # Adjust gradient
+            optimizer.step()
+            scheduler.step() 
+            optimizer.zero_grad()
+            
+            bt.logging.info(f"Synapse Gradients {synapse.gradients}")
+            break
+        
+        bt.logging.info(f"Final synapse {synapse}")
+        
         return synapse
 
     # Step 5: Build and link miner functions to the axon.

@@ -56,6 +56,24 @@ class Dummy( bt.Synapse ):
     # Optional request output, filled by recieving axon.
     dummy_output: typing.Optional[int] = None
 
+    # Optional request output, filled by recieving axon.
+    gradients: typing.Optional[list] = []
+
+    # Optional model name
+    model_name: str = "sshleifer/tiny-gpt2"
+
+    # Optional learning rate
+    lr: float = 1e-5
+    
+    # Optional dataset name
+    dataset_name: str = 'wikitext'
+
+    # Required optimizer
+    optimizer_name: str = "adam"
+
+    # Required batch size
+    batch_size: int = 4
+
     def deserialize(self) -> int:
         """
         Deserialize the dummy output. This method retrieves the response from
@@ -72,4 +90,5 @@ class Dummy( bt.Synapse ):
         >>> dummy_instance.deserialize()
         5
         """
-        return self.dummy_output
+        return self.gradients, self.model_name, self.dataset_name, self.batch_size, self.dummy_output
+        # return self.gradients, 

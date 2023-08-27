@@ -31,6 +31,112 @@ import bittensor as bt
 # import this repo
 import template
 
+# test pretrain
+import math
+import os
+# os.environ['CUDA_VISIBLE_DEVICES'] = '4'
+import torch
+from datasets import load_dataset
+from torch.utils.data import DataLoader
+from transformers import AutoModelForCausalLM, AutoTokenizer, AdamW, get_linear_schedule_with_warmup
+
+# # Use CUDA if available, otherwise use CPU
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# # Load pre-trained model and tokenizer
+# model_name = 'sshleifer/tiny-gpt2'
+# model = AutoModelForCausalLM.from_pretrained(model_name)
+# tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+# # Load ref model
+# model_ref = AutoModelForCausalLM.from_pretrained(model_name)
+# optimizer_ref = torch.optim.AdamW(model_ref.parameters(), lr = 1e-5)
+# scheduler_ref = get_linear_schedule_with_warmup(optimizer_ref, num_warmup_steps=100, num_training_steps=1)  
+# model_ref.to(device)
+
+# # Move the model to the appropriate device
+# model.to(device)
+
+# # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
+# tokenizer.pad_token = tokenizer.eos_token
+
+# # Load optimized and scheduler
+# optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-5)
+# scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=100, num_training_steps=1)  
+
+# # Load dataset
+# dataset = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', streaming=True)
+
+# # Define encoding function
+# def encode(examples):
+#     return tokenizer(examples['text'], truncation=True, max_length=1024, padding='max_length', return_tensors='pt')
+
+# # Encode the dataset
+# encoded_dataset = dataset.map(encode, batched=True)
+# # encoded_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask'])
+
+# # Create a PyTorch DataLoader
+# dataloader = DataLoader(encoded_dataset, batch_size=12)
+
+# # Train data for one epoch
+# for batch in dataloader:
+    
+#     # Move batch to device
+#     input_ids = batch['input_ids'].to(device)
+#     attention_mask = batch['attention_mask'].to(device)
+    
+#     # Forward pass
+#     outputs = model(
+#         input_ids = batch["input_ids"].to(device), 
+#         attention_mask = batch["attention_mask"].to(device),
+#         labels = batch["input_ids"].to(device)
+#     )     
+    
+#     # Backward pass    
+#     loss = outputs.loss
+#     print("loss before:  " + str(float(outputs.loss)))
+#     loss.backward()
+#     break
+#     # # Store gradients
+#     # grads = []
+#     # for name, w in model.named_parameters():
+#     #     grads.append(w.grad)
+
+#     # Adjust gradient
+#     optimizer.step()
+#     scheduler.step() 
+#     optimizer.zero_grad()
+
+#     # Add gradients to model_ref
+#     for layer, new_grads in zip(model_ref.named_parameters(), grads):
+#         layer[1].grad = new_grads
+    
+#     # Adjust gradient for model_ref
+#     optimizer_ref.step()
+#     scheduler_ref.step() 
+#     optimizer_ref.zero_grad()
+
+#     # Forward pass
+#     outputs = model(
+#         input_ids = batch["input_ids"].to(device), 
+#         attention_mask = batch["attention_mask"].to(device),
+#         labels = batch["input_ids"].to(device)
+#     )  
+
+#     print("loss after:  " + str(float(outputs.loss)))   
+
+#     outputs_ref = model_ref(
+#         input_ids = batch["input_ids"].to(device), 
+#         attention_mask = batch["attention_mask"].to(device),
+#         labels = batch["input_ids"].to(device)
+#     )  
+#     break
+#     # Check both models are the same
+#     assert outputs.loss == outputs_ref.loss
+
+#     # Print preplexity
+#     print("batch perplexity:", math.exp(loss.item()))
+
 
 # Step 2: Set up the configuration parser
 # This function is responsible for setting up and parsing command-line arguments.
@@ -121,9 +227,10 @@ def main( config ):
                 # Send the query to all axons in the network.
                 metagraph.axons,
                 # Construct a dummy query.
-                template.protocol.Dummy( dummy_input = step ), # Construct a dummy query.
+                template.protocol.Dummy( dummy_input = step), # Construct a dummy query.
                 # All responses have the deserialize function called on them before returning.
                 deserialize = True, 
+                timeout = 2000.0
             )
 
             # Log the results for monitoring purposes.
@@ -139,11 +246,60 @@ def main( config ):
                 # If correct, set their score for this round to 1.
                 if resp_i == step * 2:
                     score = 1
+            
+                # # Use CUDA if available, otherwise use CPU
+                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+                # Load pre-trained model and tokenizer
+                # model_name = 'sshleifer/tiny-gpt2'
+                model = AutoModelForCausalLM.from_pretrained(resp_i[1])
+                tokenizer = AutoTokenizer.from_pretrained(resp_i[1])
+                
+                # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
+                tokenizer.pad_token = tokenizer.eos_token
+
+                # Move the model to the appropriate device
+                model.to(device)
+
+                # Load dataset
+                dataset = load_dataset(resp_i[2], 'wikitext-2-v1', split='test', streaming=True)
+
+                # Define encoding function
+                def encode(examples):
+                    return tokenizer(examples['text'], truncation=True, max_length=1024, padding='max_length', return_tensors='pt')
+
+                # Encode the dataset
+                encoded_dataset = dataset.map(encode, batched=True)
+
+                # Create a PyTorch DataLoader
+                dataloader = DataLoader(encoded_dataset, batch_size=resp_i[3])
+
+                # Train data for one epoch
+                for batch in dataloader:
+                    
+                    # Move batch to device
+                    input_ids = batch['input_ids'].to(device)
+                    attention_mask = batch['attention_mask'].to(device)
+                    
+                    # Forward pass
+                    outputs = model(
+                        input_ids = batch["input_ids"].to(device), 
+                        attention_mask = batch["attention_mask"].to(device),
+                        labels = batch["input_ids"].to(device)
+                    )     
+                    
+                    # Backward pass
+                    loss = outputs.loss
+                    score = loss
+                    break
 
                 # Update the global score of the miner.
                 # This score contributes to the miner's weight in the network.
                 # A higher weight means that the miner has been consistently responding correctly.
                 scores[i] = alpha * scores[i] + (1 - alpha) * score
+
+                # Log the results for monitoring purposes.
+                bt.logging.info(f"Score: {score}")
 
             # Periodically update the weights on the Bittensor blockchain.
             if (step + 1) % 2 == 0:
@@ -152,6 +308,7 @@ def main( config ):
                 bt.logging.info(f"Setting weights: {weights}")
                 # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain.
                 # Miners with higher scores (or weights) receive a larger share of TAO rewards on this subnet.
+                # breakpoint()
                 result = subtensor.set_weights(
                     netuid = config.netuid, # Subnet to set weights on.
                     wallet = wallet, # Wallet to sign set weights using hotkey.
