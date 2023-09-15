@@ -33,6 +33,7 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, AdamW, get_linear_schedule_with_warmup
+from optimum.bettertransformer import BetterTransformer
 
 def get_config():
     # Step 2: Set up the configuration parser
@@ -108,7 +109,7 @@ def main( config ):
     # Step 4: Set up miner functionalities
     # The following functions control the miner's response to incoming requests.
     # The blacklist function decides if a request should be ignored.
-    def blacklist_fn( synapse: template.protocol.Dummy ) -> bool:
+    def blacklist_fn( synapse: template.protocol.Train ) -> bool:
         # TODO(developer): Define how miners should blacklist requests. This Function 
         # Runs before the synapse data has been deserialized (i.e. before synapse.data is available).
         # The synapse is instead contructed via the headers of the request. It is important to blacklist
@@ -128,7 +129,7 @@ def main( config ):
 
     # The priority function determines the order in which requests are handled.
     # More valuable or higher-priority requests are processed before others.
-    def priority_fn( synapse: template.protocol.Dummy ) -> float:
+    def priority_fn( synapse: template.protocol.Train ) -> float:
         # TODO(developer): Define how miners should prioritize requests.
         # Miners may recieve messages from multiple entities at once. This function
         # determines which request should be processed first. Higher values indicate
@@ -141,13 +142,10 @@ def main( config ):
         return prirority
 
     # This is the core miner function, which decides the miner's response to a valid, high-priority request.
-    def dummy( synapse: template.protocol.Dummy ) -> template.protocol.Dummy:
+    def train( synapse: template.protocol.Train ) -> template.protocol.Train:
         # TODO(developer): Define how miners should process requests.
         # This function runs after the synapse has been deserialized (i.e. after synapse.data is available).
         # This function runs after the blacklist and priority functions have been called.
-        # Below: simple template logic: return the input value multiplied by 2.
-        # If you change this, your miner will lose emission in the network incentive landscape.
-        synapse.dummy_output = synapse.dummy_input * 2
 
         # # Use CUDA if available, otherwise use CPU
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -155,6 +153,7 @@ def main( config ):
         # Load pre-trained model and tokenizer
         # model_name = 'sshleifer/tiny-gpt2'
         model = AutoModelForCausalLM.from_pretrained(synapse.model_name)
+        # model = BetterTransformer.transform(model, keep_original_model=False)
         tokenizer = AutoTokenizer.from_pretrained(synapse.model_name)
         
         # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
@@ -177,7 +176,7 @@ def main( config ):
 
         # Define encoding function
         def encode(examples):
-            return tokenizer(examples['text'], truncation=True, max_length=1024, padding='max_length', return_tensors='pt')
+            return tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length', return_tensors='pt')
 
         # Encode the dataset
         encoded_dataset = dataset.map(encode, batched=True)
@@ -207,9 +206,9 @@ def main( config ):
             # Store gradients
             synapse.gradients = []
             for name, w in model.named_parameters():
-                bt.logging.info(f"Synapse Gradients {synapse.gradients}")
-                bt.logging.info(f"Name {name}")
-                bt.logging.info(f"w {w}")
+                # bt.logging.info(f"Synapse Gradients {synapse.gradients}")
+                # bt.logging.info(f"Name {name}")
+                # bt.logging.info(f"w {w}")
                 synapse.gradients.append(w.grad)
 
             # Adjust gradient
@@ -217,11 +216,23 @@ def main( config ):
             scheduler.step() 
             optimizer.zero_grad()
             
-            bt.logging.info(f"Synapse Gradients {synapse.gradients}")
+            # bt.logging.info(f"Synapse Gradients {synapse.gradients}")
             break
         
+        # synapse.gradients = [synapse.gradients[-1][0]]
+        synapse.gradients = [gradient.tolist() for gradient in synapse.gradients]
         bt.logging.info(f"Final synapse {synapse}")
-        
+
+        outputs = model(
+            input_ids = batch["input_ids"].to(device), 
+            attention_mask = batch["attention_mask"].to(device),
+            labels = batch["input_ids"].to(device)
+        )  
+
+        print("loss")
+        synapse.loss = float(outputs.loss)
+        print(loss)
+
         return synapse
 
     # Step 5: Build and link miner functions to the axon.
@@ -232,14 +243,14 @@ def main( config ):
     # Attach determiners which functions are called when servicing a request.
     bt.logging.info(f"Attaching forward function to axon.")
     axon.attach(
-        forward_fn = dummy,
+        forward_fn = train,
         blacklist_fn = blacklist_fn,
         priority_fn = priority_fn,
     )
 
     # Serve passes the axon information to the network + netuid we are hosting on.
     # This will auto-update if the axon port of external ip have changed.
-    bt.logging.info(f"Serving axon {dummy} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}")
+    bt.logging.info(f"Serving axon {train} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}")
     axon.serve( netuid = config.netuid, subtensor = subtensor )
 
     # Start  starts the miner's axon, making it active on the network.

@@ -39,6 +39,7 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, AdamW, get_linear_schedule_with_warmup
+from optimum.bettertransformer import BetterTransformer
 
 # # Use CUDA if available, otherwise use CPU
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -227,25 +228,20 @@ def main( config ):
                 # Send the query to all axons in the network.
                 metagraph.axons,
                 # Construct a dummy query.
-                template.protocol.Dummy( dummy_input = step), # Construct a dummy query.
+                template.protocol.Train( dummy_input = step), # Construct a dummy query.
                 # All responses have the deserialize function called on them before returning.
                 deserialize = True, 
                 timeout = 2000.0
             )
 
             # Log the results for monitoring purposes.
-            bt.logging.info(f"Received dummy responses: {responses}")
+            # bt.logging.info(f"Received dummy responses: {responses}")
 
             # TODO(developer): Define how the validator scores responses.
             # Adjust the scores based on responses from miners.
             for i, resp_i in enumerate(responses):
                 # Initialize the score for the current miner's response.
                 score = 0
-
-                # Check if the miner has provided the correct response by doubling the dummy input.
-                # If correct, set their score for this round to 1.
-                if resp_i == step * 2:
-                    score = 1
             
                 # # Use CUDA if available, otherwise use CPU
                 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -253,6 +249,7 @@ def main( config ):
                 # Load pre-trained model and tokenizer
                 # model_name = 'sshleifer/tiny-gpt2'
                 model = AutoModelForCausalLM.from_pretrained(resp_i[1])
+                # model = BetterTransformer.transform(model, keep_original_model=False)
                 tokenizer = AutoTokenizer.from_pretrained(resp_i[1])
                 
                 # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
@@ -261,12 +258,20 @@ def main( config ):
                 # Move the model to the appropriate device
                 model.to(device)
 
+                # Load optimized and scheduler
+                if resp_i[4] == "adam":
+                    optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-5)
+                else:
+                    optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-5)
+                scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=100, num_training_steps=1)  
+
+
                 # Load dataset
                 dataset = load_dataset(resp_i[2], 'wikitext-2-v1', split='test', streaming=True)
 
                 # Define encoding function
                 def encode(examples):
-                    return tokenizer(examples['text'], truncation=True, max_length=1024, padding='max_length', return_tensors='pt')
+                    return tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length', return_tensors='pt')
 
                 # Encode the dataset
                 encoded_dataset = dataset.map(encode, batched=True)
@@ -274,35 +279,53 @@ def main( config ):
                 # Create a PyTorch DataLoader
                 dataloader = DataLoader(encoded_dataset, batch_size=resp_i[3])
 
-                # Train data for one epoch
-                for batch in dataloader:
+                if resp_i[0] is None:
+                    scores[i] = 0
+                    continue
+                else:
+                    for layer, new_grads in zip(model.named_parameters(),resp_i[0]):
+                        layer[1].grad = torch.tensor(new_grads)
                     
-                    # Move batch to device
-                    input_ids = batch['input_ids'].to(device)
-                    attention_mask = batch['attention_mask'].to(device)
-                    
-                    # Forward pass
-                    outputs = model(
-                        input_ids = batch["input_ids"].to(device), 
-                        attention_mask = batch["attention_mask"].to(device),
-                        labels = batch["input_ids"].to(device)
-                    )     
-                    
-                    # Backward pass
-                    loss = outputs.loss
-                    score = loss
-                    break
+                    # Adjust gradient
+                    optimizer.step()
+                    scheduler.step() 
+                    optimizer.zero_grad()
 
-                # Update the global score of the miner.
-                # This score contributes to the miner's weight in the network.
-                # A higher weight means that the miner has been consistently responding correctly.
-                scores[i] = alpha * scores[i] + (1 - alpha) * score
+                    # Train data for one epoch
+                    for batch in dataloader:
+                        
+                        # Move batch to device
+                        input_ids = batch['input_ids'].to(device)
+                        attention_mask = batch['attention_mask'].to(device)
+                        
+                        # Forward pass
+                        outputs = model(
+                            input_ids = batch["input_ids"].to(device), 
+                            attention_mask = batch["attention_mask"].to(device),
+                            labels = batch["input_ids"].to(device)
+                        )     
+                        
+                        # Backward pass
+                        loss = outputs.loss
+                        # score = loss
+                        break
+
+                    # Check if the miner has provided the correct response by doubling the dummy input.
+                    # If correct, set their score for this round to 1.
+                    if resp_i[5] == loss:
+                        score = 1
+
+                    # Update the global score of the miner.
+                    # This score contributes to the miner's weight in the network.
+                    # A higher weight means that the miner has been consistently responding correctly.
+                    scores[i] = alpha * scores[i] + (1 - alpha) * score
 
                 # Log the results for monitoring purposes.
                 bt.logging.info(f"Score: {score}")
 
             # Periodically update the weights on the Bittensor blockchain.
-            if (step + 1) % 2 == 0:
+            # NOTE Disbaled for now due to weight settting bug
+            if (step + 1) % 10000000000 == 0:
                 # TODO(developer): Define how the validator normalizes scores before setting weights.
                 weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
                 bt.logging.info(f"Setting weights: {weights}")

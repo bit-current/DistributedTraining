@@ -18,7 +18,9 @@
 # DEALINGS IN THE SOFTWARE.
 
 import typing
+from typing import Any
 import bittensor as bt
+import torch
 
 # TODO(developer): Rewrite with your protocol definition.
 
@@ -39,10 +41,25 @@ import bittensor as bt
 #   dummy_output = dendrite.query( Dummy( dummy_input = 1 ) )
 #   assert dummy_output == 2
 
-class Dummy( bt.Synapse ):
+# from pydantic import BaseModel
+# from typing import List
+
+# # class Tensor(BaseModel):
+# #     data: List[torch.FloatTensor]
+
+# #     class Config:
+# #         arbitrary_types_allowed = True
+
+# class Tensor(BaseModel):
+#     data: list[torch.FloatTensor] = None
+
+#     class Config:
+#         arbitrary_types_allowed = True
+
+class Train( bt.Synapse ):
     """
-    A simple dummy protocol representation which uses bt.Synapse as its base.
-    This protocol helps in handling dummy request and response communication between
+    A simple Train protocol representation which uses bt.Synapse as its base.
+    This protocol helps in handling request and response communication between
     the miner and the validator.
 
     Attributes:
@@ -50,17 +67,24 @@ class Dummy( bt.Synapse ):
     - dummy_output: An optional integer value which, when filled, represents the response from the miner.
     """
 
+    class Config:
+        """
+        Pydantic model configuration class for Prompting. This class sets validation of attribute assignment as True.
+        validate_assignment set to True means the pydantic model will validate attribute assignments on the class.
+        """
+
+        validate_assignment = False
+        arbitrary_types_allowed = True
+
     # Required request input, filled by sending dendrite caller.
     dummy_input: int
 
     # Optional request output, filled by recieving axon.
-    dummy_output: typing.Optional[int] = None
-
-    # Optional request output, filled by recieving axon.
-    gradients: typing.Optional[list] = []
+    gradients: typing.Optional[list[list]] = None
+    # gradients: typing.Optional[list[torch.FloatTensor]] = None
 
     # Optional model name
-    model_name: str = "sshleifer/tiny-gpt2"
+    model_name: str = "kmfoda/tiny-random-gpt2"
 
     # Optional learning rate
     lr: float = 1e-5
@@ -74,21 +98,23 @@ class Dummy( bt.Synapse ):
     # Required batch size
     batch_size: int = 4
 
+    # Optional score
+    loss: float = 0
+
     def deserialize(self) -> int:
         """
-        Deserialize the dummy output. This method retrieves the response from
+        Deserialize the train output. This method retrieves the response from
         the miner in the form of dummy_output, deserializes it and returns it
         as the output of the dendrite.query() call.
 
         Returns:
-        - int: The deserialized response, which in this case is the value of dummy_output.
+        - int: The deserialized response, which in this case is the value of train_instance.
 
         Example:
-        Assuming a Dummy instance has a dummy_output value of 5:
-        >>> dummy_instance = Dummy(dummy_input=4)
-        >>> dummy_instance.dummy_output = 5
-        >>> dummy_instance.deserialize()
+        Assuming a Train instance has a dummy_output value of 5:
+        >>> train_instance = Train(dummy_input=4)
+        >>> train_instance.dummy_output = 5
+        >>> train_instance.deserialize()
         5
         """
-        return self.gradients, self.model_name, self.dataset_name, self.batch_size, self.dummy_output
-        # return self.gradients, 
+        return self.gradients, self.model_name, self.dataset_name, self.batch_size, self.optimizer_name, self.loss
