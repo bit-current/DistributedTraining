@@ -21,6 +21,7 @@ import typing
 from typing import Any
 import bittensor as bt
 import torch
+from transformers import AutoModelForCausalLM
 
 # TODO(developer): Rewrite with your protocol definition.
 
@@ -41,7 +42,7 @@ import torch
 #   dummy_output = dendrite.query( Dummy( dummy_input = 1 ) )
 #   assert dummy_output == 2
 
-# from pydantic import BaseModel
+from pydantic import BaseModel
 # from typing import List
 
 # # class Tensor(BaseModel):
@@ -50,11 +51,12 @@ import torch
 # #     class Config:
 # #         arbitrary_types_allowed = True
 
-# class Tensor(BaseModel):
-#     data: list[torch.FloatTensor] = None
+class Tensor(BaseModel):
+    data: list[torch.FloatTensor] = None
 
-#     class Config:
-#         arbitrary_types_allowed = True
+    class Config:
+        arbitrary_types_allowed = True
+        validate_assignment = False
 
 class Train( bt.Synapse ):
     """
@@ -80,12 +82,18 @@ class Train( bt.Synapse ):
     dummy_input: int
 
     # Optional request output, filled by recieving axon.
-    gradients: typing.Optional[list[list]] = None
-    # gradients: typing.Optional[list[torch.FloatTensor]] = None
+    gradients: list[ bt.Tensor ] = None
+    # gradients: list[torch.FloatTensor] = None
 
     # Optional model name
     model_name: str = "kmfoda/tiny-random-gpt2"
 
+    # Model Weight
+    # model_weights: list[ bt.Tensor ] = [layer.clone().detach() for layer in AutoModelForCausalLM.from_pretrained(model_name).parameters()]
+    model_weights: str = ""
+    # model_weights: list[ bt.Tensor ] = [torch.tensor(1.0), torch.tensor(1.0)]
+    # [torch.tensor(1.0) for layer in AutoModelForCausalLM.from_pretrained(model_name).parameters()]
+    
     # Optional learning rate
     lr: float = 1e-5
     
@@ -117,4 +125,4 @@ class Train( bt.Synapse ):
         >>> train_instance.deserialize()
         5
         """
-        return self.gradients, self.model_name, self.dataset_name, self.batch_size, self.optimizer_name, self.loss
+        return self.gradients, self.model_name, self.dataset_name, self.batch_size, self.optimizer_name, self.loss, self.model_weights

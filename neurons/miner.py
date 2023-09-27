@@ -153,7 +153,10 @@ def main( config ):
         # Load pre-trained model and tokenizer
         # model_name = 'sshleifer/tiny-gpt2'
         model = AutoModelForCausalLM.from_pretrained(synapse.model_name)
-        # model = BetterTransformer.transform(model, keep_original_model=False)
+        
+        for layer, weight in zip(model.parameters(), synapse.model_weights):
+            layer = torch.nn.parameter.Parameter(weight)
+
         tokenizer = AutoTokenizer.from_pretrained(synapse.model_name)
         
         # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
@@ -166,9 +169,9 @@ def main( config ):
 
         # Load optimized and scheduler
         if synapse.optimizer_name == "adam":
-            optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-5)
+            optimizer = torch.optim.AdamW(model.parameters(), lr = 0.002)
         else:
-            optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-5)
+            optimizer = torch.optim.AdamW(model.parameters(), lr = 0.002)
         scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=100, num_training_steps=1)  
 
         # Load dataset
@@ -184,9 +187,11 @@ def main( config ):
         # Create a PyTorch DataLoader
         dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size)
 
+        from tqdm import tqdm
         # Train data for one epoch
-        for batch in dataloader:
-            
+        for step, batch in enumerate(dataloader):
+
+            # break
             # Move batch to device
             input_ids = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
@@ -200,27 +205,31 @@ def main( config ):
             
             # Backward pass    
             loss = outputs.loss
+            print(step)
+            print(loss)
             # synpase.loss = loss
             loss.backward()
 
-            # Store gradients
-            synapse.gradients = []
-            for name, w in model.named_parameters():
-                # bt.logging.info(f"Synapse Gradients {synapse.gradients}")
-                # bt.logging.info(f"Name {name}")
-                # bt.logging.info(f"w {w}")
-                synapse.gradients.append(w.grad)
+            if step == 0:
+                synapse.gradients = []
+                # Store gradients
+                for layer in model.parameters():
+                    synapse.gradients.append(layer.grad)
+            else:
+                # Store gradients
+                for i, layer in enumerate(model.parameters()):
+                    synapse.gradients[i] += layer.grad
 
             # Adjust gradient
             optimizer.step()
             scheduler.step() 
             optimizer.zero_grad()
-            
-            # bt.logging.info(f"Synapse Gradients {synapse.gradients}")
-            break
-        
+
+            if step == 0:
+                break
+
         # synapse.gradients = [synapse.gradients[-1][0]]
-        synapse.gradients = [gradient.tolist() for gradient in synapse.gradients]
+        # synapse.gradients = [gradient for gradient in synapse.gradients]
         bt.logging.info(f"Final synapse {synapse}")
 
         outputs = model(

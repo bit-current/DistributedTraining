@@ -228,7 +228,7 @@ def main( config ):
                 # Send the query to all axons in the network.
                 metagraph.axons,
                 # Construct a dummy query.
-                template.protocol.Train( dummy_input = step), # Construct a dummy query.
+                template.protocol.Train( dummy_input = step,  model_name = "kmfoda/tiny-random-gpt2"), # Construct a dummy query.
                 # All responses have the deserialize function called on them before returning.
                 deserialize = True, 
                 timeout = 2000.0
@@ -248,8 +248,13 @@ def main( config ):
 
                 # Load pre-trained model and tokenizer
                 # model_name = 'sshleifer/tiny-gpt2'
+                # resp_i = ([], "kmfoda/tiny-random-gpt2", 'wikitext', 4, None)
                 model = AutoModelForCausalLM.from_pretrained(resp_i[1])
-                # model = BetterTransformer.transform(model, keep_original_model=False)
+
+                # load model weights
+                for layer, weight in zip(model.parameters(), resp_i[6]):
+                    layer = torch.nn.parameter.Parameter(weight)
+
                 tokenizer = AutoTokenizer.from_pretrained(resp_i[1])
                 
                 # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
