@@ -33,6 +33,7 @@ import template
 
 # test pretrain
 import math
+import numpy as np
 import os
 # os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 import torch
@@ -266,11 +267,10 @@ def main( config ):
 
                 # Load optimized and scheduler
                 if resp_i[4] == "adam":
-                    optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-5)
+                    optimizer = torch.optim.AdamW(model.parameters(), lr = resp_i[8])
                 else:
-                    optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-5)
-                scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=100, num_training_steps=1)  
-
+                    optimizer = torch.optim.AdamW(model.parameters(), lr = resp_i[8])
+                scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=resp_i[7])  
 
                 # Load dataset
                 dataset = load_dataset(resp_i[2], 'wikitext-2-v1', split='test', streaming=True)
@@ -299,27 +299,48 @@ def main( config ):
                     optimizer.zero_grad()
 
                     # Train data for one epoch
-                    for batch in dataloader:
+                    for step, batch in enumerate(dataloader):
                         
                         # Move batch to device
                         input_ids = batch['input_ids'].to(device)
                         attention_mask = batch['attention_mask'].to(device)
-                        
+                        labels = batch["input_ids"].to(device)
+
                         # Forward pass
                         outputs = model(
-                            input_ids = batch["input_ids"].to(device), 
-                            attention_mask = batch["attention_mask"].to(device),
-                            labels = batch["input_ids"].to(device)
+                            input_ids = input_ids, 
+                            attention_mask = attention_mask,
+                            labels = labels
                         )     
                         
                         # Backward pass
                         loss = outputs.loss
-                        # score = loss
-                        break
+                        print(step)
+                        print(loss)
+                        # synpase.loss = loss
+                        loss.backward()
+
+                        # Adjust gradient
+                        optimizer.step()
+                        scheduler.step() 
+                        optimizer.zero_grad()
+
+                        if step == 10:
+                            break
+
+                    outputs = model(
+                        input_ids = batch["input_ids"].to(device), 
+                        attention_mask = batch["attention_mask"].to(device),
+                        labels = batch["input_ids"].to(device)
+                    )  
+
+                    print("final loss")
+                    loss = float(outputs.loss)
+                    rmse = math.sqrt(np.square(np.subtract([loss],[resp_i[5]])).mean())
 
                     # Check if the miner has provided the correct response by doubling the dummy input.
                     # If correct, set their score for this round to 1.
-                    if resp_i[5] == loss:
+                    if rmse < 0.01:
                         score = 1
 
                     # Update the global score of the miner.

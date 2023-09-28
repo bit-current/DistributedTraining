@@ -114,6 +114,9 @@ class Train( bt.Synapse ):
 
     # Optional score
     loss: float = 0
+    
+    # Training Steps
+    steps: int = 10
 
     def deserialize(self) -> int:
         """
@@ -131,4 +134,4 @@ class Train( bt.Synapse ):
         >>> train_instance.deserialize()
         5
         """
-        return self.gradients, self.model_name, self.dataset_name, self.batch_size, self.optimizer_name, self.loss, self.model_weights
+        return self.gradients, self.model_name, self.dataset_name, self.batch_size, self.optimizer_name, self.loss, self.model_weights, self.steps, self.lr

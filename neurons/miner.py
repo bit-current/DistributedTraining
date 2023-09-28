@@ -34,7 +34,7 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, AdamW, get_linear_schedule_with_warmup
-from optimum.bettertransformer import BetterTransformer
+from tqdm import tqdm
 
 def get_config():
     # Step 2: Set up the configuration parser
@@ -169,12 +169,9 @@ def main( config ):
 
         # synapse.gradients = [1,2]
 
-        # Load optimized and scheduler
-        if synapse.optimizer_name == "adam":
-            optimizer = torch.optim.AdamW(model.parameters(), lr = 0.002)
-        else:
-            optimizer = torch.optim.AdamW(model.parameters(), lr = 0.002)
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=100, num_training_steps=1)  
+        # Load optimizer and scheduler
+        optimizer = torch.optim.AdamW(model.parameters(), lr = synapse.lr)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=synapse.steps)  
 
         # Load dataset
         dataset = load_dataset(synapse.dataset_name, 'wikitext-2-v1', split='test', streaming=True)
@@ -189,7 +186,6 @@ def main( config ):
         # Create a PyTorch DataLoader
         dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size)
 
-        from tqdm import tqdm
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
 
@@ -197,12 +193,13 @@ def main( config ):
             # Move batch to device
             input_ids = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
+            labels = batch["input_ids"].to(device)
 
             # Forward pass
             outputs = model(
-                input_ids = batch["input_ids"].to(device), 
-                attention_mask = batch["attention_mask"].to(device),
-                labels = batch["input_ids"].to(device)
+                input_ids = input_ids, 
+                attention_mask =attention_mask,
+                labels = labels
             )     
             
             # Backward pass    
@@ -216,22 +213,23 @@ def main( config ):
                 synapse.gradients = []
                 # Store gradients
                 for layer in model.parameters():
-                    synapse.gradients.append(bt.Tensor.serialize(layer.grad))
+                    synapse.gradients.append(layer.grad)
             else:
                 # Store gradients
                 for i, layer in enumerate(model.parameters()):
-                    synapse.gradients[i] += bt.Tensor.serialize(layer.grad)
+                    synapse.gradients[i] += layer.grad
 
             # Adjust gradient
             optimizer.step()
             scheduler.step() 
             optimizer.zero_grad()
 
-            if step == 0:
+            if step == 10:
                 break
 
-        # synapse.gradients = [synapse.gradients[-1][0]]
-        # synapse.gradients = [gradient for gradient in synapse.gradients]
+        for i, layer in enumerate(model.parameters()):
+            synapse.gradients[i] = bt.Tensor.serialize(synapse.gradients[i])
+
         bt.logging.info(f"Final synapse {synapse}")
 
         outputs = model(
@@ -242,7 +240,7 @@ def main( config ):
 
         print("loss")
         synapse.loss = float(outputs.loss)
-        print(loss)
+        print(synapse.loss)
 
         return synapse
 
