@@ -43,7 +43,7 @@ from transformers import AutoModelForCausalLM
 #   assert dummy_output == 2
 
 from pydantic import BaseModel
-# from typing import List
+from typing import List
 
 # # class Tensor(BaseModel):
 # #     data: List[torch.FloatTensor]
@@ -51,12 +51,12 @@ from pydantic import BaseModel
 # #     class Config:
 # #         arbitrary_types_allowed = True
 
-class Tensor(BaseModel):
-    data: list[torch.FloatTensor] = None
+# class Tensor(BaseModel):
+#     data: list[torch.FloatTensor] = None
 
-    class Config:
-        arbitrary_types_allowed = True
-        validate_assignment = False
+#     class Config:
+#         arbitrary_types_allowed = True
+#         validate_assignment = False
 
 class Train( bt.Synapse ):
     """
@@ -87,15 +87,16 @@ class Train( bt.Synapse ):
     dummy_input_hash: str = ""
 
     # Optional request output, filled by recieving axon.
-    gradients: list[ bt.Tensor ] = None
-    # gradients: list[torch.FloatTensor] = None
+    gradients: List[ bt.Tensor ] = []
+    # gradients: list = None
 
     # Optional model name
     model_name: str = "kmfoda/tiny-random-gpt2"
 
     # Model Weight
-    # model_weights: list[ bt.Tensor ] = [layer.clone().detach() for layer in AutoModelForCausalLM.from_pretrained(model_name).parameters()]
-    model_weights: str = ""
+    model_weights: List[ bt.Tensor ] = [bt.Tensor.serialize(layer) for layer in AutoModelForCausalLM.from_pretrained(model_name).parameters()]
+    # [layer.clone().detach() for layer in AutoModelForCausalLM.from_pretrained(model_name).parameters()]
+    # model_weights: str = ""
     # model_weights: list[ bt.Tensor ] = [torch.tensor(1.0), torch.tensor(1.0)]
     # [torch.tensor(1.0) for layer in AutoModelForCausalLM.from_pretrained(model_name).parameters()]
     

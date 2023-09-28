@@ -253,7 +253,8 @@ def main( config ):
 
                 # load model weights
                 for layer, weight in zip(model.parameters(), resp_i[6]):
-                    layer = torch.nn.parameter.Parameter(weight)
+                    # layer = torch.nn.parameter.Parameter(weight)
+                    layer = torch.nn.parameter.Parameter(bt.Tensor.deserialize(weight).clone().detach())
 
                 tokenizer = AutoTokenizer.from_pretrained(resp_i[1])
                 
@@ -284,12 +285,13 @@ def main( config ):
                 # Create a PyTorch DataLoader
                 dataloader = DataLoader(encoded_dataset, batch_size=resp_i[3])
 
-                if resp_i[0] is None:
+                if resp_i[0] == []:
                     scores[i] = 0
                     continue
                 else:
                     for layer, new_grads in zip(model.named_parameters(),resp_i[0]):
-                        layer[1].grad = torch.tensor(new_grads)
+                        # layer[1].grad = torch.tensor(bt.Tensor.deserialize(new_grads))
+                        layer[1].grad = bt.Tensor.deserialize(new_grads).clone().detach()
                     
                     # Adjust gradient
                     optimizer.step()

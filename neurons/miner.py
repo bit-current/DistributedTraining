@@ -110,11 +110,7 @@ def main( config ):
     # Step 4: Set up miner functionalities
     # The following functions control the miner's response to incoming requests.
     # The blacklist function decides if a request should be ignored.
-<<<<<<< HEAD
-    def blacklist_fn( synapse: template.protocol.Train ) -> bool:
-=======
-    def blacklist_fn( synapse: template.protocol.Dummy ) -> typing.Tuple[bool, str]:
->>>>>>> cc4a2a04be7690340a4939e3fd9135f8b6067634
+    def blacklist_fn( synapse: template.protocol.Train ) -> typing.Tuple[bool, str]:
         # TODO(developer): Define how miners should blacklist requests. This Function 
         # Runs before the synapse data has been deserialized (i.e. before synapse.data is available).
         # The synapse is instead contructed via the headers of the request. It is important to blacklist
@@ -160,7 +156,8 @@ def main( config ):
         model = AutoModelForCausalLM.from_pretrained(synapse.model_name)
         
         for layer, weight in zip(model.parameters(), synapse.model_weights):
-            layer = torch.nn.parameter.Parameter(weight)
+            # layer = torch.nn.parameter.Parameter(weight)
+            layer = torch.nn.parameter.Parameter(bt.Tensor.deserialize(weight).clone().detach())
 
         tokenizer = AutoTokenizer.from_pretrained(synapse.model_name)
         
@@ -219,11 +216,11 @@ def main( config ):
                 synapse.gradients = []
                 # Store gradients
                 for layer in model.parameters():
-                    synapse.gradients.append(layer.grad)
+                    synapse.gradients.append(bt.Tensor.serialize(layer.grad))
             else:
                 # Store gradients
                 for i, layer in enumerate(model.parameters()):
-                    synapse.gradients[i] += layer.grad
+                    synapse.gradients[i] += bt.Tensor.serialize(layer.grad)
 
             # Adjust gradient
             optimizer.step()
