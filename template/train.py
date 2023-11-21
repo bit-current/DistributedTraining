@@ -65,8 +65,6 @@ class Train( bt.Synapse ):
     the miner and the validator.
 
     Attributes:
-    - dummy_input: An integer value representing the input request sent by the validator.
-    - dummy_output: An optional integer value which, when filled, represents the response from the miner.
     """
 
     class Config:
@@ -79,7 +77,7 @@ class Train( bt.Synapse ):
         arbitrary_types_allowed = True
 
     # Required request input, filled by sending dendrite caller.
-    dummy_input: int
+    dataset_indices: list
 
     # Required request input hash, filled automatically when dendrite creates the request.
     # This allows for proper data validation and messages are signed with the hashes of the
@@ -117,21 +115,3 @@ class Train( bt.Synapse ):
     
     # Training Steps
     steps: int = 10
-
-    def deserialize(self) -> int:
-        """
-        Deserialize the train output. This method retrieves the response from
-        the miner in the form of dummy_output, deserializes it and returns it
-        as the output of the dendrite.query() call.
-
-        Returns:
-        - int: The deserialized response, which in this case is the value of train_instance.
-
-        Example:
-        Assuming a Train instance has a dummy_output value of 5:
-        >>> train_instance = Train(dummy_input=4)
-        >>> train_instance.dummy_output = 5
-        >>> train_instance.deserialize()
-        5
-        """
-        return self.gradients, self.model_name, self.dataset_name, self.batch_size, self.optimizer_name, self.loss, self.model_weights, self.steps, self.lr

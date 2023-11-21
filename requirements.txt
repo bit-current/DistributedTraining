@@ -1,2 +1,5 @@
-git+https://github.com/opentensor/bittensor.git@revolution
+bittensor
+datasets
+optimum
 torch
+transformers

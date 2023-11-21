@@ -110,7 +110,7 @@ def main( config ):
     # Step 4: Set up miner functionalities
     # The following functions control the miner's response to incoming requests.
     # The blacklist function decides if a request should be ignored.
-    def blacklist_fn( synapse: template.protocol.Train ) -> typing.Tuple[bool, str]:
+    def blacklist_fn( synapse: template.train.Train ) -> typing.Tuple[bool, str]:
         # TODO(developer): Define how miners should blacklist requests. This Function 
         # Runs before the synapse data has been deserialized (i.e. before synapse.data is available).
         # The synapse is instead contructed via the headers of the request. It is important to blacklist
@@ -130,7 +130,7 @@ def main( config ):
 
     # The priority function determines the order in which requests are handled.
     # More valuable or higher-priority requests are processed before others.
-    def priority_fn( synapse: template.protocol.Train ) -> float:
+    def priority_fn( synapse: template.train.Train ) -> float:
         # TODO(developer): Define how miners should prioritize requests.
         # Miners may recieve messages from multiple entities at once. This function
         # determines which request should be processed first. Higher values indicate
@@ -143,7 +143,7 @@ def main( config ):
         return prirority
 
     # This is the core miner function, which decides the miner's response to a valid, high-priority request.
-    def train( synapse: template.protocol.Train ) -> template.protocol.Train:
+    def train( synapse: template.train.Train ) -> template.train.Train:
         # TODO(developer): Define how miners should process requests.
         # This function runs after the synapse has been deserialized (i.e. after synapse.data is available).
         # This function runs after the blacklist and priority functions have been called.
@@ -163,7 +163,6 @@ def main( config ):
         
         # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
         tokenizer.pad_token = tokenizer.eos_token
-
         # Move the model to the appropriate device
         model.to(device)
 
@@ -174,7 +173,8 @@ def main( config ):
         scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=synapse.steps)  
 
         # Load dataset
-        dataset = load_dataset(synapse.dataset_name, 'wikitext-2-v1', split='test', streaming=True)
+        dataset = load_dataset(synapse.dataset_name, 'wikitext-2-v1', split='train')
+        dataset = dataset.select(range(synapse.dataset_indices[0], synapse.dataset_indices[1]))
 
         # Define encoding function
         def encode(examples):
@@ -182,18 +182,21 @@ def main( config ):
 
         # Encode the dataset
         encoded_dataset = dataset.map(encode, batched=True)
-
+        
         # Create a PyTorch DataLoader
         dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size)
 
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
-
             # break
             # Move batch to device
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            labels = batch["input_ids"].to(device)
+            # input_ids = batch['input_ids'].to(device)
+            # attention_mask = batch['attention_mask'].to(device)
+            # labels = batch["input_ids"].to(device)
+
+            input_ids = torch.stack(batch['input_ids']).to(device)
+            attention_mask = torch.stack(batch['attention_mask']).to(device)
+            labels = torch.stack(batch['attention_mask']).to(device)
 
             # Forward pass
             outputs = model(
@@ -233,9 +236,9 @@ def main( config ):
         bt.logging.info(f"Final synapse {synapse}")
 
         outputs = model(
-            input_ids = batch["input_ids"].to(device), 
-            attention_mask = batch["attention_mask"].to(device),
-            labels = batch["input_ids"].to(device)
+            input_ids = torch.stack(batch["input_ids"]).to(device), 
+            attention_mask = torch.stack(batch["attention_mask"]).to(device),
+            labels = torch.stack(batch["input_ids"]).to(device)
         )  
 
         print("loss")

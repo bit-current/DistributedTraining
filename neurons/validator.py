@@ -27,6 +27,7 @@ import torch
 import argparse
 import traceback
 import bittensor as bt
+import random
 
 # import this repo
 import template
@@ -217,24 +218,33 @@ def main( config ):
     alpha = 0.9
     scores = torch.ones_like(metagraph.S, dtype=torch.float32)
     bt.logging.info(f"Weights: {scores}")
+    
+    # Step 7: Init dataset
+    config.dataset_name = "wikitext"
+    config.batch_size = 16
+    dataset = load_dataset(config.dataset_name, 'wikitext-2-v1', split='train')
 
-    # Step 7: The Main Validation Loop
+    # Step 8: The Main Validation Loop
     bt.logging.info("Starting validator loop.")
     step = 0
     while True:
         try:
+            start_index = random.randint(0, len(dataset)-config.batch_size)
+            end_index = start_index + config.batch_size
+
             # TODO(developer): Define how the validator selects a miner to query, how often, etc.
             # Broadcast a query to all miners on the network.
             responses = dendrite.query(
                 # Send the query to all axons in the network.
                 metagraph.axons,
                 # Construct a dummy query.
-                template.protocol.Train( dummy_input = step,  model_name = "kmfoda/tiny-random-gpt2"), # Construct a dummy query.
+                template.train.Train( dataset_indices=[start_index, end_index],  model_name = "kmfoda/tiny-random-gpt2", batch_size = config.batch_size), # Construct a dummy query.
                 # All responses have the deserialize function called on them before returning.
                 deserialize = True, 
                 timeout = 2000.0
             )
 
+            # breakpoint()
             # Log the results for monitoring purposes.
             # bt.logging.info(f"Received dummy responses: {responses}")
 
@@ -250,14 +260,14 @@ def main( config ):
                 # Load pre-trained model and tokenizer
                 # model_name = 'sshleifer/tiny-gpt2'
                 # resp_i = ([], "kmfoda/tiny-random-gpt2", 'wikitext', 4, None)
-                model = AutoModelForCausalLM.from_pretrained(resp_i[1])
+                model = AutoModelForCausalLM.from_pretrained(resp_i.model_name)
 
                 # load model weights
-                for layer, weight in zip(model.parameters(), resp_i[6]):
+                for layer, weight in zip(model.parameters(), resp_i.model_weights):
                     # layer = torch.nn.parameter.Parameter(weight)
                     layer = torch.nn.parameter.Parameter(bt.Tensor.deserialize(weight).clone().detach())
 
-                tokenizer = AutoTokenizer.from_pretrained(resp_i[1])
+                tokenizer = AutoTokenizer.from_pretrained(resp_i.model_name)
                 
                 # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
                 tokenizer.pad_token = tokenizer.eos_token
@@ -266,30 +276,30 @@ def main( config ):
                 model.to(device)
 
                 # Load optimized and scheduler
-                if resp_i[4] == "adam":
-                    optimizer = torch.optim.AdamW(model.parameters(), lr = resp_i[8])
+                if resp_i.optimizer_name == "adam":
+                    optimizer = torch.optim.AdamW(model.parameters(), lr = resp_i.lr)
                 else:
-                    optimizer = torch.optim.AdamW(model.parameters(), lr = resp_i[8])
-                scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=resp_i[7])  
-
-                # Load dataset
-                dataset = load_dataset(resp_i[2], 'wikitext-2-v1', split='test', streaming=True)
+                    optimizer = torch.optim.AdamW(model.parameters(), lr = resp_i.lr)
+                scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=resp_i.steps)  
 
                 # Define encoding function
                 def encode(examples):
                     return tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length', return_tensors='pt')
 
+                # Select the correct datapoints
+                dataset_sample = dataset.select(range(start_index, end_index))
+
                 # Encode the dataset
-                encoded_dataset = dataset.map(encode, batched=True)
+                encoded_dataset = dataset_sample.map(encode, batched=True)
 
                 # Create a PyTorch DataLoader
-                dataloader = DataLoader(encoded_dataset, batch_size=resp_i[3])
+                dataloader = DataLoader(encoded_dataset, batch_size=resp_i.batch_size)
 
-                if resp_i[0] == []:
+                if resp_i.gradients == []:
                     scores[i] = 0
                     continue
                 else:
-                    for layer, new_grads in zip(model.named_parameters(),resp_i[0]):
+                    for layer, new_grads in zip(model.named_parameters(),resp_i.gradients):
                         # layer[1].grad = torch.tensor(bt.Tensor.deserialize(new_grads))
                         layer[1].grad = bt.Tensor.deserialize(new_grads).clone().detach()
                     
@@ -302,9 +312,9 @@ def main( config ):
                     for step, batch in enumerate(dataloader):
                         
                         # Move batch to device
-                        input_ids = batch['input_ids'].to(device)
-                        attention_mask = batch['attention_mask'].to(device)
-                        labels = batch["input_ids"].to(device)
+                        input_ids = torch.stack(batch['input_ids']).to(device)
+                        attention_mask = torch.stack(batch['attention_mask']).to(device)
+                        labels = torch.stack(batch["input_ids"]).to(device)
 
                         # Forward pass
                         outputs = model(
@@ -329,14 +339,14 @@ def main( config ):
                             break
 
                     outputs = model(
-                        input_ids = batch["input_ids"].to(device), 
-                        attention_mask = batch["attention_mask"].to(device),
-                        labels = batch["input_ids"].to(device)
+                        input_ids = torch.stack(batch["input_ids"]).to(device), 
+                        attention_mask = torch.stack(batch["attention_mask"]).to(device),
+                        labels = torch.stack(batch["input_ids"]).to(device)
                     )  
 
                     print("final loss")
                     loss = float(outputs.loss)
-                    rmse = math.sqrt(np.square(np.subtract([loss],[resp_i[5]])).mean())
+                    rmse = math.sqrt(np.square(np.subtract([loss],[resp_i.loss])).mean())
 
                     # Check if the miner has provided the correct response by doubling the dummy input.
                     # If correct, set their score for this round to 1.
