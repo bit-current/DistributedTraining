@@ -28,6 +28,7 @@ import argparse
 import traceback
 import bittensor as bt
 import random
+import asyncio
 
 # import this repo
 import template
@@ -42,104 +43,7 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, AdamW, get_linear_schedule_with_warmup
 from optimum.bettertransformer import BetterTransformer
-
-# # Use CUDA if available, otherwise use CPU
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# # Load pre-trained model and tokenizer
-# model_name = 'sshleifer/tiny-gpt2'
-# model = AutoModelForCausalLM.from_pretrained(model_name)
-# tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-# # Load ref model
-# model_ref = AutoModelForCausalLM.from_pretrained(model_name)
-# optimizer_ref = torch.optim.AdamW(model_ref.parameters(), lr = 1e-5)
-# scheduler_ref = get_linear_schedule_with_warmup(optimizer_ref, num_warmup_steps=100, num_training_steps=1)  
-# model_ref.to(device)
-
-# # Move the model to the appropriate device
-# model.to(device)
-
-# # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
-# tokenizer.pad_token = tokenizer.eos_token
-
-# # Load optimized and scheduler
-# optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-5)
-# scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=100, num_training_steps=1)  
-
-# # Load dataset
-# dataset = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', streaming=True)
-
-# # Define encoding function
-# def encode(examples):
-#     return tokenizer(examples['text'], truncation=True, max_length=1024, padding='max_length', return_tensors='pt')
-
-# # Encode the dataset
-# encoded_dataset = dataset.map(encode, batched=True)
-# # encoded_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask'])
-
-# # Create a PyTorch DataLoader
-# dataloader = DataLoader(encoded_dataset, batch_size=12)
-
-# # Train data for one epoch
-# for batch in dataloader:
-    
-#     # Move batch to device
-#     input_ids = batch['input_ids'].to(device)
-#     attention_mask = batch['attention_mask'].to(device)
-    
-#     # Forward pass
-#     outputs = model(
-#         input_ids = batch["input_ids"].to(device), 
-#         attention_mask = batch["attention_mask"].to(device),
-#         labels = batch["input_ids"].to(device)
-#     )     
-    
-#     # Backward pass    
-#     loss = outputs.loss
-#     print("loss before:  " + str(float(outputs.loss)))
-#     loss.backward()
-#     break
-#     # # Store gradients
-#     # grads = []
-#     # for name, w in model.named_parameters():
-#     #     grads.append(w.grad)
-
-#     # Adjust gradient
-#     optimizer.step()
-#     scheduler.step() 
-#     optimizer.zero_grad()
-
-#     # Add gradients to model_ref
-#     for layer, new_grads in zip(model_ref.named_parameters(), grads):
-#         layer[1].grad = new_grads
-    
-#     # Adjust gradient for model_ref
-#     optimizer_ref.step()
-#     scheduler_ref.step() 
-#     optimizer_ref.zero_grad()
-
-#     # Forward pass
-#     outputs = model(
-#         input_ids = batch["input_ids"].to(device), 
-#         attention_mask = batch["attention_mask"].to(device),
-#         labels = batch["input_ids"].to(device)
-#     )  
-
-#     print("loss after:  " + str(float(outputs.loss)))   
-
-#     outputs_ref = model_ref(
-#         input_ids = batch["input_ids"].to(device), 
-#         attention_mask = batch["attention_mask"].to(device),
-#         labels = batch["input_ids"].to(device)
-#     )  
-#     break
-#     # Check both models are the same
-#     assert outputs.loss == outputs_ref.loss
-
-#     # Print preplexity
-#     print("batch perplexity:", math.exp(loss.item()))
-
+from utils import get_random_uids, AsyncDendritePool
 
 # Step 2: Set up the configuration parser
 # This function is responsible for setting up and parsing command-line arguments.
@@ -177,7 +81,7 @@ def get_config():
     # Return the parsed config.
     return config
 
-def main( config ):
+async def main( config ):
     # Set up logging with the provided configuration and directory.
     bt.logging(config=config, logging_dir=config.full_path)
     bt.logging.info(f"Running validator for subnet: {config.netuid} on network: {config.subtensor.chain_endpoint} with config:")
@@ -196,13 +100,14 @@ def main( config ):
     subtensor = bt.subtensor( config = config )
     bt.logging.info(f"Subtensor: {subtensor}")
 
-    # Dendrite is the RPC client; it lets us send messages to other nodes (axons) in the network.
-    dendrite = bt.dendrite( wallet = wallet )
-    bt.logging.info(f"Dendrite: {dendrite}")
-
     # The metagraph holds the state of the network, letting us know about other miners.
     metagraph = subtensor.metagraph( config.netuid )
     bt.logging.info(f"Metagraph: {metagraph}")
+
+    # Dendrite is the RPC client; it lets us send messages to other nodes (axons) in the network.
+    dendrite = bt.dendrite( wallet = wallet )
+    dendrite_pool = AsyncDendritePool( wallet = wallet, metagraph = metagraph )
+    bt.logging.info(f"Dendrite: {dendrite}")
 
     # Step 5: Connect the validator to the network
     if wallet.hotkey.ss58_address not in metagraph.hotkeys:
@@ -222,6 +127,7 @@ def main( config ):
     # Step 7: Init dataset
     config.dataset_name = "wikitext"
     config.batch_size = 16
+    config.num_of_duplicates = 2 # number of miners running the same process for validation
     dataset = load_dataset(config.dataset_name, 'wikitext-2-v1', split='train')
 
     # Step 8: The Main Validation Loop
@@ -229,24 +135,40 @@ def main( config ):
     step = 0
     while True:
         try:
-            start_index = random.randint(0, len(dataset)-config.batch_size)
-            end_index = start_index + config.batch_size
+            
+            uids = get_random_uids(metagraph, k=100) # .to(self.device)
+            num_data_splits = math.floor(len(uids) / config.num_of_duplicates)
+            split_uids = [uids[(i*num_data_splits):(i*num_data_splits) + (num_data_splits+1)] for i in range(0, num_data_splits)]  
+            
+            # axons = [metagraph.axons[uid] for uid in uids]
+            # split_axons = [[metagraph.axons[uid] for uid in uids] for uids in split_uids]
+            
+            # TODO strucutre in a way so that we don't repeat data points
+            start_index = random.randint(0, len(dataset)-(config.batch_size*num_data_splits))
+            end_index = start_index + (config.batch_size*num_data_splits)
 
-            # TODO(developer): Define how the validator selects a miner to query, how often, etc.
-            # Broadcast a query to all miners on the network.
-            responses = dendrite.query(
-                # Send the query to all axons in the network.
-                metagraph.axons,
-                # Construct a dummy query.
-                template.train.Train( dataset_indices=[start_index, end_index],  model_name = "kmfoda/tiny-random-gpt2", batch_size = config.batch_size), # Construct a dummy query.
-                # All responses have the deserialize function called on them before returning.
-                deserialize = True, 
-                timeout = 2000.0
+            # TODO split queries
+            queries = []
+            for i in range(0, len(split_uids)):
+                queries.append(
+                    template.train.Train( 
+                        dataset_indices=[start_index * (config.batch_size*i), (end_index*(config.batch_size*i)) + (config.batch_size*i)],  
+                        model_name = "kmfoda/tiny-random-gpt2", 
+                        batch_size = config.batch_size
+                    )
+                )
+
+
+            breakpoint()
+
+            responses = await dendrite_pool.async_forward(
+                uids,
+                queries
             )
 
-            # breakpoint()
+            breakpoint()
             # Log the results for monitoring purposes.
-            # bt.logging.info(f"Received dummy responses: {responses}")
+            bt.logging.info(f"Received responses: {responses}")
 
             # TODO(developer): Define how the validator scores responses.
             # Adjust the scores based on responses from miners.
@@ -402,4 +324,4 @@ if __name__ == "__main__":
     # Parse the configuration.
     config = get_config()
     # Run the main function.
-    main( config )
+    asyncio.run( main(config) )

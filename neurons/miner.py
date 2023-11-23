@@ -45,6 +45,7 @@ def get_config():
     parser.add_argument('--custom', default='my_custom_value', help='Adds a custom value to the parser.')
     # Adds override arguments for network and netuid.
     parser.add_argument( '--netuid', type = int, default = 1, help = "The chain subnet uid." )
+    parser.add_argument( '--axon.port', type = int, default = 8091)
     # Adds subtensor specific arguments i.e. --subtensor.chain_endpoint ... --subtensor.network ...
     bt.subtensor.add_args(parser)
     # Adds logging specific arguments i.e. --logging.debug ..., --logging.trace .. or --logging.logging_dir ...
@@ -249,7 +250,11 @@ def main( config ):
 
     # Step 5: Build and link miner functions to the axon.
     # The axon handles request processing, allowing validators to send this process requests.
-    axon = bt.axon( wallet = wallet )
+    axon = bt.axon( 
+        wallet = wallet,
+        port=config.axon.port
+    )
+
     bt.logging.info(f"Axon {axon}")
 
     # Attach determiners which functions are called when servicing a request.
