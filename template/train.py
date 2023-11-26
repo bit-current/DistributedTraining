@@ -18,45 +18,14 @@
 # DEALINGS IN THE SOFTWARE.
 
 import typing
-from typing import Any
+from typing import Any, List
+
 import bittensor as bt
+import numpy as np
 import torch
+from pydantic import BaseModel
 from transformers import AutoModelForCausalLM
 
-# TODO(developer): Rewrite with your protocol definition.
-
-# This is the protocol for the dummy miner and validator.
-# It is a simple request-response protocol where the validator sends a request
-# to the miner, and the miner responds with a dummy response.
-
-# ---- miner ----
-# Example usage:
-#   def dummy( synapse: Dummy ) -> Dummy:
-#       synapse.dummy_output = synapse.dummy_input + 1
-#       return synapse
-#   axon = bt.axon().attach( dummy ).serve(netuid=...).start()
-
-# ---- validator ---
-# Example usage:
-#   dendrite = bt.dendrite()
-#   dummy_output = dendrite.query( Dummy( dummy_input = 1 ) )
-#   assert dummy_output == 2
-
-from pydantic import BaseModel
-from typing import List
-
-# # class Tensor(BaseModel):
-# #     data: List[torch.FloatTensor]
-
-# #     class Config:
-# #         arbitrary_types_allowed = True
-
-# class Tensor(BaseModel):
-#     data: list[torch.FloatTensor] = None
-
-#     class Config:
-#         arbitrary_types_allowed = True
-#         validate_assignment = False
 
 class Train( bt.Synapse ):
     """
@@ -111,7 +80,7 @@ class Train( bt.Synapse ):
     batch_size: int = 4
 
     # Optional score
-    loss: float = 0
+    loss: float = np.nan 
     
     # Training Steps
     steps: int = 10

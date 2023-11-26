@@ -1,8 +1,10 @@
 import asyncio
-import torch
-from typing import List, Any
-import bittensor as bt
 import random
+from typing import Any, List
+
+import bittensor as bt
+import torch
+
 from template.train import Train
 
 
