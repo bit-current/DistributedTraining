@@ -48,6 +48,7 @@ from transformers import (
     AutoTokenizer,
     get_linear_schedule_with_warmup,
 )
+from functools import partial
 from utils import AsyncDendritePool, get_random_uids
 from validator_core import DatasetStateSingelton, ModelSingleton, upload_checkpoint
 
@@ -135,10 +136,10 @@ async def main( config ):
     bt.logging.info(f"Weights: {scores}")
     
     # Step 7: Init DHT
-    initial_peers= "/ip4/161.97.156.125/tcp/8108/p2p/12D3KooWRYFcmYhf7Lyn3TH9cFxqhruhnjMYky4ehdZHFuv6M4A9"
-    model_name: str = "kmfoda/tiny-random-gpt2"
-    lr = 0.00001
-    dht = hivemind.DHT(initial_peers=[initial_peers], start=True)
+    config.initial_peers= "/ip4/161.97.156.125/tcp/8108/p2p/12D3KooWRYFcmYhf7Lyn3TH9cFxqhruhnjMYky4ehdZHFuv6M4A9"
+    config.model_name: str = "kmfoda/tiny-random-gpt2"
+    config.lr = 0.00001
+    dht = hivemind.DHT(initial_peers=[config.initial_peers], start=True)
     print("To join the training, use initial_peers =", [str(addr) for addr in dht.get_visible_maddrs()])
 
     # Step 7: Init dataset
@@ -148,20 +149,27 @@ async def main( config ):
     config.run_id = 's25_test_run'
     config.upload_interval = 900
     config.weight_update_interval = 900
+    config.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    latest_upload = 0
-    latest_weight_update = 0
 
     dataset = load_dataset(config.dataset_name, 'wikitext-2-v1', split='train')
     dataset_indices = [i for i in range(0, len(dataset))]
     dataset_common_state = DatasetStateSingelton(dht ,dataset_indices)
 
     ## Do I need to wait before I push the model to the GPU after hivemindopt?
-    model = ModelSingleton.get_instance(model_name)
-    
-    opt = torch.optim.AdamW(model.parameters(), lr = lr)
+    model = ModelSingleton.get_instance(config.model_name)
+    # Move the model to the appropriate device
+    model.to(config.device)
+    tokenizer = AutoTokenizer.from_pretrained(config.model_name)
+    tokenizer.pad_token = tokenizer.eos_token
 
-    breakpoint()
+    # Define encoding function
+    def encode(examples):
+        return tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length', return_tensors='pt')
+
+
+    opt = torch.optim.AdamW(model.parameters(), lr = config.lr)
+
     opt = hivemind.Optimizer(
         dht=dht,                  # use a DHT that is connected with other peers
         run_id=config.run_id,    # unique identifier of this collaborative run
@@ -175,18 +183,25 @@ async def main( config ):
     )
 
     state_averager = TrainingStateAverager(
-                    dht=dht,
-                    optimizer=opt,
-                    scheduler=get_linear_schedule_with_warmup(opt, num_warmup_steps=5000, num_training_steps=125_000),
-                    prefix=f"{config.run_id}_state_averager",
-                    state_compression=hivemind.Float16Compression(),
-                    bandwidth=optimizer_args.bandwidth,
-                    client_mode=optimizer_args.client_mode,
-                    start=True,
-                    **asdict(averager_args),
+        dht=dht, 
+        optimizer=partial(torch.optim.AdamW, lr=config.lr), 
+        scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
+        params=model.parameters(),
+        start=True,
+        # prefix=f"{config.run_id}_state_averager",
+        prefix=f"test"
+        # state_compression=hivemind.Float16Compression(),
+        # bandwidth=optimizer_args.bandwidth,
+        # client_mode=optimizer_args.client_mode,
+        # **asdict(averager_args),
     )
 
-    # Step 8: The Main Validation Loop
+    # Step 8: Init Loss
+    previous_loss = -1000
+    latest_upload = 0
+    latest_weight_update = 0
+
+    # Step 9: The Main Validation Loop
     bt.logging.info("Starting validator loop.")
     step = 0
     while True:
@@ -194,27 +209,27 @@ async def main( config ):
             
             uids = get_random_uids(metagraph, k=100) # .to(self.device)
             total_per_pass = 100000
+
             examples_per_uid = total_per_pass // len(uids)
-            uids_indices = dataset_common_state.get_dataset_indices(len(uids), examples_per_uid)
-            
+            # uids_indices = dataset_common_state.get_dataset_indices(len(uids), examples_per_uid)
+            uids_indices = [1, 2, 3]
+
             # TODO split queries
             queries = []
             for uid_idx in range(0, len(uids), examples_per_uid):
-                
-                shuffled_uid_group = random.shuffle(uids_indices[uid_idx:uid_idx+examples_per_uid])
+                # shuffled_uid_group = random.shuffle(uids_indices[uid_idx:uid_idx+examples_per_uid])
                 #TODO get the hashes of the groups
                 # Make miners return the group hashes with their losses as well.
+                breakpoint()
+                template.train.Train(dataset_indices = uids_indices, model_name = config.model_name, initial_peers = [config.initial_peers], batch_size = config.batch_size)
                 queries.append(
                     template.train.Train( 
-                        dataset_indices=shuffled_uid_group,
-                        model_name = "kmfoda/tiny-random-gpt2", 
-                        dht_connector = dht_state.get_visible_maddrs(), # TODO Add a decorator or sth for this to get the values 
+                        dataset_indices = uids_indices,
+                        model_name = config.model_name, 
+                        initial_peers = [config.initial_peers], #TODO Add a decorator or sth for this to get the values 
                         batch_size = config.batch_size #TODO let miners decide this? Based on their hardware?
                     )
                 )
-
-            
-            breakpoint()
 
             responses = await dendrite_pool.async_forward(
                 uids,
@@ -225,141 +240,54 @@ async def main( config ):
             # Log the results for monitoring purposes.
             bt.logging.info(f"Received responses: {responses}")
 
-            if step % 1 == 0:
+            if step % 5 == 0:
                 ### TODO add anomaly detection here
                 # swarm_responses = responses[(i*config.num_of_duplicates):(i*config.num_of_duplicates)+(config.num_of_duplicates+1)]
                 # swarm_losses = [swarm_response.loss for swarm_response in swarm_responses]
                 ###
 
-                if time.time() - latest_upload > config.upload_interval:
-                    state_averager.load_state_from_peers()
-                    upload_checkpoint(commit_message, state_averager, model, repo_path,repo_url)
-                    latest_upload = time.time()
-
-                if time.time() - latest_weight_update > config.weight_update_interval:
-                    state_averager.load_state_from_peers()
-                    upload_checkpoint(commit_message, state_averager, model, repo_path,repo_url)
-                    latest_weight_update = time.time()
-
-                # Initialize the score for the current miner's response.
-                score = np.zeros(len(responses))
-
-                # # Use CUDA if available, otherwise use CPU
-                # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-                # Load pre-trained model and tokenizer
-                # model_name = 'sshleifer/tiny-gpt2'
-                # response = ([], "kmfoda/tiny-random-gpt2", 'wikitext', 4, None)
-
-                # load model weights
-                for layer, weight in zip(model.parameters(), response.model_weights):
-                    # layer = torch.nn.parameter.Parameter(weight)
-                    layer = torch.nn.parameter.Parameter(bt.Tensor.deserialize(weight).clone().detach())
-
-                tokenizer = AutoTokenizer.from_pretrained(response.model_name)
+                breakpoint()
+                state_averager.load_state_from_peers()
                 
-                # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
-                tokenizer.pad_token = tokenizer.eos_token
-
-                # Move the model to the appropriate device
-                model.to(device)
-
-                # Load optimized and scheduler
-                if response.optimizer_name == "adam":
-                    optimizer = torch.optim.AdamW(model.parameters(), lr = response.lr)
-                else:
-                    optimizer = torch.optim.AdamW(model.parameters(), lr = response.lr)
-                scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=response.steps)  
-
-                # Define encoding function
-                def encode(examples):
-                    return tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length', return_tensors='pt')
-
                 # Select the correct datapoints
-                dataset_sample = dataset.select(response.dataset_indices)
+                dataset_sample = dataset.select(random.sample(dataset_indices, 32))
 
                 # Encode the dataset
                 encoded_dataset = dataset_sample.map(encode, batched=True)
 
-                # Create a PyTorch DataLoader
-                dataloader = DataLoader(encoded_dataset, batch_size=response.batch_size)
+                # Move batch to device
+                input_ids = torch.stack(encoded_dataset['input_ids']).to(config.device)
+                attention_mask = torch.stack(encoded_dataset['attention_mask']).to(config.device)
+                labels = torch.stack(encoded_dataset["input_ids"]).to(config.device)
 
-                # if response.gradients == []:
-                #     scores[i] = 0
-                #     continue
-                # else:
-                #     for layer, new_grads in zip(model.named_parameters(),response.gradients):
-                #         # layer[1].grad = torch.tensor(bt.Tensor.deserialize(new_grads))
-                #         layer[1].grad = bt.Tensor.deserialize(new_grads).clone().detach()
-                    
-                #     # Adjust gradient
-                #     optimizer.step()
-                #     scheduler.step() 
-                #     optimizer.zero_grad()
+                # Forward pass
+                outputs = model(
+                    input_ids = input_ids, 
+                    attention_mask = attention_mask,
+                    labels = labels
+                )     
+                
+                # Backward pass
+                loss = outputs.loss
 
-                # Train data for one epoch
-                for step, batch in enumerate(dataloader):
-                    
-                    # Move batch to device
-                    input_ids = torch.stack(batch['input_ids']).to(device)
-                    attention_mask = torch.stack(batch['attention_mask']).to(device)
-                    labels = torch.stack(batch["input_ids"]).to(device)
+                # Compute score
+                if (loss - previous_loss) > 0:
+                    score = 0
+                else:
+                    score = 1
+                previous_loss = loss
 
-                    # Forward pass
-                    outputs = model(
-                        input_ids = input_ids, 
-                        attention_mask = attention_mask,
-                        labels = labels
-                    )     
-                    
-                    # Backward pass
-                    loss = outputs.loss
-                    print(step)
-                    print(loss)
-                    # synpase.loss = loss
-                    loss.backward()
+                # Apply score to responsive uids
+                for response in responses:
+                    uid = response.uids
+                    # Update the global score of the miner.
+                    # This score contributes to the miner's weight in the network.
+                    # A higher weight means that the miner has been consistently responding correctly.
+                    scores[uid] = alpha * scores[uid] + (1 - alpha) * score
 
-                    # Adjust gradient
-                    optimizer.step()
-                    scheduler.step() 
-                    optimizer.zero_grad()
-
-                    if step == 10:
-                        break
-
-                    outputs = model(
-                        input_ids = torch.stack(batch["input_ids"]).to(device), 
-                        attention_mask = torch.stack(batch["attention_mask"]).to(device),
-                        labels = torch.stack(batch["input_ids"]).to(device)
-                    )  
-
-                    print("final loss")
-                    correct_loss = float(outputs.loss)
-
-                    for swarm_response in swarm_responses:
-                        rmse = math.sqrt(np.square(np.subtract([correct_loss],[response.loss])).mean())
-                        # Check if the miner has provided the correct response by doubling the dummy input.
-                        # If correct, set their score for this round to 1.
-                        if rmse < 0.01:
-                            score = 1
-
-                        # Update the global score of the miner.
-                        # This score contributes to the miner's weight in the network.
-                        # A higher weight means that the miner has been consistently responding correctly.
-                        scores[i] = alpha * scores[i] + (1 - alpha) * score
-
-                        # Log the results for monitoring purposes.
-                        bt.logging.info(f"Score: {score}")
-
-            # Periodically update the weights on the Bittensor blockchain.
-            # NOTE Disbaled for now due to weight settting bug
-            if (step + 1) % 10000000000 == 0:
-                # TODO(developer): Define how the validator normalizes scores before setting weights.
+                # Set weights
                 weights = torch.nn.functional.normalize(scores, p=1.0, dim=0)
                 bt.logging.info(f"Setting weights: {weights}")
-                # This is a crucial step that updates the incentive mechanism on the Bittensor blockchain.
-                # Miners with higher scores (or weights) receive a larger share of TAO rewards on this subnet.
-                # breakpoint()
                 result = subtensor.set_weights(
                     netuid = config.netuid, # Subnet to set weights on.
                     wallet = wallet, # Wallet to sign set weights using hotkey.
@@ -369,6 +297,18 @@ async def main( config ):
                 )
                 if result: bt.logging.success('Successfully set weights.')
                 else: bt.logging.error('Failed to set weights.') 
+
+                # upload_checkpoint(commit_message, state_averager, model, repo_path,repo_url)
+
+                # if time.time() - latest_upload > config.upload_interval:
+                #     state_averager.load_state_from_peers()
+                #     upload_checkpoint(commit_message, state_averager, model, repo_path,repo_url)
+                #     latest_upload = time.time()
+
+                # if time.time() - latest_weight_update > config.weight_update_interval:
+                #     state_averager.load_state_from_peers()
+                #     upload_checkpoint(commit_message, state_averager, model, repo_path,repo_url)
+                #     latest_weight_update = time.time()
 
             # End the current step and prepare for the next iteration.
             step += 1

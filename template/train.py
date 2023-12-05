@@ -48,6 +48,9 @@ class Train( bt.Synapse ):
     # Required request input, filled by sending dendrite caller.
     dataset_indices: list
 
+    # Initial peers
+    initial_peers: list
+
     # Required request input hash, filled automatically when dendrite creates the request.
     # This allows for proper data validation and messages are signed with the hashes of the
     # required body fields. Ensure you have a {field}_hash field for each required field.
@@ -61,9 +64,7 @@ class Train( bt.Synapse ):
     # Optional request output, filled by recieving axon.
     gradients: List[ bt.Tensor ] = []
     # gradients: list = None
-
     
-
     # Optional model name
     model_name: str = "kmfoda/tiny-random-gpt2"
 
