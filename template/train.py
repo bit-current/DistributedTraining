@@ -53,9 +53,16 @@ class Train( bt.Synapse ):
     # required body fields. Ensure you have a {field}_hash field for each required field.
     dummy_input_hash: str = ""
 
+    # Required run_id
+    # allows peers to set run_id for DHT connection
+    run_id: str = "s25_test_run"
+
+
     # Optional request output, filled by recieving axon.
     gradients: List[ bt.Tensor ] = []
     # gradients: list = None
+
+    
 
     # Optional model name
     model_name: str = "kmfoda/tiny-random-gpt2"

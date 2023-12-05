@@ -34,6 +34,7 @@ import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, AdamW, get_linear_schedule_with_warmup
+from hivemind import Optimizer
 from tqdm import tqdm
 
 def get_config():
@@ -154,11 +155,27 @@ def main( config ):
 
         # Load pre-trained model and tokenizer
         # model_name = 'sshleifer/tiny-gpt2'
+
+        #TODO Have a setup call and a training call, based on the state of readiness of the miner. Or a singleton.
+        dht = hivemind.DHT(initial_peers=[os.environ["INITIAL_PEERS"]], start=True)
         model = AutoModelForCausalLM.from_pretrained(synapse.model_name)
+        opt = torch.optim.AdamW(model.parameters(), lr = synapse.lr)
+        # Add a while True: loop here or sth?
+        # Set up a decentralized optimizer that will average with peers in background
+
+        opt = hivemind.Optimizer(
+            dht=dht,                  # use a DHT that is connected with other peers
+            run_id=synapse.run_id,    # unique identifier of this collaborative run
+            batch_size_per_step=32,   # each call to opt.step adds this many samples towards the next epoch
+            target_batch_size=10000,  # after peers collectively process this many samples, average weights and begin the next epoch
+            optimizer=opt,            # wrap the SGD optimizer defined above
+            use_local_updates=True,   # perform optimizer steps with local gradients, average parameters in background
+            matchmaking_time=3.0,     # when averaging parameters, gather peers in background for up to this many seconds
+            averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
+            verbose=True              # print logs incessently
+        )
+
         
-        for layer, weight in zip(model.parameters(), synapse.model_weights):
-            # layer = torch.nn.parameter.Parameter(weight)
-            layer = torch.nn.parameter.Parameter(bt.Tensor.deserialize(weight).clone().detach())
 
         tokenizer = AutoTokenizer.from_pretrained(synapse.model_name)
         
@@ -170,12 +187,12 @@ def main( config ):
         # synapse.gradients = [1,2]
 
         # Load optimizer and scheduler
-        optimizer = torch.optim.AdamW(model.parameters(), lr = synapse.lr)
+        
         scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=synapse.steps)  
 
         # Load dataset
         dataset = load_dataset(synapse.dataset_name, 'wikitext-2-v1', split='train')
-        dataset = dataset.select(range(synapse.dataset_indices[0], synapse.dataset_indices[1]))
+        dataset = dataset.select(synapse.dataset_indices)
 
         # Define encoding function
         def encode(examples):
@@ -189,12 +206,8 @@ def main( config ):
 
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
-            # break
-            # Move batch to device
-            # input_ids = batch['input_ids'].to(device)
-            # attention_mask = batch['attention_mask'].to(device)
-            # labels = batch["input_ids"].to(device)
-
+            
+            opt.zero_grad()
             input_ids = torch.stack(batch['input_ids']).to(device)
             attention_mask = torch.stack(batch['attention_mask']).to(device)
             labels = torch.stack(batch['attention_mask']).to(device)
@@ -208,43 +221,13 @@ def main( config ):
             
             # Backward pass    
             loss = outputs.loss
-            print(step)
-            print(loss)
-            # synpase.loss = loss
             loss.backward()
-
-            if step == 0:
-                synapse.gradients = []
-                # Store gradients
-                for layer in model.parameters():
-                    synapse.gradients.append(layer.grad)
-            else:
-                # Store gradients
-                for i, layer in enumerate(model.parameters()):
-                    synapse.gradients[i] += layer.grad
-
             # Adjust gradient
-            optimizer.step()
-            scheduler.step() 
-            optimizer.zero_grad()
+            opt.step()
+            
+        synapse.loss = loss
 
-            if step == 10:
-                break
-
-        for i, layer in enumerate(model.parameters()):
-            synapse.gradients[i] = bt.Tensor.serialize(synapse.gradients[i])
-
-        bt.logging.info(f"Final synapse {synapse}")
-
-        outputs = model(
-            input_ids = torch.stack(batch["input_ids"]).to(device), 
-            attention_mask = torch.stack(batch["attention_mask"]).to(device),
-            labels = torch.stack(batch["input_ids"]).to(device)
-        )  
-
-        print("loss")
-        synapse.loss = float(outputs.loss)
-        print(synapse.loss)
+        bt.logging.info(f"Final loss {synapse}")
 
         return synapse
 
