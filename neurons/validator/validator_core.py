@@ -15,7 +15,7 @@ class DatasetStateSingelton:
     If the indices run out then a new epoch is calculated and the number of available indices is reset to full.
     The following 
     '''
-        _instance = None
+    _instance = None
 
     def __new__(cls, dht_state, dataset_indices,*args, **kwargs):
         if not cls._instance:
@@ -84,7 +84,7 @@ class DatasetStateSingelton:
 
 class ModelSingleton:
     _instance = None
-    _device = 
+
     @classmethod
     def get_instance(cls, model_name):
         if cls._instance is None:

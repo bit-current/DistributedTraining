@@ -33,13 +33,14 @@ import time
 import traceback
 
 import bittensor as bt
+import hivemind
 import numpy as np
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 import torch
 from datasets import load_dataset
-from optimum.bettertransformer import BetterTransformer
 from hivemind.optim.state_averager import TrainingStateAverager
+from optimum.bettertransformer import BetterTransformer
 from torch.utils.data import DataLoader
 from transformers import (
     AdamW,
@@ -48,6 +49,7 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 from utils import AsyncDendritePool, get_random_uids
+from validator_core import DatasetStateSingelton, ModelSingleton, upload_checkpoint
 
 # import this repo
 import template
@@ -132,8 +134,14 @@ async def main( config ):
     scores = torch.ones_like(metagraph.S, dtype=torch.float32)
     bt.logging.info(f"Weights: {scores}")
     
+    # Step 7: Init DHT
+    initial_peers= "/ip4/161.97.156.125/tcp/8108/p2p/12D3KooWRYFcmYhf7Lyn3TH9cFxqhruhnjMYky4ehdZHFuv6M4A9"
+    model_name: str = "kmfoda/tiny-random-gpt2"
+    lr = 0.00001
+    dht = hivemind.DHT(initial_peers=[initial_peers], start=True)
+    print("To join the training, use initial_peers =", [str(addr) for addr in dht.get_visible_maddrs()])
+
     # Step 7: Init dataset
-    dataset_state = hivemind.DHT(initial_peers=[os.environ["INITIAL_PEERS"]], start=True)
     config.dataset_name = "wikitext"
     config.batch_size = 16
     config.num_of_duplicates = 2 # number of miners running the same process for validation
@@ -146,13 +154,14 @@ async def main( config ):
 
     dataset = load_dataset(config.dataset_name, 'wikitext-2-v1', split='train')
     dataset_indices = [i for i in range(0, len(dataset))]
-    dataset_common_state = DatasetStateSingelton(dht_common_state ,dataset_indices)
+    dataset_common_state = DatasetStateSingelton(dht ,dataset_indices)
 
     ## Do I need to wait before I push the model to the GPU after hivemindopt?
-    model = ModelSingleton.get_instance(response.model_name)
+    model = ModelSingleton.get_instance(model_name)
     
-    opt = torch.optim.AdamW(model.parameters(), lr = synapse.lr)
+    opt = torch.optim.AdamW(model.parameters(), lr = lr)
 
+    breakpoint()
     opt = hivemind.Optimizer(
         dht=dht,                  # use a DHT that is connected with other peers
         run_id=config.run_id,    # unique identifier of this collaborative run
@@ -166,7 +175,7 @@ async def main( config ):
     )
 
     state_averager = TrainingStateAverager(
-                    dht=dht_state,
+                    dht=dht,
                     optimizer=opt,
                     scheduler=get_linear_schedule_with_warmup(opt, num_warmup_steps=5000, num_training_steps=125_000),
                     prefix=f"{config.run_id}_state_averager",
@@ -175,7 +184,7 @@ async def main( config ):
                     client_mode=optimizer_args.client_mode,
                     start=True,
                     **asdict(averager_args),
-                )
+    )
 
     # Step 8: The Main Validation Loop
     bt.logging.info("Starting validator loop.")
@@ -190,8 +199,8 @@ async def main( config ):
             
             # TODO split queries
             queries = []
-            for uid_idx in range(0, len(uids), examples_per_uid)
-
+            for uid_idx in range(0, len(uids), examples_per_uid):
+                
                 shuffled_uid_group = random.shuffle(uids_indices[uid_idx:uid_idx+examples_per_uid])
                 #TODO get the hashes of the groups
                 # Make miners return the group hashes with their losses as well.
@@ -199,7 +208,7 @@ async def main( config ):
                     template.train.Train( 
                         dataset_indices=shuffled_uid_group,
                         model_name = "kmfoda/tiny-random-gpt2", 
-                        dht_connector = dht_state.get_visible_maddrs()# TODO Add a decorator or sth for this to get the values 
+                        dht_connector = dht_state.get_visible_maddrs(), # TODO Add a decorator or sth for this to get the values 
                         batch_size = config.batch_size #TODO let miners decide this? Based on their hardware?
                     )
                 )

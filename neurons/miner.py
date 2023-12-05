@@ -20,22 +20,30 @@
 # Bittensor Miner Template:
 # TODO(developer): Rewrite based on protocol and validator defintion.
 
+import argparse
+
 # Step 1: Import necessary libraries and modules
 import os
 import time
-import argparse
-import typing
 import traceback
+import typing
+
 import bittensor as bt
+import torch
+from datasets import load_dataset
+from hivemind import Optimizer
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from transformers import (
+    AdamW,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    get_linear_schedule_with_warmup,
+)
 
 # import this repo
 import template
-import torch
-from datasets import load_dataset
-from torch.utils.data import DataLoader
-from transformers import AutoModelForCausalLM, AutoTokenizer, AdamW, get_linear_schedule_with_warmup
-from hivemind import Optimizer
-from tqdm import tqdm
+
 
 def get_config():
     # Step 2: Set up the configuration parser
@@ -183,12 +191,6 @@ def main( config ):
         tokenizer.pad_token = tokenizer.eos_token
         # Move the model to the appropriate device
         model.to(device)
-
-        # synapse.gradients = [1,2]
-
-        # Load optimizer and scheduler
-        
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=synapse.steps)  
 
         # Load dataset
         dataset = load_dataset(synapse.dataset_name, 'wikitext-2-v1', split='train')
