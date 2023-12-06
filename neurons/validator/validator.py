@@ -154,7 +154,7 @@ async def main( config ):
 
     dataset = load_dataset(config.dataset_name, 'wikitext-2-v1', split='train')
     dataset_indices = [i for i in range(0, len(dataset))]
-    dataset_common_state = DatasetStateSingelton(dht ,dataset_indices)
+    dataset_common_state = DatasetStateSingelton(dht ,dataset_indices, config.run_id)
 
     ## Do I need to wait before I push the model to the GPU after hivemindopt?
     model = ModelSingleton.get_instance(config.model_name)
