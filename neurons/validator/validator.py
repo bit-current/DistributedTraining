@@ -216,7 +216,7 @@ async def main( config ):
     while True:
         try:
             
-            uids = get_random_uids(metagraph, k=100) # .to(self.device)
+            uids = get_random_uids(metagraph, k=256) # .to(self.device)
             total_per_pass = 100000
 
             examples_per_uid = total_per_pass // len(uids)
@@ -225,17 +225,14 @@ async def main( config ):
 
             # TODO split queries
             queries = []
-            for uid_idx in range(0, len(uids), examples_per_uid):
+            for uid in uids:
                 # shuffled_uid_group = random.shuffle(uids_indices[uid_idx:uid_idx+examples_per_uid])
                 #TODO get the hashes of the groups
                 # Make miners return the group hashes with their losses as well.
-                breakpoint()
-                template.train.Train(dataset_indices = uids_indices, model_name = config.model_name, initial_peers = [config.initial_peers], batch_size = config.batch_size)
                 queries.append(
                     template.train.Train( 
-                        dataset_indices = uids_indices,
-                        model_name = config.model_name, 
-                        initial_peers = [config.initial_peers], #TODO Add a decorator or sth for this to get the values 
+                        dataset_indices = uids_indices, #TODO send different indices to different uids
+                        # initial_peers = config.initial_peers, #TODO Add a decorator or sth for this to get the values 
                         batch_size = config.batch_size #TODO let miners decide this? Based on their hardware?
                     )
                 )
@@ -245,7 +242,6 @@ async def main( config ):
                 queries
             )
 
-            breakpoint()
             # Log the results for monitoring purposes.
             bt.logging.info(f"Received responses: {responses}")
 
@@ -255,14 +251,18 @@ async def main( config ):
                 # swarm_losses = [swarm_response.loss for swarm_response in swarm_responses]
                 ###
 
-                breakpoint()
                 state_averager.load_state_from_peers()
                 
+                # Select the correct datapoints
+                dataset_sample = dataset.select(random.sample(dataset_indices, 32))
+
+                # Encode the dataset
+                encoded_dataset = dataset_sample.map(encode, batched=True)
                 
                 # Move batch to device
-                input_ids = torch.stack(encoded_dataset['input_ids']).to(config.device)
-                attention_mask = torch.stack(encoded_dataset['attention_mask']).to(config.device)
-                labels = torch.stack(encoded_dataset["input_ids"]).to(config.device)
+                input_ids = torch.tensor(encoded_dataset['input_ids']).to(config.device)
+                attention_mask = torch.tensor(encoded_dataset['attention_mask']).to(config.device)
+                labels = torch.tensor(encoded_dataset["input_ids"]).to(config.device)
 
                 # Forward pass
                 outputs = model(
@@ -282,8 +282,8 @@ async def main( config ):
                 previous_loss = loss
 
                 # Apply score to responsive uids
-                for response in responses:
-                    uid = response.uids
+                for uid in uids:
+                    breakpoint()
                     # Update the global score of the miner.
                     # This score contributes to the miner's weight in the network.
                     # A higher weight means that the miner has been consistently responding correctly.

@@ -43,6 +43,7 @@ from transformers import (
 
 # import this repo
 import template
+import hivemind
 
 
 def get_config():
@@ -84,7 +85,7 @@ def get_config():
 
 
 # Main takes the config and starts the miner.
-def main( config ):
+async def main( config ):
 
     # Activating Bittensor's logging with the set configurations.
     bt.logging(config=config, logging_dir=config.full_path)
@@ -159,31 +160,31 @@ def main( config ):
         # This function runs after the blacklist and priority functions have been called.
 
         # # Use CUDA if available, otherwise use CPU
+        # return synapse
+        # breakpoint()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # Load pre-trained model and tokenizer
         # model_name = 'sshleifer/tiny-gpt2'
 
         #TODO Have a setup call and a training call, based on the state of readiness of the miner. Or a singleton.
-        dht = hivemind.DHT(initial_peers=[os.environ["INITIAL_PEERS"]], start=True)
+        # dht = hivemind.DHT(initial_peers=[os.environ["INITIAL_PEERS"]], start=True)
         model = AutoModelForCausalLM.from_pretrained(synapse.model_name)
         opt = torch.optim.AdamW(model.parameters(), lr = synapse.lr)
         # Add a while True: loop here or sth?
         # Set up a decentralized optimizer that will average with peers in background
 
-        opt = hivemind.Optimizer(
-            dht=dht,                  # use a DHT that is connected with other peers
-            run_id=synapse.run_id,    # unique identifier of this collaborative run
-            batch_size_per_step=32,   # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=10000,  # after peers collectively process this many samples, average weights and begin the next epoch
-            optimizer=opt,            # wrap the SGD optimizer defined above
-            use_local_updates=True,   # perform optimizer steps with local gradients, average parameters in background
-            matchmaking_time=3.0,     # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
-            verbose=True              # print logs incessently
-        )
-
-        
+        # opt = hivemind.Optimizer(
+        #     dht=dht,                  # use a DHT that is connected with other peers
+        #     run_id=synapse.run_id,    # unique identifier of this collaborative run
+        #     batch_size_per_step=32,   # each call to opt.step adds this many samples towards the next epoch
+        #     target_batch_size=10000,  # after peers collectively process this many samples, average weights and begin the next epoch
+        #     optimizer=opt,            # wrap the SGD optimizer defined above
+        #     use_local_updates=True,   # perform optimizer steps with local gradients, average parameters in background
+        #     matchmaking_time=3.0,     # when averaging parameters, gather peers in background for up to this many seconds
+        #     averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
+        #     verbose=True              # print logs incessently
+        # )
 
         tokenizer = AutoTokenizer.from_pretrained(synapse.model_name)
         
@@ -229,7 +230,7 @@ def main( config ):
             
         synapse.loss = loss
 
-        bt.logging.info(f"Final loss {synapse}")
+        bt.logging.info(f"loss {synapse.loss}")
 
         return synapse
 
@@ -254,7 +255,6 @@ def main( config ):
     # This will auto-update if the axon port of external ip have changed.
     bt.logging.info(f"Serving axon {train} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}")
     axon.serve( netuid = config.netuid, subtensor = subtensor )
-
     # Start  starts the miner's axon, making it active on the network.
     bt.logging.info(f"Starting axon server on port: {config.axon.port}")
     axon.start()
@@ -294,4 +294,6 @@ def main( config ):
 
 # This is the main function, which runs the miner.
 if __name__ == "__main__":
-    main( get_config() )
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main( get_config() ))
