@@ -146,7 +146,7 @@ async def main( config ):
     config.dataset_name = "wikitext"
     config.batch_size = 16
     config.num_of_duplicates = 2 # number of miners running the same process for validation
-    config.run_id = 's25_test_run'
+    config.run_id = '7am_run_test'
     config.upload_interval = 900
     config.weight_update_interval = 900
     config.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -188,8 +188,8 @@ async def main( config ):
         scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
         params=model.parameters(),
         start=True,
-        # prefix=f"{config.run_id}_state_averager",
-        prefix=f"test"
+        prefix=f"{config.run_id}_state_averager",
+        # prefix=f"test"
         # state_compression=hivemind.Float16Compression(),
         # bandwidth=optimizer_args.bandwidth,
         # client_mode=optimizer_args.client_mode,
@@ -204,6 +204,15 @@ async def main( config ):
     # Step 9: The Main Validation Loop
     bt.logging.info("Starting validator loop.")
     step = 0
+
+# Select the correct datapoints
+    ## Testing on the same split allows variance from samples to not be a factor
+    ## Plus different validators can select their own random samples freely
+    ## Leading to a diverse yet similar hacky validation
+    test_dataset_sample = dataset.select(random.sample(dataset_indices, 32))
+
+    # Encode the dataset
+    test_encoded_dataset = dataset_sample.map(encode, batched=True)
     while True:
         try:
             
@@ -211,8 +220,8 @@ async def main( config ):
             total_per_pass = 100000
 
             examples_per_uid = total_per_pass // len(uids)
-            # uids_indices = dataset_common_state.get_dataset_indices(len(uids), examples_per_uid)
-            uids_indices = [1, 2, 3]
+            uids_indices = dataset_common_state.get_dataset_indices(len(uids), examples_per_uid) #TODO add repeat on blocked
+            #uids_indices = [1, 2, 3]
 
             # TODO split queries
             queries = []
@@ -249,12 +258,7 @@ async def main( config ):
                 breakpoint()
                 state_averager.load_state_from_peers()
                 
-                # Select the correct datapoints
-                dataset_sample = dataset.select(random.sample(dataset_indices, 32))
-
-                # Encode the dataset
-                encoded_dataset = dataset_sample.map(encode, batched=True)
-
+                
                 # Move batch to device
                 input_ids = torch.stack(encoded_dataset['input_ids']).to(config.device)
                 attention_mask = torch.stack(encoded_dataset['attention_mask']).to(config.device)

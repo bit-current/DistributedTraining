@@ -7,6 +7,9 @@ from transformers import (
 )
 
 
+import random 
+import json
+from time import sleep
 class DatasetStateSingelton:
     '''
     This class shares the amount of indicies in an existing dataset for distribution among miners.
@@ -17,29 +20,47 @@ class DatasetStateSingelton:
     '''
     _instance = None
 
-    def __new__(cls, dht_state, dataset_indices,*args, **kwargs):
+    def __new__(cls, dht_state, dataset_indices,run_id,default_expiration_time = 600 ,*args, **kwargs):
         if not cls._instance:
             cls._instance = super(DatasetStateSingelton, cls).__new__(cls, *args, **kwargs)
             cls._instance._dht_state = dht_state
             cls._dataset_indices = dataset_indices
             cls.dataset_indices = dataset_indices
+            cls.default_expiration_time = default_expiration_time
+            assert run_id #can't be empty/zero/null #TODO clean me
+            cls.run_id = run_id
+            
             
         return cls._instance
 
-    def __getattr__(self, name):
-        # Called when an attribute lookup has not found the attribute in the usual places
-        return self._dht_state.get(name)
+    @classmethod
+    def _serialize_to_string(cls,data_str):
+        """
+        Serializes the dataset indices to a string.
+        """
+        # Assuming dataset_indices is a list or a similar serializable structure
+        return json.dumps(data_str)
 
-    def __setattr__(self, name, value):
-        if name in ['_dht_state', '_dataset_indices']:
-            # This condition is to allow initial setting of _dht_state
-            super(DatasetStateSingelton, self).__setattr__(name, value)
-        else:
-            # Update the DHT state
-            if type(value) != dict:
-                self._dht_state.store(name, value)
-            else:
-                raise NotImplementedError("Can't use dicts directly with DHTs need to use subkey and traverse the dict")
+    @classmethod
+    def _deserialize_from_string(cls, data_str):
+        """
+        Deserializes the string back to dataset indices.
+        """
+        # Assuming the data_str is in JSON format
+        return json.loads(data_str)
+
+
+    def get_dht(cls, name):
+        sleep(2)
+        stored_data = cls._dht_state.get(f"{cls.run_id}_{name}")
+        return cls._deserialize_from_string(stored_data) if stored_data else None
+        
+    def set_dht(cls, name, value):
+        sleep(2)
+        serialized_value = cls._serialize_to_string(value)
+        status = cls._dht_state.store(f"{cls.run_id}_{name}", serialized_value, get_dht_time() + cls.default_expiration_time)
+        return status
+    
 
     def get_dataset_indices(cls, m, n):
             
@@ -54,18 +75,24 @@ class DatasetStateSingelton:
         :return: List of selected groups, each group is a list of n indices.
         """
 
-        indices_dict = cls.dataset_indices
-        if len(indices) < m * n:
+        indices = cls.get_dht("dataset_indices")
+        no_value_flag = False
+        try:
+            no_value_flag = len(indices) < m * n
+        except:
+            no_value_flag = True
+        if no_value_flag:
+            print("Run out. Reloading")
             # Not enough indices to select the required number of groups"
             # Restore all the values. Then resample.
 
-            cls.dataset_indices = cls._dataset_indices
+            cls.set_dht("dataset_indices",cls._dataset_indices)
             try:
                 cls.epoch += 1
             except:
                 cls.epoch = 1
 
-            return get_dataset_indices(m,n)
+            return cls.get_dataset_indices(m,n)
             #raise ValueError()
 
         selected_groups = []
@@ -78,10 +105,11 @@ class DatasetStateSingelton:
             indices = indices[:start] + indices[start + n:]
 
         # Update the original list in the dictionary
-        cls.dataset_indices = indices
+        print("updating after mod")
+        cls.set_dht("dataset_indices",indices)
 
         return selected_groups
-
+        
 class ModelSingleton:
     _instance = None
 
