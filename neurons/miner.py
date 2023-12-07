@@ -31,7 +31,7 @@ import typing
 import bittensor as bt
 import torch
 from datasets import load_dataset
-from hivemind import Optimizer
+import hivemind
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import (
@@ -39,6 +39,7 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     get_linear_schedule_with_warmup,
+    default_data_collator
 )
 
 # import this repo
@@ -84,7 +85,7 @@ def get_config():
 
 
 # Main takes the config and starts the miner.
-def main( config ):
+async def main( config ):
 
     # Activating Bittensor's logging with the set configurations.
     bt.logging(config=config, logging_dir=config.full_path)
@@ -182,7 +183,6 @@ def main( config ):
             averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
             verbose=True              # print logs incessently
         )
-
         
 
         tokenizer = AutoTokenizer.from_pretrained(synapse.model_name)
@@ -204,20 +204,21 @@ def main( config ):
         encoded_dataset = dataset.map(encode, batched=True)
         
         # Create a PyTorch DataLoader
-        dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size)
+        dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size, collate_fn=default_data_collator)
 
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
             
-            opt.zero_grad()
-            input_ids = torch.stack(batch['input_ids']).to(device)
-            attention_mask = torch.stack(batch['attention_mask']).to(device)
-            labels = torch.stack(batch['attention_mask']).to(device)
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = input_ids.clone()
 
+            opt.zero_grad()
+            
             # Forward pass
             outputs = model(
                 input_ids = input_ids, 
-                attention_mask =attention_mask,
+                attention_mask = attention_mask,
                 labels = labels
             )     
             
@@ -254,12 +255,12 @@ def main( config ):
     # This will auto-update if the axon port of external ip have changed.
     bt.logging.info(f"Serving axon {train} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}")
     axon.serve( netuid = config.netuid, subtensor = subtensor )
-
+    
     # Start  starts the miner's axon, making it active on the network.
     bt.logging.info(f"Starting axon server on port: {config.axon.port}")
     axon.start()
-
     # Step 6: Keep the miner alive
+    time.sleep(2)
     # This loop maintains the miner's operations until intentionally stopped.
     bt.logging.info(f"Starting main loop")
     step = 0
@@ -280,6 +281,7 @@ def main( config ):
                 bt.logging.info(log)
             step += 1
             time.sleep(1)
+            
 
         # If someone intentionally stops the miner, it'll safely terminate operations.
         except KeyboardInterrupt:

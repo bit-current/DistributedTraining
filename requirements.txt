@@ -1,5 +1,4 @@
 bittensor
 datasets
-optimum
-torch
 transformers
+#hivemind
