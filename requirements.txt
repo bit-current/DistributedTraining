@@ -1,4 +1,4 @@
 bittensor
 datasets
 transformers
-#hivemind
+hivemind
