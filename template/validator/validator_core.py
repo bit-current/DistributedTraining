@@ -9,7 +9,10 @@ from transformers import (
 
 import random 
 import json
+import time
 from time import sleep
+import bittensor as bt
+
 class DatasetStateSingelton:
     '''
     This class shares the amount of indicies in an existing dataset for distribution among miners.
@@ -29,7 +32,6 @@ class DatasetStateSingelton:
             cls.default_expiration_time = default_expiration_time
             assert run_id #can't be empty/zero/null #TODO clean me
             cls.run_id = run_id
-            
             
         return cls._instance
 
@@ -124,13 +126,13 @@ class ModelSingleton:
 
 
 def upload_checkpoint(commit_message, state_averager, model, repo_path,repo_url):
-    logger.info("Saving optimizer")
+    bt.logging.info("Saving optimizer")
     torch.save(state_averager.optimizer.state_dict(), f"{repo_path}/optimizer_state.pt")
     timestamp_at_upload = time.time()
-    logger.info("Started uploading to Model Hub")
+    bt.logging.info("Started uploading to Model Hub")
     model.push_to_hub(
         repo_name=repo_path,
         repo_url=repo_url,
         commit_message=commit_message,
     )
-    logger.info("Finished uploading to Model Hub")
+    bt.logging.info("Finished uploading to Model Hub")
