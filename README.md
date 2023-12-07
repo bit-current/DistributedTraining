@@ -14,8 +14,7 @@ This repository requires python3.8 or higher. To install, simply clone this repo
 ```bash
 git clone https://github.com/KMFODA/PretrainSubnet
 cd PretrainSubnet
-python -m pip install -r requirements.txt
-python -m pip install -e .
+pip install -e . && python post_install.py
 ```
 
 ---
