@@ -45,7 +45,7 @@ class Train( bt.Synapse ):
     dataset_indices: list = [0, 1]
 
     # Initial peers
-    # initial_peers: str = "/ip4/161.97.156.125/tcp/8108/p2p/12D3KooWRYFcmYhf7Lyn3TH9cFxqhruhnjMYky4ehdZHFuv6M4A9"
+    initial_peers: str = "/ip4/161.97.156.125/tcp/8108/p2p/12D3KooWRYFcmYhf7Lyn3TH9cFxqhruhnjMYky4ehdZHFuv6M4A9"
 
     # Required request input hash, filled automatically when dendrite creates the request.
     # This allows for proper data validation and messages are signed with the hashes of the

@@ -1,11 +1,7 @@
-import asyncio
-import random
-from typing import Any, List
-
-import bittensor as bt
 import torch
-
-from template.train import Train
+import random
+import bittensor as bt
+from typing import List
 
 
 def check_uid_availability(
@@ -30,7 +26,9 @@ def check_uid_availability(
     return True
 
 
-def get_random_uids(metagraph, k: int, exclude: List[int] = None) -> torch.LongTensor:
+def get_random_uids(
+    self, k: int, exclude: List[int] = None
+) -> torch.LongTensor:
     """Returns k available random uids from the metagraph.
     Args:
         k (int): Number of uids to return.
@@ -43,9 +41,9 @@ def get_random_uids(metagraph, k: int, exclude: List[int] = None) -> torch.LongT
     candidate_uids = []
     avail_uids = []
 
-    for uid in range(metagraph.n.item()):
+    for uid in range(self.metagraph.n.item()):
         uid_is_available = check_uid_availability(
-            metagraph, uid, 400
+            self.metagraph, uid, self.config.neuron.vpermit_tao_limit
         )
         uid_is_not_excluded = exclude is None or uid not in exclude
 
@@ -60,30 +58,5 @@ def get_random_uids(metagraph, k: int, exclude: List[int] = None) -> torch.LongT
         uids = torch.tensor(available_uids)
     else:
         uids = torch.tensor(random.sample(available_uids, k))
-    
+        
     return uids
-
-class AsyncDendritePool:
-    def __init__(self, wallet, metagraph):
-        self.metagraph = metagraph
-        self.dendrite = bt.dendrite(wallet=wallet)
-    
-    async def async_forward(
-            self,
-            uids: List[int],
-            queries: List[Train], 
-            timeout: float = 12.0
-    ):
-
-        def call_single_uid(uid, query):
-            return self.dendrite(
-                self.metagraph.axons[uid],
-                synapse=query,
-                timeout=timeout
-            )
-        
-        async def query_async():
-            corutines = [call_single_uid(uid, query) for uid, query in zip(uids, queries)]
-            return await asyncio.gather(*corutines)
-        
-        return await query_async()
