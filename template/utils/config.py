@@ -21,6 +21,7 @@ import torch
 import argparse
 import bittensor as bt
 from loguru import logger
+import torch
 
 
 def check_config(cls, config: "bt.Config"):
@@ -78,7 +79,7 @@ def add_args(cls, parser):
         "--neuron.device",
         type=str,
         help="Device to run on.",
-        default="cpu",
+        default=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
 
     parser.add_argument(
@@ -103,6 +104,69 @@ def add_args(cls, parser):
     )
 
     if neuron_type == "validator":
+        parser.add_argument(
+            "--neuron.initial_peers",
+            type=str,
+            help="The address for the DHT",
+            default="/ip4/161.97.156.125/tcp/8108/p2p/12D3KooWRYFcmYhf7Lyn3TH9cFxqhruhnjMYky4ehdZHFuv6M4A9",
+        )
+
+        parser.add_argument(
+            "--neuron.model_name",
+            type=str,
+            help="The model to be trained",
+            default="kmfoda/tiny-random-gpt2",
+        )
+
+        parser.add_argument(
+            "--neuron.lr",
+            type=float,
+            help="The learning rate",
+            default=0.00001,
+        )
+
+        parser.add_argument(
+            "--neuron.dataset_name",
+            type=str,
+            help="The datasets the model will be trained on",
+            default="wikitext",
+        )
+
+        parser.add_argument(
+            "--neuron.batch_size",
+            type=int,
+            help="The default batch size",
+            default=32,
+        )
+
+        parser.add_argument(
+            "--neuron.num_of_duplicates",
+            type=int,
+            help="The size of a group of miners duplicating work",
+            default=2,
+        )
+    
+        parser.add_argument(
+            "--neuron.run_id",
+            type=str,
+            help="The DHT run_id",
+            default="7am_run_test",
+        )
+
+        parser.add_argument(
+            "--neuron.weight_update_interval",
+            type=int,
+            help="The number of steps before updating the model's weights",
+            default=900,
+        )
+
+        parser.add_argument(
+            "--neuron.upload_interval",
+            type=int,
+            help="The number of steps before uploading the model",
+            default=900,
+        )
+
         parser.add_argument(
             "--neuron.num_concurrent_forwards",
             type=int,

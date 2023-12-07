@@ -61,13 +61,13 @@ class Miner(BaseMinerNeuron):
         """
 
         # # Use CUDA if available, otherwise use CPU
-        breakpoint()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         dht = hivemind.DHT(initial_peers=[synapse.initial_peers], start=True)
         model = AutoModelForCausalLM.from_pretrained(synapse.model_name)
         opt = torch.optim.AdamW(model.parameters(), lr = synapse.lr)
 
+        # opt = hivemind.Optimizer(dht=dht, run_id="1", batch_size_per_step=32,target_batch_size=10000,optimizer=opt,use_local_updates=True,matchmaking_time=3.0,averaging_timeout=10.0,verbose=True)
         # Set up a decentralized optimizer that will average with peers in background
         opt = hivemind.Optimizer(
             dht=dht,                  # use a DHT that is connected with other peers
@@ -80,7 +80,6 @@ class Miner(BaseMinerNeuron):
             averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
             verbose=True              # print logs incessently
         )
-        
     
         bt.logging.info("Loading state from peers")
         opt.load_state_from_peers()

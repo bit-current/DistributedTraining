@@ -50,19 +50,11 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info("load_state()")
         self.load_state()
 
-        # TODO CLEAN THIS
-        # Step 7: Init DHT
-        self.config.initial_peers= "/ip4/161.97.156.125/tcp/8108/p2p/12D3KooWRYFcmYhf7Lyn3TH9cFxqhruhnjMYky4ehdZHFuv6M4A9"
-        self.config.model_name: str = "kmfoda/tiny-random-gpt2"
-        self.config.lr = 0.00001
-        self.config.dataset_name = "wikitext"
-        self.config.batch_size = 16
-        self.config.num_of_duplicates = 2 # number of miners running the same process for validation
-        self.config.run_id = '7am_run_test'
-        self.config.upload_interval = 900
-        self.config.weight_update_interval = 900
-        self.config.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.dht = hivemind.DHT(initial_peers=[self.config.initial_peers], start=True)
+        # Init DHT
+        self.dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
+        print("To join the training, use initial_peers =", [str(addr) for addr in self.dht.get_visible_maddrs()])
+        
+        # Init Dendrite Pool
         self.dendrite_pool = AsyncDendritePool( wallet = self.wallet, metagraph = self.metagraph )
         
         # Init Loss
@@ -70,31 +62,33 @@ class Validator(BaseValidatorNeuron):
         self.latest_upload = 0
         self.latest_weight_update = 0
         self.step = 0
-        print("To join the training, use initial_peers =", [str(addr) for addr in self.dht.get_visible_maddrs()])
 
-        self.dataset = load_dataset(self.config.dataset_name, 'wikitext-2-v1', split='train')
+        # Init Dataset
+        self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
         self.dataset_indices = [i for i in range(0, len(self.dataset))]
-        self.dataset_common_state = DatasetStateSingelton(self.dht , self.dataset_indices, self.config.run_id)
+        self.dataset_common_state = DatasetStateSingelton(self.dht , self.dataset_indices, self.config.neuron.run_id)
 
-        self.model = ModelSingleton.get_instance(self.config.model_name)
-        self.model.to(self.config.device)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.config.model_name)
+        # Init Model
+        self.model = ModelSingleton.get_instance(self.config.neuron.model_name)
+        self.model.to(self.config.neuron.device)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
+        # Init State Averager
         self.state_averager = TrainingStateAverager(
             dht=self.dht, 
-            optimizer=partial(torch.optim.AdamW, lr=self.config.lr), 
+            optimizer=partial(torch.optim.AdamW, lr=self.config.neuron.lr), 
             scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
             params=self.model.parameters(),
             start=True,
-            prefix=f"{self.config.run_id}_state_averager_1",
+            prefix=f"{self.config.neuron.run_id}_state_averager_1",
             # state_compression=hivemind.Float16Compression(),
             # bandwidth=optimizer_args.bandwidth,
             # client_mode=optimizer_args.client_mode,
             # **asdict(averager_args),
         )
         
-        # The Main Validation Loop
+        # Start Main Validation Loop
         bt.logging.info("Starting validator loop.")
         
     # Define encoding function

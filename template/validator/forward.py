@@ -53,9 +53,9 @@ async def forward(self):
         queries.append(
             template.protocol.Train( 
                 dataset_indices = uids_indices, #TODO send different indices to different uids
-                run_id = self.config.run_id,
+                run_id = self.config.neuron.run_id,
                 # initial_peers = config.initial_peers, #TODO Add a decorator or sth for this to get the values 
-                batch_size = self.config.batch_size #TODO let miners decide this? Based on their hardware?
+                batch_size = self.config.neuron.batch_size #TODO let miners decide this? Based on their hardware?
             )
         )
 
