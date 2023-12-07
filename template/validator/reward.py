@@ -72,7 +72,7 @@ def get_rewards(
     
     # Backward pass
     loss = outputs.loss
-
+    breakpoint()
     # Compute score
     if (loss - self.previous_loss) > 0:
         score = 0

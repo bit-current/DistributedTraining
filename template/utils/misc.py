@@ -124,7 +124,7 @@ class AsyncDendritePool:
             self,
             uids: List[int],
             queries: List[Train], 
-            timeout: float = 12.0
+            timeout: float = 120.0
     ):
 
         def call_single_uid(uid, query):
