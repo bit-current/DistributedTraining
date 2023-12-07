@@ -63,7 +63,7 @@ class Miner(BaseMinerNeuron):
         # # Use CUDA if available, otherwise use CPU
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        dht = hivemind.DHT(initial_peers=[synapse.initial_peers], start=True)
+        #dht = hivemind.DHT(initial_peers=[synapse.initial_peers], start=True)
         model = AutoModelForCausalLM.from_pretrained(synapse.model_name)
         opt = torch.optim.AdamW(model.parameters(), lr = synapse.lr)
 

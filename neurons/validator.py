@@ -26,7 +26,7 @@ import bittensor as bt
 import torch
 from datasets import load_dataset
 from hivemind.optim.state_averager import TrainingStateAverager
-from optimum.bettertransformer import BetterTransformer
+#from optimum.bettertransformer import BetterTransformer
 from torch.utils.data import DataLoader
 from transformers import (
     AdamW,
