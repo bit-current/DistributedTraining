@@ -81,19 +81,19 @@ class Validator(BaseValidatorNeuron):
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        self.opt = torch.optim.AdamW(self.model.parameters(), lr = self.config.lr)
+        #self.opt = torch.optim.AdamW(self.model.parameters(), lr = self.config.lr)
 
-        opt = hivemind.Optimizer(
-            dht=self.dht,                  # use a DHT that is connected with other peers
-            run_id=self.config.run_id,    # unique identifier of this collaborative run
-            batch_size_per_step=32,   # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=10000,  # after peers collectively process this many samples, average weights and begin the next epoch 
-            optimizer=self.opt,            # wrap the SGD optimizer defined above
-            use_local_updates=True,   # perform optimizer steps with local gradients, average parameters in background
-            matchmaking_time=3.0,     # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
-            verbose=True              # print logs incessently
-        )
+        # opt = hivemind.Optimizer(
+        #     dht=self.dht,               # use a DHT that is connected with other peers
+        #     run_id=self.config.run_id,  # unique identifier of this collaborative run
+        #     batch_size_per_step=32,     # each call to opt.step adds this many samples towards the next epoch
+        #     target_batch_size=10000,    # after peers collectively process this many samples, average weights and begin the next epoch 
+        #     optimizer=self.opt,         # wrap the SGD optimizer defined above
+        #     use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
+        #     matchmaking_time=3.0,       # when averaging parameters, gather peers in background for up to this many seconds
+        #     averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
+        #     verbose=True                # print logs incessently
+        # )
 
         self.state_averager = TrainingStateAverager(
             dht=self.dht, 

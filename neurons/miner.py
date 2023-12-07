@@ -63,26 +63,26 @@ class Miner(BaseMinerNeuron):
         # # Use CUDA if available, otherwise use CPU
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        #dht = hivemind.DHT(initial_peers=[synapse.initial_peers], start=True)
+        dht = hivemind.DHT(initial_peers=[synapse.initial_peers], start=True)
         model = AutoModelForCausalLM.from_pretrained(synapse.model_name)
         opt = torch.optim.AdamW(model.parameters(), lr = synapse.lr)
 
-        # Add a while True: loop here or sth?
         # Set up a decentralized optimizer that will average with peers in background
+        opt = hivemind.Optimizer(
+            dht=dht,                  # use a DHT that is connected with other peers
+            run_id=synapse.run_id,    # unique identifier of this collaborative run
+            batch_size_per_step=32,   # each call to opt.step adds this many samples towards the next epoch
+            target_batch_size=10000,  # after peers collectively process this many samples, average weights and begin the next epoch
+            optimizer=opt,            # wrap the SGD optimizer defined above
+            use_local_updates=True,   # perform optimizer steps with local gradients, average parameters in background
+            matchmaking_time=3.0,     # when averaging parameters, gather peers in background for up to this many seconds
+            averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
+            verbose=True              # print logs incessently
+        )
         
-        # opt = hivemind.Optimizer(dht=dht, run_id="test", batch_size_per_step=32, target_batch_size=10000, optimizer=opt, use_local_updates=True, matchmaking_time=3.0, averaging_timeout=10.0, verbose=True)
-
-        # opt = hivemind.Optimizer(
-        #     dht=dht,                  # use a DHT that is connected with other peers
-        #     run_id=synapse.run_id,    # unique identifier of this collaborative run
-        #     batch_size_per_step=32,   # each call to opt.step adds this many samples towards the next epoch
-        #     target_batch_size=10000,  # after peers collectively process this many samples, average weights and begin the next epoch
-        #     optimizer=opt,            # wrap the SGD optimizer defined above
-        #     use_local_updates=True,   # perform optimizer steps with local gradients, average parameters in background
-        #     matchmaking_time=3.0,     # when averaging parameters, gather peers in background for up to this many seconds
-        #     averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
-        #     verbose=True              # print logs incessently
-        # )
+    
+        bt.logging.info("Loading state from peers")
+        opt.load_state_from_peers()
         
         tokenizer = AutoTokenizer.from_pretrained(synapse.model_name)
         
