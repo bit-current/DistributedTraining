@@ -69,20 +69,21 @@ class Miner(BaseMinerNeuron):
 
         # Add a while True: loop here or sth?
         # Set up a decentralized optimizer that will average with peers in background
-
-        opt = hivemind.Optimizer(
-            dht=dht,                  # use a DHT that is connected with other peers
-            run_id=synapse.run_id,    # unique identifier of this collaborative run
-            batch_size_per_step=32,   # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=10000,  # after peers collectively process this many samples, average weights and begin the next epoch
-            optimizer=opt,            # wrap the SGD optimizer defined above
-            use_local_updates=True,   # perform optimizer steps with local gradients, average parameters in background
-            matchmaking_time=3.0,     # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
-            verbose=True              # print logs incessently
-        )
         
+        # opt = hivemind.Optimizer(dht=dht, run_id="test", batch_size_per_step=32, target_batch_size=10000, optimizer=opt, use_local_updates=True, matchmaking_time=3.0, averaging_timeout=10.0, verbose=True)
 
+        # opt = hivemind.Optimizer(
+        #     dht=dht,                  # use a DHT that is connected with other peers
+        #     run_id=synapse.run_id,    # unique identifier of this collaborative run
+        #     batch_size_per_step=32,   # each call to opt.step adds this many samples towards the next epoch
+        #     target_batch_size=10000,  # after peers collectively process this many samples, average weights and begin the next epoch
+        #     optimizer=opt,            # wrap the SGD optimizer defined above
+        #     use_local_updates=True,   # perform optimizer steps with local gradients, average parameters in background
+        #     matchmaking_time=3.0,     # when averaging parameters, gather peers in background for up to this many seconds
+        #     averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
+        #     verbose=True              # print logs incessently
+        # )
+        
         tokenizer = AutoTokenizer.from_pretrained(synapse.model_name)
         
         # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
@@ -93,17 +94,17 @@ class Miner(BaseMinerNeuron):
         # Load dataset
         dataset = load_dataset(synapse.dataset_name, 'wikitext-2-v1', split='train')
         dataset = dataset.select(synapse.dataset_indices)
-        # breakpoint()
+        
         # Define encoding function
         def encode(examples):
-            return tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length', return_tensors='pt')
+            return tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')
 
         # Encode the dataset
         encoded_dataset = dataset.map(encode, batched=True)
         
         # Create a PyTorch DataLoader
-        dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size, collate_fn=default_data_collator)
-
+        dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size, collate_fn = default_data_collator)
+        
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
             
@@ -129,7 +130,7 @@ class Miner(BaseMinerNeuron):
         synapse.loss = loss
 
         bt.logging.info(f"loss {synapse.loss}")
-        # breakpoint()
+        
         return synapse
 
 
