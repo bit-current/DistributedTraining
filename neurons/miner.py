@@ -61,6 +61,7 @@ class Miner(BaseMinerNeuron):
         """
 
         # # Use CUDA if available, otherwise use CPU
+        breakpoint()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         dht = hivemind.DHT(initial_peers=[synapse.initial_peers], start=True)
