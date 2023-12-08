@@ -31,7 +31,7 @@ class DatasetStateSingelton:
             cls._dataset_indices = dataset_indices
             cls.dataset_indices = dataset_indices
             cls.default_expiration_time = default_expiration_time
-            assert run_id #can't be empty/zero/null #TODO clean me
+            assert run_id, "run_id isn't specified when run_id can't be empty/zero/null" 
             cls.run_id = run_id
             
         return cls._instance
@@ -66,7 +66,6 @@ class DatasetStateSingelton:
     
 
     def get_dataset_indices(cls, m, n):
-            
         """
         Selects m groups of n consecutive indices from a list in indices_dict[key].
         Each group of n indices is removed from the original list to ensure no replacement.
@@ -77,7 +76,7 @@ class DatasetStateSingelton:
         :param n: Number of consecutive indices in each group.
         :return: List of selected groups, each group is a list of n indices.
         """
-
+        breakpoint()
         indices = cls.get_dht("dataset_indices")
         no_value_flag = False
         try:
@@ -89,7 +88,7 @@ class DatasetStateSingelton:
             # Not enough indices to select the required number of groups"
             # Restore all the values. Then resample.
 
-            cls.set_dht("dataset_indices",cls._dataset_indices)
+            cls.set_dht("dataset_indices", cls._dataset_indices)
             try:
                 cls.epoch += 1
             except:

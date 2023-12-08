@@ -47,7 +47,7 @@ class Miner(BaseMinerNeuron):
         dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
         self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
         opt = torch.optim.AdamW(self.model.parameters(), lr = self.config.neuron.lr)
-
+        breakpoint()
         # Set up a decentralized optimizer that will average with peers in background
         self.opt = hivemind.Optimizer(
             dht=dht,                    # use a DHT that is connected with other peers
