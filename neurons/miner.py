@@ -91,7 +91,7 @@ class Miner(BaseMinerNeuron):
         Returns:
             template.protocol.Train: The synapse object with the 'loss' field set to models loss.
         """
-    
+
         bt.logging.info("Loading state from peers")
         self.opt.load_state_from_peers()
 
@@ -106,7 +106,7 @@ class Miner(BaseMinerNeuron):
         
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
-            
+            breakpoint()
             input_ids = batch['input_ids'].to(self.device)
             attention_mask = batch['attention_mask'].to(self.device)
             labels = input_ids.clone()

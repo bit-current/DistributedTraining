@@ -88,6 +88,9 @@ class Validator(BaseValidatorNeuron):
             # **asdict(averager_args),
         )
         
+        # Init device
+        self.device = self.config.neuron.device
+        
         # Start Main Validation Loop
         bt.logging.info("Starting validator loop.")
         

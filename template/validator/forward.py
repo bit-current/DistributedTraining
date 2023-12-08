@@ -78,7 +78,7 @@ async def forward(self):
     bt.logging.info(f"Received responses: {responses}")
 
     # Adjust the scores based on responses from miners.
-    rewards = get_rewards(self, uids=miner_uids, responses=responses)
+    rewards = get_rewards(self, uids=miner_uids)
 
     bt.logging.info(f"Scored responses: {rewards}")
     # Update the scores based on the rewards.

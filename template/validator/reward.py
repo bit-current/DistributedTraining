@@ -37,7 +37,6 @@ def reward(query: int, response: int) -> float:
 def get_rewards(
     self,
     uids: List[int],
-    responses: List[float],
 ) -> torch.FloatTensor:
     """
     Returns a tensor of rewards for the given query and responses.
@@ -59,9 +58,9 @@ def get_rewards(
     encoded_dataset = dataset_sample.map(self.encode, batched=True)
     
     # Move batch to device
-    input_ids = torch.tensor(encoded_dataset['input_ids']).to(self.config.device)
-    attention_mask = torch.tensor(encoded_dataset['attention_mask']).to(self.config.device)
-    labels = torch.tensor(encoded_dataset["input_ids"]).to(self.config.device)
+    input_ids = torch.tensor(encoded_dataset['input_ids']).to(self.device)
+    attention_mask = torch.tensor(encoded_dataset['attention_mask']).to(self.device)
+    labels = torch.tensor(encoded_dataset["input_ids"]).to(self.device)
 
     # Forward pass
     outputs = self.model(
@@ -72,7 +71,7 @@ def get_rewards(
     
     # Backward pass
     loss = outputs.loss
-    breakpoint()
+
     # Compute score
     if (loss - self.previous_loss) > 0:
         score = 0
@@ -83,5 +82,5 @@ def get_rewards(
 
     # Get all the reward results by iteratively calling your reward() function.
     return torch.FloatTensor(
-        [score for _ in responses]
+        [score for _ in uids]
     ).to(self.device)
