@@ -61,8 +61,9 @@ class Miner(BaseMinerNeuron):
             verbose=True                # print logs incessently
         )
         
-        # # Use CUDA if available, otherwise use CPU
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Init device
+        self.device = self.config.neuron.device
+        
         # Move the model to the appropriate device
         self.model.to(self.device)
         

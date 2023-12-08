@@ -64,7 +64,7 @@ async def forward(self):
         miner_uids,
         queries
     )
-    breakpoint()
+
     # Log the results for monitoring purposes.
     bt.logging.info(f"Received responses: {responses}")
 
