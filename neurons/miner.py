@@ -26,7 +26,6 @@ import template
 
 # import base miner class which takes care of most of the boilerplate
 from template.base.miner import BaseMinerNeuron
-from template.protocol import Train
 
 import bittensor as bt
 import torch
@@ -35,7 +34,6 @@ import hivemind
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import (
-    AdamW,
     AutoModelForCausalLM,
     AutoTokenizer,
     get_linear_schedule_with_warmup,
@@ -45,24 +43,22 @@ from transformers import (
 class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
-
-        # TODO(developer): Anything specific to your use case you can do here
         
-        dht = hivemind.DHT(initial_peers=[Train.initial_peers], start=True)
-        self.model = AutoModelForCausalLM.from_pretrained(Train.model_name)
-        opt = torch.optim.AdamW(self.model.parameters(), lr = 1e-5)
+        dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
+        self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
+        opt = torch.optim.AdamW(self.model.parameters(), lr = self.config.neuron.lr)
 
         # Set up a decentralized optimizer that will average with peers in background
         self.opt = hivemind.Optimizer(
-            dht=dht,                  # use a DHT that is connected with other peers
-            run_id=Train.run_id,    # unique identifier of this collaborative run #TODO Should we set the same run_id as for the validator??
-            batch_size_per_step=32,   # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=10000,  # after peers collectively process this many samples, average weights and begin the next epoch
-            optimizer=opt,            # wrap the SGD optimizer defined above
-            use_local_updates=True,   # perform optimizer steps with local gradients, average parameters in background
-            matchmaking_time=3.0,     # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
-            verbose=True              # print logs incessently
+            dht=dht,                    # use a DHT that is connected with other peers
+            run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run #TODO Should we set the same run_id as for the validator??
+            batch_size_per_step=32,     # each call to opt.step adds this many samples towards the next epoch
+            target_batch_size=10000,    # after peers collectively process this many samples, average weights and begin the next epoch
+            optimizer=opt,              # wrap the SGD optimizer defined above
+            use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
+            matchmaking_time=3.0,       # when averaging parameters, gather peers in background for up to this many seconds
+            averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
+            verbose=True                # print logs incessently
         )
         
         # # Use CUDA if available, otherwise use CPU
@@ -70,12 +66,12 @@ class Miner(BaseMinerNeuron):
         # Move the model to the appropriate device
         self.model.to(self.device)
         
-        self.tokenizer = AutoTokenizer.from_pretrained(Train.model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
         self.tokenizer.pad_token = self.tokenizer.eos_token
         
         # Load dataset
-        self.dataset = load_dataset(Train.dataset_name, 'wikitext-2-v1', split='train')
+        self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
         
     # Define encoding function
     def encode(self, examples):

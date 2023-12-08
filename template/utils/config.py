@@ -103,54 +103,55 @@ def add_args(cls, parser):
         default=False,
     )
 
+    parser.add_argument(
+        "--neuron.initial_peers",
+        type=str,
+        help="The address for the DHT",
+        default="/ip4/54.80.217.105/tcp/8008/p2p/12D3KooWRq4dCjodY3WsSgJu7mAUGrqHpy3hdmYhv2iRam1ocpfJ",
+    )
+
+    parser.add_argument(
+        "--neuron.model_name",
+        type=str,
+        help="The model to be trained",
+        default="kmfoda/tiny-random-gpt2",
+    )
+
+    parser.add_argument(
+        "--neuron.lr",
+        type=float,
+        help="The learning rate",
+        default=0.00001,
+    )
+
+    parser.add_argument(
+        "--neuron.dataset_name",
+        type=str,
+        help="The datasets the model will be trained on",
+        default="wikitext",
+    )
+
+    parser.add_argument(
+        "--neuron.batch_size",
+        type=int,
+        help="The default batch size",
+        default=32,
+    )
+
+    parser.add_argument(
+        "--neuron.run_id",
+        type=str,
+        help="The DHT run_id",
+        default="7am_run_test",
+    )
+
     if neuron_type == "validator":
-        parser.add_argument(
-            "--neuron.initial_peers",
-            type=str,
-            help="The address for the DHT",
-            default="/ip4/54.80.217.105/tcp/8008/p2p/12D3KooWRq4dCjodY3WsSgJu7mAUGrqHpy3hdmYhv2iRam1ocpfJ",
-        )
-
-        parser.add_argument(
-            "--neuron.model_name",
-            type=str,
-            help="The model to be trained",
-            default="kmfoda/tiny-random-gpt2",
-        )
-
-        parser.add_argument(
-            "--neuron.lr",
-            type=float,
-            help="The learning rate",
-            default=0.00001,
-        )
-
-        parser.add_argument(
-            "--neuron.dataset_name",
-            type=str,
-            help="The datasets the model will be trained on",
-            default="wikitext",
-        )
-
-        parser.add_argument(
-            "--neuron.batch_size",
-            type=int,
-            help="The default batch size",
-            default=32,
-        )
 
         parser.add_argument(
             "--neuron.num_of_duplicates",
             type=int,
             help="The size of a group of miners duplicating work",
             default=2,
-        )
-    
-        parser.add_argument(
-            "--neuron.run_id",
-            type=str,
-            help="The DHT run_id",
-            default="7am_run_test",
         )
 
         parser.add_argument(
