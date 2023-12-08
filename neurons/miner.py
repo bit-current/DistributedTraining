@@ -26,6 +26,7 @@ import template
 
 # import base miner class which takes care of most of the boilerplate
 from template.base.miner import BaseMinerNeuron
+from template.protocol import Train
 
 import bittensor as bt
 import torch
@@ -46,6 +47,40 @@ class Miner(BaseMinerNeuron):
         super(Miner, self).__init__(config=config)
 
         # TODO(developer): Anything specific to your use case you can do here
+        
+        dht = hivemind.DHT(initial_peers=[Train.initial_peers], start=True)
+        self.model = AutoModelForCausalLM.from_pretrained(Train.model_name)
+        opt = torch.optim.AdamW(self.model.parameters(), lr = 1e-5)
+
+        # Set up a decentralized optimizer that will average with peers in background
+        self.opt = hivemind.Optimizer(
+            dht=dht,                  # use a DHT that is connected with other peers
+            run_id=Train.run_id,    # unique identifier of this collaborative run #TODO Should we set the same run_id as for the validator??
+            batch_size_per_step=32,   # each call to opt.step adds this many samples towards the next epoch
+            target_batch_size=10000,  # after peers collectively process this many samples, average weights and begin the next epoch
+            optimizer=opt,            # wrap the SGD optimizer defined above
+            use_local_updates=True,   # perform optimizer steps with local gradients, average parameters in background
+            matchmaking_time=3.0,     # when averaging parameters, gather peers in background for up to this many seconds
+            averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
+            verbose=True              # print logs incessently
+        )
+        
+        # # Use CUDA if available, otherwise use CPU
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Move the model to the appropriate device
+        self.model.to(self.device)
+        
+        self.tokenizer = AutoTokenizer.from_pretrained(Train.model_name)
+        # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        
+        # Load dataset
+        self.dataset = load_dataset(Train.dataset_name, 'wikitext-2-v1', split='train')
+        
+    # Define encoding function
+    def encode(self, examples):
+        return self.tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')
+
 
     async def forward(
         self, synapse: template.protocol.Train
@@ -59,48 +94,15 @@ class Miner(BaseMinerNeuron):
         Returns:
             template.protocol.Train: The synapse object with the 'loss' field set to models loss.
         """
-
-        # # Use CUDA if available, otherwise use CPU
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        dht = hivemind.DHT(initial_peers=[synapse.initial_peers], start=True)
-        model = AutoModelForCausalLM.from_pretrained(synapse.model_name)
-        opt = torch.optim.AdamW(model.parameters(), lr = synapse.lr)
-
-        # opt = hivemind.Optimizer(dht=dht, run_id="1", batch_size_per_step=32,target_batch_size=10000,optimizer=opt,use_local_updates=True,matchmaking_time=3.0,averaging_timeout=10.0,verbose=True)
-        # Set up a decentralized optimizer that will average with peers in background
-        opt = hivemind.Optimizer(
-            dht=dht,                  # use a DHT that is connected with other peers
-            run_id=synapse.run_id,    # unique identifier of this collaborative run
-            batch_size_per_step=32,   # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=10000,  # after peers collectively process this many samples, average weights and begin the next epoch
-            optimizer=opt,            # wrap the SGD optimizer defined above
-            use_local_updates=True,   # perform optimizer steps with local gradients, average parameters in background
-            matchmaking_time=3.0,     # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=10.0,   # give up on averaging if not successful in this many seconds
-            verbose=True              # print logs incessently
-        )
     
         bt.logging.info("Loading state from peers")
-        opt.load_state_from_peers()
-        
-        tokenizer = AutoTokenizer.from_pretrained(synapse.model_name)
-        
-        # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
-        tokenizer.pad_token = tokenizer.eos_token
-        # Move the model to the appropriate device
-        model.to(device)
+        self.opt.load_state_from_peers()
 
-        # Load dataset
-        dataset = load_dataset(synapse.dataset_name, 'wikitext-2-v1', split='train')
-        dataset = dataset.select(synapse.dataset_indices)
+        # Select dataset indices to use for optimization step
+        dataset = self.dataset.select(synapse.dataset_indices)
         
-        # Define encoding function
-        def encode(examples):
-            return tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')
-
         # Encode the dataset
-        encoded_dataset = dataset.map(encode, batched=True)
+        encoded_dataset = dataset.map(self.encode, batched=True)
         
         # Create a PyTorch DataLoader
         dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size, collate_fn = default_data_collator)
@@ -108,14 +110,14 @@ class Miner(BaseMinerNeuron):
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
             
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
+            input_ids = batch['input_ids'].to(self.device)
+            attention_mask = batch['attention_mask'].to(self.device)
             labels = input_ids.clone()
 
-            opt.zero_grad()
+            self.opt.zero_grad()
             
             # Forward pass
-            outputs = model(
+            outputs = self.model(
                 input_ids = input_ids, 
                 attention_mask = attention_mask,
                 labels = labels
@@ -125,7 +127,7 @@ class Miner(BaseMinerNeuron):
             loss = outputs.loss
             loss.backward()
             # Adjust gradient
-            opt.step()
+            self.opt.step()
             
         synapse.loss = loss
 
