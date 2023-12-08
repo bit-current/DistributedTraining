@@ -44,11 +44,15 @@ class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
         
+        # Init device
+        self.device = self.config.neuron.device
+
+        # Init DHT
         dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
-        self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
-        opt = torch.optim.AdamW(self.model.parameters(), lr = self.config.neuron.lr)
-        breakpoint()
+        self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name).to()
+        
         # Set up a decentralized optimizer that will average with peers in background
+        opt = torch.optim.AdamW(self.model.parameters(), lr = self.config.neuron.lr)
         self.opt = hivemind.Optimizer(
             dht=dht,                    # use a DHT that is connected with other peers
             run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run #TODO Should we set the same run_id as for the validator??
@@ -60,9 +64,6 @@ class Miner(BaseMinerNeuron):
             averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
             verbose=True                # print logs incessently
         )
-        
-        # Init device
-        self.device = self.config.neuron.device
         
         # Move the model to the appropriate device
         self.model.to(self.device)
