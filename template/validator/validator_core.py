@@ -42,8 +42,7 @@ class DatasetStateSingelton:
         Serializes the dataset indices to a string.
         """
         # Assuming dataset_indices is a list or a similar serializable structure
-        breakpoint()
-        return json.dumps(data_str)
+        return json.dumps(data_str.value)
 
     @staticmethod
     def _deserialize_from_string(data_str):
@@ -51,8 +50,7 @@ class DatasetStateSingelton:
         Deserializes the string back to dataset indices.
         """
         # Assuming the data_str is in JSON format
-        breakpoint()
-        return json.loads(data_str)
+        return json.loads(data_str.value)
 
 
     def get_dht(cls, name):
