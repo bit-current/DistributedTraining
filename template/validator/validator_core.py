@@ -42,7 +42,7 @@ class DatasetStateSingelton:
         Serializes the dataset indices to a string.
         """
         # Assuming dataset_indices is a list or a similar serializable structure
-        return json.dumps(data_str.value)
+        return json.dumps(data_str)
 
     @staticmethod
     def _deserialize_from_string(data_str):
