@@ -36,16 +36,16 @@ class DatasetStateSingelton:
             
         return cls._instance
 
-    @classmethod
-    def _serialize_to_string(cls,data_str):
+    @staticmethod
+    def _serialize_to_string(data_str):
         """
         Serializes the dataset indices to a string.
         """
         # Assuming dataset_indices is a list or a similar serializable structure
         return json.dumps(data_str)
 
-    @classmethod
-    def _deserialize_from_string(cls, data_str):
+    @staticmethod
+    def _deserialize_from_string(data_str):
         """
         Deserializes the string back to dataset indices.
         """
@@ -65,22 +65,22 @@ class DatasetStateSingelton:
         return status
     
 
-    def get_dataset_indices(cls, m, n):
+    def get_dataset_indices(cls, groups_count, items_per_group):
         """
         Selects m groups of n consecutive indices from a list in indices_dict[key].
         Each group of n indices is removed from the original list to ensure no replacement.
 
         :param indices_dict: Dictionary containing lists of indices.
         :param key: Key in the dictionary to access the list of indices.
-        :param m: Number of groups to select.
-        :param n: Number of consecutive indices in each group.
+        :param groups_count: Number of groups to select.
+        :param items_per_group: Number of consecutive indices in each group.
         :return: List of selected groups, each group is a list of n indices.
         """
         breakpoint()
         indices = cls.get_dht("dataset_indices")
         no_value_flag = False
         try:
-            no_value_flag = len(indices) < m * n
+            no_value_flag = len(indices) < groups_count * items_per_group
         except:
             no_value_flag = True
         if no_value_flag:
@@ -94,17 +94,17 @@ class DatasetStateSingelton:
             except:
                 cls.epoch = 1
 
-            return cls.get_dataset_indices(m,n)
+            return cls.get_dataset_indices(groups_count,items_per_group)
             #raise ValueError()
 
         selected_groups = []
-        for _ in range(m):
-            start = random.choice(range(len(indices) - n + 1))
-            group = indices[start:start + n]
+        for _ in range(groups_count):
+            start = random.choice(range(len(indices) - items_per_group + 1))
+            group = indices[start:start + items_per_group]
             selected_groups.append(group)
 
             # Remove selected indices
-            indices = indices[:start] + indices[start + n:]
+            indices = indices[:start] + indices[start + items_per_group:]
 
         # Update the original list in the dictionary
         print("updating after mod")

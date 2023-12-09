@@ -58,7 +58,7 @@ class Validator(BaseValidatorNeuron):
         self.dendrite_pool = AsyncDendritePool( wallet = self.wallet, metagraph = self.metagraph )
         
         # Init Loss
-        self.previous_loss = -1000
+        self.previous_loss = -1000 #FIXME can't get 0 vals everytime we reset. add to vali state?
         self.latest_upload = 0
         self.latest_weight_update = 0
         self.step = 0
@@ -77,11 +77,11 @@ class Validator(BaseValidatorNeuron):
         # Init State Averager
         self.state_averager = TrainingStateAverager(
             dht=self.dht, 
-            optimizer=partial(torch.optim.AdamW, lr=self.config.neuron.lr), 
+            optimizer=partial(torch.optim.AdamW, lr=self.config.neuron.lr), #FIXME shouldn't this be an instance of a loaded optimizer?
             scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
             params=self.model.parameters(),
             start=True,
-            prefix=f"{self.config.neuron.run_id}_state_averager_1",
+            prefix=f"{self.config.neuron.run_id}_state_averager_1", #do we add validator id? or let all valis collaborate? corrputible though?
             # state_compression=hivemind.Float16Compression(),
             # bandwidth=optimizer_args.bandwidth,
             # client_mode=optimizer_args.client_mode,
