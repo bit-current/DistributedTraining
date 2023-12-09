@@ -44,7 +44,7 @@ async def forward(self):
     numbers_of_groups = int(len(miner_uids)//uids_per_group)
     
     uid_list = [miner_uids[(i*uids_per_group):((i*uids_per_group)+uids_per_group)] if i != (numbers_of_groups-1) else miner_uids[(i*uids_per_group):] for i in range(0, numbers_of_groups)]
-    dataset_indices_list = self.dataset_common_state.get_dataset_indices(m = numbers_of_groups, n = datapoints_per_group) #TODO add repeat on blocked
+    dataset_indices_list = self.dataset_common_state.get_dataset_indices(groups_count = numbers_of_groups, items_per_group = datapoints_per_group) #TODO add repeat on blocked
     #dataset_indices_list = [[1,2],[3,4],[5,6]]  
 
     query_tasks = []
