@@ -42,6 +42,7 @@ class DatasetStateSingelton:
         Serializes the dataset indices to a string.
         """
         # Assuming dataset_indices is a list or a similar serializable structure
+        breakpoint()
         return json.dumps(data_str)
 
     @staticmethod
@@ -50,6 +51,7 @@ class DatasetStateSingelton:
         Deserializes the string back to dataset indices.
         """
         # Assuming the data_str is in JSON format
+        breakpoint()
         return json.loads(data_str)
 
 
