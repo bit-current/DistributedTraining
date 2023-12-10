@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 
 # Sync calls set weights and also resyncs the metagraph.
 from template.utils.config import check_config, add_args, config
-from template.utils.misc import ttl_get_block
+from template.utils.misc import ttl_get_block, load_wandb
 from template import __spec_version__ as spec_version
 
 
@@ -98,6 +98,9 @@ class BaseNeuron(ABC):
             f"Running neuron on subnet: {self.config.netuid} with uid {self.uid} using network: {self.subtensor.chain_endpoint}"
         )
         self.step = 0
+
+        if not self.config.neuron.dont_wandb_log:
+            self.wandb = load_wandb(self.config, self.wallet)
 
     @abstractmethod
     async def forward(self, synapse: bt.Synapse) -> bt.Synapse:

@@ -59,7 +59,7 @@ async def forward(self):
                     dataset_indices = dataset_indices_list[index],
                     run_id = self.config.neuron.run_id,
                     # initial_peers = config.initial_peers,     #TODO Add a decorator or sth for this to get the values 
-                    batch_size = self.config.neuron.batch_size  #TODO let miners decide this? Based on their hardware
+                    batch_size = self.config.neuron.batch_size  #TODO let miners decide this? Based on their hardware. Then reconcile if needed?
                 )
             )
 
@@ -70,9 +70,9 @@ async def forward(self):
                 queries
             )
         )
-    breakpoint()
+    #breakpoint()
     responses = await asyncio.gather(*query_tasks)
-    breakpoint()
+    #breakpoint()
 
     # Log the results for monitoring purposes.
     bt.logging.info(f"Received responses: {responses}")

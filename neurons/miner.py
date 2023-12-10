@@ -26,6 +26,7 @@ import template
 
 # import base miner class which takes care of most of the boilerplate
 from template.base.miner import BaseMinerNeuron
+from template.utils.misc import load_wandb
 
 import bittensor as bt
 import torch
@@ -39,6 +40,8 @@ from transformers import (
     get_linear_schedule_with_warmup,
     default_data_collator
 )
+
+
 
 class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
@@ -75,6 +78,8 @@ class Miner(BaseMinerNeuron):
         # Load dataset
         self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
         
+        
+
     # Define encoding function
     def encode(self, examples):
         return self.tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')
@@ -92,13 +97,14 @@ class Miner(BaseMinerNeuron):
         Returns:
             template.protocol.Train: The synapse object with the 'loss' field set to models loss.
         """
-
+        
         bt.logging.info("Loading state from peers")
         self.opt.load_state_from_peers()
 
         # Select dataset indices to use for optimization step
         dataset = self.dataset.select(synapse.dataset_indices)
-        
+        if not self.config.neuron.dont_wandb_log:
+            self.wandb.log("received_indices", synapse.dataset_indices)
         # Encode the dataset
         encoded_dataset = dataset.map(self.encode, batched=True)
         
@@ -107,7 +113,7 @@ class Miner(BaseMinerNeuron):
         
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
-            breakpoint()
+            #breakpoint()
             input_ids = batch['input_ids'].to(self.device)
             attention_mask = batch['attention_mask'].to(self.device)
             labels = input_ids.clone()
@@ -123,6 +129,9 @@ class Miner(BaseMinerNeuron):
             
             # Backward pass    
             loss = outputs.loss
+            if not self.config.neuron.dont_wandb_log:
+                self.wandb.log("loss", loss)
+                self.wandb.log('opt_local_epoch', self.opt.local_epoch)
             loss.backward()
             # Adjust gradient
             self.opt.step()

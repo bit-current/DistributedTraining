@@ -145,6 +145,27 @@ def add_args(cls, parser):
         default="7am_run_test",
     )
 
+    parser.add_argument(
+        "--neuron.dont_wandb_log",
+        action="store_true",
+        help="Toggles wandb logging for the project",
+        default=False
+    )
+
+    parser.add_argument(
+        "--neuron.wand_project",
+        type=str,
+        help="The wandb project to log to",
+        default="subnet25",
+    )
+
+    parser.add_argument(
+        "--neuron.wand_entity",
+        type=str,
+        help="The wandb project to log to",
+        default="azawahry",
+    )
+
     if neuron_type == "validator":
 
         parser.add_argument(

@@ -76,7 +76,7 @@ class DatasetStateSingelton:
         :param items_per_group: Number of consecutive indices in each group.
         :return: List of selected groups, each group is a list of n indices.
         """
-        breakpoint()
+        #breakpoint()
         indices = cls.get_dht("dataset_indices")
         no_value_flag = False
         try:

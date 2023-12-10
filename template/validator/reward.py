@@ -72,6 +72,10 @@ def get_rewards(
     # Backward pass
     loss = outputs.loss
 
+    if not self.config.neuron.dont_wandb_log:
+        self.wandb.log("loss",loss)
+        self.wandb.log("previous_loss",self.previous_loss)
+
     # Compute score
     if (loss - self.previous_loss) > 0:
         score = 0
@@ -79,6 +83,9 @@ def get_rewards(
         score = 1
 
     self.previous_loss = loss
+
+
+
 
     # Get all the reward results by iteratively calling your reward() function.
     return torch.FloatTensor(

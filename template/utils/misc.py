@@ -26,6 +26,7 @@ import bittensor as bt
 from typing import Any, List
 from template.protocol import Train
 import asyncio
+import wandb
 
 
 # LRU Cache with TTL
@@ -139,3 +140,47 @@ class AsyncDendritePool:
             return await asyncio.gather(*corutines)
         
         return await query_async()
+    
+
+def load_wandb(config, wallet):
+
+    signature = wallet.hotkey.sign(config.neuron.run_id).hex() #Extra for verification if needed
+    run_name = wallet.hotkey.ss58_address + "_" + config.neuron.run_id + "_" + signature 
+
+    wandb_run = wandb.init(
+        id = run_name,
+        name=run_name,
+        anonymous="allow",
+        project=config.neuron.wandb_project,
+        entity=config.neuron.wandb_entity,
+        config=config,
+        allow_val_change=True,
+    )
+
+    return wandb_run
+## 
+# Subnet 9 like wandb signature for extra security?
+#     config = bt.config()
+#     config.uid = my_uid
+#     config.hotkey = wallet.hotkey.ss58_address
+#     config.run_name = run_name
+#     config.version = pt.__version__
+#     config.type = 'miner'
+
+#     # Initialize wandb run
+#     wandb_run = wandb.init(
+#         id = _run_id,
+#         name=run_name,
+#         anonymous="allow",
+#         project=pt.WANDB_PROJECT,
+#         entity='opentensor-dev',
+#         config=config,
+#         dir=config.full_path,
+#         allow_val_change=True,
+#     )
+
+#     # Creating a signature for security
+#     signature = wallet.hotkey.sign(wandb_run.id.encode()).hex()
+#     config.signature = signature
+#     wandb.config.update(config, allow_val_change=True)
+

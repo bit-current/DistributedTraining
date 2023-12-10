@@ -35,12 +35,11 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 from functools import partial
-from template.utils.misc import AsyncDendritePool
+from template.utils.misc import AsyncDendritePool, load_wandb
 from template.utils.uids import get_random_uids
 from template.validator.validator_core import DatasetStateSingelton, ModelSingleton, upload_checkpoint
 from template.validator import forward
 from template.base.validator import BaseValidatorNeuron
-
 
 class Validator(BaseValidatorNeuron):
 
