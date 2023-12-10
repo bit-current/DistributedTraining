@@ -153,14 +153,14 @@ def add_args(cls, parser):
     )
 
     parser.add_argument(
-        "--neuron.wand_project",
+        "--neuron.wandb_project",
         type=str,
         help="The wandb project to log to",
         default="subnet25",
     )
 
     parser.add_argument(
-        "--neuron.wand_entity",
+        "--neuron.wandb_entity",
         type=str,
         help="The wandb project to log to",
         default="azawahry",
