@@ -145,7 +145,7 @@ class AsyncDendritePool:
 def load_wandb(config, wallet):
 
     #signature = wallet.hotkey.sign(config.neuron.run_id).hex() #Extra for verification if needed
-    run_name = wallet.hotkey.ss58_address + "_" + config.neuron.run_id + "_" #+ signature 
+    run_name = config.neuron.run_id #+ signature 
 
     wandb_run = wandb.init(
         id = run_name,
@@ -157,6 +157,10 @@ def load_wandb(config, wallet):
         allow_val_change=True,
     )
 
+    signature = wallet.hotkey.sign(config.neuron.run_id.encode()).hex()
+    config.hotkey_address = wallet.hotkey.ss58_address
+    config.signature = signature
+    wandb_run.config.update(config, allow_val_change=True)
     return wandb_run
 ## 
 # Subnet 9 like wandb signature for extra security?
