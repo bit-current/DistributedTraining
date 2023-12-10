@@ -104,7 +104,7 @@ class Miner(BaseMinerNeuron):
         # Select dataset indices to use for optimization step
         dataset = self.dataset.select(synapse.dataset_indices)
         if not self.config.neuron.dont_wandb_log:
-            self.wandb.log("received_indices", synapse.dataset_indices)
+            self.wandb.log({"received_indices": synapse.dataset_indices})
         # Encode the dataset
         encoded_dataset = dataset.map(self.encode, batched=True)
         
@@ -130,8 +130,8 @@ class Miner(BaseMinerNeuron):
             # Backward pass    
             loss = outputs.loss
             if not self.config.neuron.dont_wandb_log:
-                self.wandb.log("loss", loss)
-                self.wandb.log('opt_local_epoch', self.opt.local_epoch)
+                self.wandb.log({"loss":loss,
+                            'opt_local_epoch':self.opt.local_epoch})
             loss.backward()
             # Adjust gradient
             self.opt.step()

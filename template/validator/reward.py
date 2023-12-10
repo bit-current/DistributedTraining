@@ -73,8 +73,8 @@ def get_rewards(
     loss = outputs.loss
 
     if not self.config.neuron.dont_wandb_log:
-        self.wandb.log("loss",loss)
-        self.wandb.log("previous_loss",self.previous_loss)
+        self.wandb.log({"loss":loss,
+                    "previous_loss":self.previous_loss})
 
     # Compute score
     if (loss - self.previous_loss) > 0:
