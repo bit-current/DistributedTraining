@@ -2,3 +2,4 @@ bittensor
 datasets
 transformers
 hivemind
+wandb
