@@ -146,7 +146,6 @@ def load_wandb(config, wallet):
 
     #signature = wallet.hotkey.sign(config.neuron.run_id).hex() #Extra for verification if needed
     run_name = config.neuron.run_id #+ signature 
-    breakpoint()
     wandb_run = wandb.init(
         id = run_name,
         name=run_name,
