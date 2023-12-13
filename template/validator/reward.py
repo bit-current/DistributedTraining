@@ -20,6 +20,7 @@
 import torch
 from typing import List
 import random
+import bittensor as bt
 
 
 def reward(query: int, response: int) -> float:
@@ -82,10 +83,12 @@ def get_rewards(
     else:
         score = 1
 
+    # Log score, previous and current loss
+    bt.logging.info(f"Previous loss:    {self.previous_loss}")
+    bt.logging.info(f"Current loss:     {loss}")
+    bt.logging.info(f"Score:            {score}")
+
     self.previous_loss = loss
-
-
-
 
     # Get all the reward results by iteratively calling your reward() function.
     return torch.FloatTensor(

@@ -50,10 +50,13 @@ class Miner(BaseMinerNeuron):
         # Init device
         self.device = self.config.neuron.device
 
-        # Init DHT
+        # Init DHT and model
         dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
-        self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name).to()
+        self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
         
+        # Move the model to the appropriate device
+        self.model = self.model.to(self.device)
+
         # Set up a decentralized optimizer that will average with peers in background
         opt = torch.optim.AdamW(self.model.parameters(), lr = self.config.neuron.lr)
         self.opt = hivemind.Optimizer(
@@ -65,11 +68,8 @@ class Miner(BaseMinerNeuron):
             use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
             matchmaking_time=3.0,       # when averaging parameters, gather peers in background for up to this many seconds
             averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
-            verbose=True                # print logs incessently
+            verbose=False                # print logs incessently
         )
-        
-        # Move the model to the appropriate device
-        self.model.to(self.device)
         
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
@@ -113,7 +113,7 @@ class Miner(BaseMinerNeuron):
         
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
-            #breakpoint()
+            
             input_ids = batch['input_ids'].to(self.device)
             attention_mask = batch['attention_mask'].to(self.device)
             labels = input_ids.clone()
@@ -126,7 +126,6 @@ class Miner(BaseMinerNeuron):
                 attention_mask = attention_mask,
                 labels = labels
             )     
-            
             # Backward pass    
             loss = outputs.loss
             if not self.config.neuron.dont_wandb_log:
@@ -135,10 +134,12 @@ class Miner(BaseMinerNeuron):
             loss.backward()
             # Adjust gradient
             self.opt.step()
+
+            bt.logging.info(f"Step {step} Loss: {loss}")
             
         synapse.loss = loss
 
-        bt.logging.info(f"loss {synapse.loss}")
+        bt.logging.info(f"Final Loss: {synapse.loss}")
         
         return synapse
 

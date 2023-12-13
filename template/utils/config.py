@@ -107,14 +107,14 @@ def add_args(cls, parser):
         "--neuron.initial_peers",
         type=str,
         help="The address for the DHT",
-        default="/ip4/54.80.217.105/tcp/8008/p2p/12D3KooWRq4dCjodY3WsSgJu7mAUGrqHpy3hdmYhv2iRam1ocpfJ",
+        default="/ip4/54.80.217.105/tcp/8008/p2p/12D3KooWBEdZxHrv6LRwH8qioP3Fv7fK4RgiabvbJvL2giRLh7fN",
     )
 
     parser.add_argument(
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="kmfoda/tiny-random-gpt2",
+        default="gpt2",
     )
 
     parser.add_argument(
@@ -142,7 +142,7 @@ def add_args(cls, parser):
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="7am_run_test",
+        default="s25_test_run",
     )
 
     parser.add_argument(

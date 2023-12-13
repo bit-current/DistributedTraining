@@ -47,7 +47,7 @@ class BaseValidatorNeuron(BaseNeuron):
 
         # Set up initial scoring weights for validation
         bt.logging.info("Building validation weights.")
-        self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32)
+        self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32).to(self.device)
 
         # Init sync with the network. Updates the metagraph.
         self.sync()
@@ -144,6 +144,7 @@ class BaseValidatorNeuron(BaseNeuron):
 
         # If someone intentionally stops the validator, it'll safely terminate operations.
         except KeyboardInterrupt:
+            self.opt.shutdown()
             self.dht.shutdown()
             self.axon.stop()
             bt.logging.success("Validator killed by keyboard interrupt.")

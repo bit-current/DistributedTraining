@@ -61,7 +61,6 @@ async def forward(self):
                 template.protocol.Train( 
                     dataset_indices = dataset_indices_list[index],
                     run_id = self.config.neuron.run_id,
-                    # initial_peers = config.initial_peers,     #TODO Add a decorator or sth for this to get the values 
                     batch_size = self.config.neuron.batch_size  #TODO let miners decide this? Based on their hardware. Then reconcile if needed?
                 )
             )
@@ -73,12 +72,10 @@ async def forward(self):
                 queries
             )
         )
-    #breakpoint()
     responses = await asyncio.gather(*query_tasks)
-    #breakpoint()
 
     # Log the results for monitoring purposes.
-    bt.logging.info(f"Received responses: {responses}")
+    bt.logging.info(f"Received responses: {['Loss: ' + str(response[0].loss) for response in responses if response[0].dendrite.status_code == 200 ]}")
 
     # Adjust the scores based on responses from miners.
     rewards = get_rewards(self, uids=miner_uids)
