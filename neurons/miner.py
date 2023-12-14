@@ -176,6 +176,35 @@ class Miner(BaseMinerNeuron):
 
         Otherwise, allow the request to be processed further.
         """
+        hotkey = synapse.dendrite.hotkey
+        synapse_type = type(synapse).__name__
+
+        uid = None
+        axon = None
+        for _uid, _axon in enumerate(self.metagraph.axons):
+            if _axon.hotkey == hotkey:
+                uid = _uid
+                axon = _axon
+                break
+
+        if uid is None:
+            bt.logging.trace(
+                f"Blacklisting unrecognized hotkey: {synapse.dendrite.hotkey}"
+            )
+            return (
+                True,
+                f"Blacklisted a non registered hotkey's {synapse_type} request from {hotkey}",
+            )
+
+        if self.config.blacklist.force_validator_permit and (not self.config.blacklist.allow_non_registered):
+            # Check stake if uid is recognize
+            tao = self.metagraph.neurons[uid].stake.tao
+            if tao < self.config.neuron.vpermit_tao_limit:
+                return (
+                    True,
+                    f"Blacklisted a low stake {synapse_type} request: {tao} < {self.config.neuron.vpermit_tao_limit} from {hotkey}",
+                )
+
         if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
             # Ignore requests from unrecognized entities.
             bt.logging.trace(

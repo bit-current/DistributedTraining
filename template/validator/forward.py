@@ -73,10 +73,9 @@ async def forward(self):
             )
         )
     responses = await asyncio.gather(*query_tasks)
-
     # Log the results for monitoring purposes.
-    bt.logging.info(f"Received responses: {['Loss: ' + str(response[0].loss) for response in responses if response[0].dendrite.status_code == 200 ]}")
-
+    bt.logging.info(f"Received responses: {[{'Loss':response[0].loss,'Dataset Indices':(min(responses[0][0].dataset_indices), max(responses[0][0].dataset_indices))} for response in responses if response[0].dendrite.status_code == 200 ]}")
+    
     # Adjust the scores based on responses from miners.
     rewards = get_rewards(self, uids=miner_uids)
 

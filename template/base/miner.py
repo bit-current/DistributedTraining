@@ -154,7 +154,6 @@ class BaseMinerNeuron(BaseNeuron):
             bt.logging.debug("Stopped")
 
     def __enter__(self):
-        # breakpoint()
         """
         Starts the miner's operations in a background thread upon entering the context.
         This method facilitates the use of the miner in a 'with' statement.
@@ -216,3 +215,11 @@ class BaseMinerNeuron(BaseNeuron):
 
         # Sync the metagraph.
         self.metagraph.sync(subtensor=self.subtensor)
+    
+    def save_state(self):
+        """Saves the state of the validator to a file."""
+        ...
+
+    def load_state(self):
+        """Loads the state of the validator from a file."""
+        ...

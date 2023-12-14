@@ -76,7 +76,6 @@ class DatasetStateSingelton:
         :param items_per_group: Number of consecutive indices in each group.
         :return: List of selected groups, each group is a list of n indices.
         """
-        #breakpoint()
         indices = cls.get_dht("dataset_indices")
         no_value_flag = False
         try:
@@ -116,12 +115,10 @@ class ModelSingleton:
     _instance = None
 
     @classmethod
-    def get_instance(cls, model_name):
+    def get_instance(cls, model_name, device):
         if cls._instance is None:
-            cls._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            cls._instance = AutoModelForCausalLM.from_pretrained(model_name).to(cls._device)
+            cls._instance = AutoModelForCausalLM.from_pretrained(model_name).to(device)
             
-
         return cls._instance
 
 

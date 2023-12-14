@@ -235,6 +235,7 @@ def add_args(cls, parser):
         )
 
     else:
+
         parser.add_argument(
             "--blacklist.force_validator_permit",
             action="store_true",

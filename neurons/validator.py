@@ -67,29 +67,29 @@ class Validator(BaseValidatorNeuron):
         self.dataset_indices = [i for i in range(0, len(self.dataset))]
         self.dataset_common_state = DatasetStateSingelton(self.dht , self.dataset_indices, self.config.neuron.run_id)
 
+        # Init device
+        self.device = self.config.neuron.device
+
         # Init Model
-        self.model = ModelSingleton.get_instance(self.config.neuron.model_name)
-        self.model.to(self.config.neuron.device)
+        self.model = ModelSingleton.get_instance(self.config.neuron.model_name, self.config.neuron.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         # Init State Averager
         self.state_averager = TrainingStateAverager(
             dht=self.dht, 
-            optimizer=partial(torch.optim.AdamW, lr=self.config.neuron.lr), #FIXME shouldn't this be an instance of a loaded optimizer?
+            optimizer=partial(torch.optim.AdamW, lr=self.config.neuron.lr),
             scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
             params=self.model.parameters(),
+            allow_state_sharing=False,
             start=True,
-            prefix=f"{self.config.neuron.run_id}_state_averager_1", #do we add validator id? or let all valis collaborate? corrputible though?
+            prefix=f"{self.config.neuron.run_id}_state_averager_1", 
             # state_compression=hivemind.Float16Compression(),
             # bandwidth=optimizer_args.bandwidth,
             # client_mode=optimizer_args.client_mode,
             # **asdict(averager_args),
         )
-        
-        # Init device
-        self.device = self.config.neuron.device
-        
+
         # Start Main Validation Loop
         bt.logging.info("Starting validator loop.")
         
