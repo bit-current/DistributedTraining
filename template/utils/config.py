@@ -132,7 +132,7 @@ def add_args(cls, parser):
     )
 
     parser.add_argument(
-        "--neuron.batch_size",
+        "--neuron.batch_size_train",
         type=int,
         help="The default batch size",
         default=32,
@@ -235,6 +235,13 @@ def add_args(cls, parser):
         )
 
     else:
+
+        parser.add_argument(
+            "--neuron.batch_size_test",
+            type=int,
+            help="The default batch size",
+            default=32,
+        )
 
         parser.add_argument(
             "--blacklist.force_validator_permit",

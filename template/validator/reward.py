@@ -53,7 +53,7 @@ def get_rewards(
     self.state_averager.load_state_from_peers()
     
     # Select the correct datapoints
-    dataset_sample = self.dataset.select(random.sample(self.dataset_indices, 32))
+    dataset_sample = self.dataset.select(random.sample(self.dataset_indices, self.config.batch_size_test))
 
     # Encode the dataset
     encoded_dataset = dataset_sample.map(self.encode, batched=True)
