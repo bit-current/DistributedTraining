@@ -28,11 +28,11 @@ class DatasetStateSingelton:
         if not cls._instance:
             cls._instance = super(DatasetStateSingelton, cls).__new__(cls, *args, **kwargs)
             cls._instance._dht_state = dht_state
-            cls._dataset_indices = dataset_indices
-            cls.dataset_indices = dataset_indices
             cls.default_expiration_time = default_expiration_time
             assert run_id, "run_id isn't specified when run_id can't be empty/zero/null" 
             cls.run_id = run_id
+            cls._dataset_indices = cls._instance.get_dht("dataset_indices")
+            cls._dataset_indices_original = dataset_indices
             
         return cls._instance
 
@@ -77,24 +77,25 @@ class DatasetStateSingelton:
         :return: List of selected groups, each group is a list of n indices.
         """
         indices = cls.get_dht("dataset_indices")
+        
         no_value_flag = False
         try:
-            no_value_flag = len(indices) < groups_count * items_per_group
+            no_value_flag = len(indices) < (groups_count * items_per_group)
         except:
             no_value_flag = True
+
         if no_value_flag:
-            print("Run out. Reloading")
+            bt.logging.info("Ran out of dataset indices. Reloading")
             # Not enough indices to select the required number of groups"
             # Restore all the values. Then resample.
 
-            cls.set_dht("dataset_indices", cls._dataset_indices)
+            cls.set_dht("dataset_indices", cls._dataset_indices_original)
             try:
                 cls.epoch += 1
             except:
                 cls.epoch = 1
 
             return cls.get_dataset_indices(groups_count,items_per_group)
-            #raise ValueError()
 
         selected_groups = []
         for _ in range(groups_count):
@@ -106,7 +107,7 @@ class DatasetStateSingelton:
             indices = indices[:start] + indices[start + items_per_group:]
 
         # Update the original list in the dictionary
-        print("updating after mod")
+        bt.logging.info("Removing selected indices from the DHT")
         cls.set_dht("dataset_indices",indices)
 
         return selected_groups
