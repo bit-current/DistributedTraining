@@ -169,6 +169,13 @@ def add_args(cls, parser):
     if neuron_type == "validator":
 
         parser.add_argument(
+            "--neuron.batch_size_test",
+            type=int,
+            help="The default batch size",
+            default=32,
+        )
+
+        parser.add_argument(
             "--neuron.num_of_duplicates",
             type=int,
             help="The size of a group of miners duplicating work",
@@ -235,13 +242,6 @@ def add_args(cls, parser):
         )
 
     else:
-
-        parser.add_argument(
-            "--neuron.batch_size_test",
-            type=int,
-            help="The default batch size",
-            default=32,
-        )
 
         parser.add_argument(
             "--blacklist.force_validator_permit",
