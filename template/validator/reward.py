@@ -49,7 +49,6 @@ def get_rewards(
     Returns:
     - torch.FloatTensor: A tensor of rewards for the given query and responses.
     """
-    breakpoint()
     self.state_averager.load_state_from_peers()
     
     # Select the correct datapoints
@@ -76,19 +75,21 @@ def get_rewards(
     if not self.config.neuron.dont_wandb_log:
         self.wandb.log({"loss":loss,
                     "previous_loss":self.previous_loss})
+    
+    # Get latest previous loss from DHT
+    self.previous_loss = self.dataset_common_state.get_dht("loss")
+    bt.logging.info(f"Previous loss:    {self.previous_loss}")
+    bt.logging.info(f"Current loss:     {loss}")
 
     # Compute score
     if (loss - self.previous_loss) > 0:
         score = 0
     else:
         score = 1
+        self.dataset_common_state.set_dht("loss", loss)
 
     # Log score, previous and current loss
-    bt.logging.info(f"Previous loss:    {self.previous_loss}")
-    bt.logging.info(f"Current loss:     {loss}")
     bt.logging.info(f"Score:            {score}")
-
-    self.previous_loss = loss
 
     # Get all the reward results by iteratively calling your reward() function.
     return torch.FloatTensor(
