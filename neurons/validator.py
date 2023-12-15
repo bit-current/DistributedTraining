@@ -55,17 +55,17 @@ class Validator(BaseValidatorNeuron):
         
         # Init Dendrite Pool
         self.dendrite_pool = AsyncDendritePool( wallet = self.wallet, metagraph = self.metagraph )
-        
-        # Init Loss
-        self.previous_loss = -1000 #FIXME can't get 0 vals everytime we reset. add to vali state?
-        self.latest_upload = 0
-        self.latest_weight_update = 0
-        self.step = 0
 
         # Init Dataset
         self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
         self.dataset_indices = [i for i in range(0, len(self.dataset))]
         self.dataset_common_state = DatasetStateSingelton(self.dht , self.dataset_indices, self.config.neuron.run_id)
+
+        # Init Loss
+        self.previous_loss = self.dataset_common_state.get_dht("loss")
+        self.latest_upload = 0
+        self.latest_weight_update = 0
+        self.step = 0
 
         # Init device
         self.device = self.config.neuron.device

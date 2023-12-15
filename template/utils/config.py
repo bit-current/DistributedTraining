@@ -139,6 +139,13 @@ def add_args(cls, parser):
     )
 
     parser.add_argument(
+        "--neuron.target_batch_size",
+        type=int,
+        help="The default batch size",
+        default=320,
+    )
+
+    parser.add_argument(
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",

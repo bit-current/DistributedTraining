@@ -39,7 +39,7 @@ async def forward(self):
     """
     miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
 
-    datapoints_per_group = 320
+    datapoints_per_group = self.config.neuron.target_batch_size
     uids_per_group = 2
     numbers_of_groups = int(len(miner_uids)//uids_per_group)
     

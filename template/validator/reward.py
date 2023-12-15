@@ -49,7 +49,7 @@ def get_rewards(
     Returns:
     - torch.FloatTensor: A tensor of rewards for the given query and responses.
     """
-
+    breakpoint()
     self.state_averager.load_state_from_peers()
     
     # Select the correct datapoints

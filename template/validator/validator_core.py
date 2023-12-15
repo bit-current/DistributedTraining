@@ -27,12 +27,12 @@ class DatasetStateSingelton:
     def __new__(cls, dht_state, dataset_indices,run_id,default_expiration_time = 600 ,*args, **kwargs):
         if not cls._instance:
             cls._instance = super(DatasetStateSingelton, cls).__new__(cls, *args, **kwargs)
-            cls._instance._dht_state = dht_state
+            cls._instance.dht_state = dht_state
             cls.default_expiration_time = default_expiration_time
             assert run_id, "run_id isn't specified when run_id can't be empty/zero/null" 
             cls.run_id = run_id
-            cls._dataset_indices = cls._instance.get_dht("dataset_indices")
-            cls._dataset_indices_original = dataset_indices
+            cls.dataset_indices = cls._instance.get_dht("dataset_indices")
+            cls.loss = cls._instance.get_dht("loss")
             
         return cls._instance
 
@@ -55,7 +55,7 @@ class DatasetStateSingelton:
 
     def get_dht(cls, name):
         sleep(2)
-        stored_data = cls._dht_state.get(f"{cls.run_id}_{name}")
+        stored_data = cls.dht_state.get(f"{cls.run_id}_{name}")
         return cls._deserialize_from_string(stored_data) if stored_data else None
         
     def set_dht(cls, name, value):
@@ -89,7 +89,7 @@ class DatasetStateSingelton:
             # Not enough indices to select the required number of groups"
             # Restore all the values. Then resample.
 
-            cls.set_dht("dataset_indices", cls._dataset_indices_original)
+            cls.set_dht("dataset_indices", cls.dataset_indices_original)
             try:
                 cls.epoch += 1
             except:

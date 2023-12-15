@@ -61,14 +61,14 @@ class Miner(BaseMinerNeuron):
         opt = torch.optim.AdamW(self.model.parameters(), lr = self.config.neuron.lr)
         self.opt = hivemind.Optimizer(
             dht=dht,                    # use a DHT that is connected with other peers
-            run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run #TODO Should we set the same run_id as for the validator??
+            run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run
             batch_size_per_step=self.config.neuron.batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=10000,    # after peers collectively process this many samples, average weights and begin the next epoch
+            target_batch_size=self.config.neuron.target_batch_size,    # after peers collectively process this many samples, average weights and begin the next epoch
             optimizer=opt,              # wrap the SGD optimizer defined above
             use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
-            matchmaking_time=3.0,       # when averaging parameters, gather peers in background for up to this many seconds
+            matchmaking_time=10.0,       # when averaging parameters, gather peers in background for up to this many seconds
             averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
-            verbose=False                # print logs incessently
+            verbose=False               # print logs incessently
         )
         
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
@@ -77,7 +77,7 @@ class Miner(BaseMinerNeuron):
         
         # Load dataset
         self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
-        
+        breakpoint()
         
 
     # Define encoding function
@@ -105,6 +105,7 @@ class Miner(BaseMinerNeuron):
         dataset = self.dataset.select(synapse.dataset_indices)
         if not self.config.neuron.dont_wandb_log:
             self.wandb.log({"received_indices": synapse.dataset_indices})
+
         # Encode the dataset
         encoded_dataset = dataset.map(self.encode, batched=True)
         
