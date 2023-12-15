@@ -101,9 +101,8 @@ class Miner(BaseMinerNeuron):
         bt.logging.info("Loading state from peers")
         self.opt.load_state_from_peers()
         
-        if self.optimizer.is_synchronized_with_peers():
-            # TODO bt.logging
-            print("Miner synchronized with peers")
+        if self.opt.is_synchronized_with_peers():
+            bt.logging.info("Miner synchronized with peers")
 
         # Select dataset indices to use for optimization step
         dataset = self.dataset.select(synapse.dataset_indices)
