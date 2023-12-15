@@ -19,6 +19,7 @@
 import hivemind
 import time
 import typing
+from functools import partial
 import bittensor as bt
 
 # Bittensor Miner Template:
@@ -42,7 +43,6 @@ from transformers import (
 )
 
 
-
 class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
@@ -62,6 +62,7 @@ class Miner(BaseMinerNeuron):
         self.opt = hivemind.Optimizer(
             dht=dht,                    # use a DHT that is connected with other peers
             run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run
+            scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
             batch_size_per_step=self.config.neuron.batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
             target_batch_size=self.config.neuron.target_batch_size,    # after peers collectively process this many samples, average weights and begin the next epoch
             optimizer=opt,              # wrap the SGD optimizer defined above
@@ -77,7 +78,6 @@ class Miner(BaseMinerNeuron):
         
         # Load dataset
         self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
-        breakpoint()
         
 
     # Define encoding function
@@ -100,6 +100,10 @@ class Miner(BaseMinerNeuron):
         
         bt.logging.info("Loading state from peers")
         self.opt.load_state_from_peers()
+        
+        if self.optimizer.is_synchronized_with_peers():
+            # TODO bt.logging
+            print("Miner synchronized with peers")
 
         # Select dataset indices to use for optimization step
         dataset = self.dataset.select(synapse.dataset_indices)

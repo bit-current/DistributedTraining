@@ -51,6 +51,9 @@ def get_rewards(
     """
     self.state_averager.load_state_from_peers()
     
+    # For debugging
+    #print(self.state_averager.optimizer.state_dict())
+    
     # Select the correct datapoints
     dataset_sample = self.dataset.select(random.sample(self.dataset_indices, self.config.neuron.batch_size_test))
 
@@ -80,13 +83,16 @@ def get_rewards(
     self.previous_loss = self.dataset_common_state.get_dht("loss")
     bt.logging.info(f"Previous loss:    {self.previous_loss}")
     bt.logging.info(f"Current loss:     {loss}")
-
+    
     # Compute score
-    if (loss - self.previous_loss) > 0:
-        score = 0
-    else:
+    if self.previous_loss == None:
         score = 1
-        self.dataset_common_state.set_dht("loss", loss)
+    else:    
+        if (loss - self.previous_loss) > 0:
+            score = 0
+        else:
+            score = 1
+            self.dataset_common_state.set_dht("loss", loss)
 
     # Log score, previous and current loss
     bt.logging.info(f"Score:            {score}")

@@ -24,13 +24,14 @@ class DatasetStateSingelton:
     '''
     _instance = None
 
-    def __new__(cls, dht_state, dataset_indices,run_id,default_expiration_time = 600 ,*args, **kwargs):
+    def __new__(cls, dht_state, dataset_indices, run_id, default_expiration_time = 600, *args, **kwargs):
         if not cls._instance:
             cls._instance = super(DatasetStateSingelton, cls).__new__(cls, *args, **kwargs)
             cls._instance.dht_state = dht_state
             cls.default_expiration_time = default_expiration_time
             assert run_id, "run_id isn't specified when run_id can't be empty/zero/null" 
             cls.run_id = run_id
+            cls.dataset_indices_original = dataset_indices
             cls.dataset_indices = cls._instance.get_dht("dataset_indices")
             cls.loss = cls._instance.get_dht("loss")
             
@@ -61,7 +62,7 @@ class DatasetStateSingelton:
     def set_dht(cls, name, value):
         sleep(2)
         serialized_value = cls._serialize_to_string(value)
-        status = cls._dht_state.store(f"{cls.run_id}_{name}", serialized_value, get_dht_time() + cls.default_expiration_time)
+        status = cls.dht_state.store(f"{cls.run_id}_{name}", serialized_value, get_dht_time() + cls.default_expiration_time)
         return status
     
 
@@ -77,7 +78,6 @@ class DatasetStateSingelton:
         :return: List of selected groups, each group is a list of n indices.
         """
         indices = cls.get_dht("dataset_indices")
-        
         no_value_flag = False
         try:
             no_value_flag = len(indices) < (groups_count * items_per_group)
@@ -88,14 +88,13 @@ class DatasetStateSingelton:
             bt.logging.info("Ran out of dataset indices. Reloading")
             # Not enough indices to select the required number of groups"
             # Restore all the values. Then resample.
-
             cls.set_dht("dataset_indices", cls.dataset_indices_original)
             try:
                 cls.epoch += 1
             except:
                 cls.epoch = 1
 
-            return cls.get_dataset_indices(groups_count,items_per_group)
+            return cls.get_dataset_indices(groups_count, items_per_group)
 
         selected_groups = []
         for _ in range(groups_count):

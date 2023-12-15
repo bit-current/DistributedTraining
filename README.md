@@ -22,8 +22,8 @@ pip install -e . && python post_install.py
 Once you have installed this repo and attained your subnet via the instructions in the nested docs (staging, testing, or main) you can run the miner and validator with the following commands.
 ```bash
 # To run on test net
-python neurons/miner.py --netuid 34 --subtensor.network test --wallet.name test_bitcurrent --wallet.hotkey miner_1 --logging.debug
-python neurons/validator.py --netuid 34 --subtensor.network test --wallet.name test_bitcurrent --wallet.hotkey validator_1 --logging.debug
+python neurons/miner.py --netuid 34 --subtensor.network test --wallet.name miner --wallet.hotkey default --logging.debug
+python neurons/validator.py --netuid 34 --subtensor.network test --wallet.name miner --wallet.hotkey default --logging.debug
 # To run the miner
 python -m neurons/miner.py 
     --netuid <your netuid>  # Must be attained by following the instructions in the docs/running_on_*.md files
