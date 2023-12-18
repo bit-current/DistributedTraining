@@ -26,6 +26,7 @@ import bittensor as bt
 import torch
 from datasets import load_dataset
 from hivemind.optim.state_averager import TrainingStateAverager
+
 #from optimum.bettertransformer import BetterTransformer
 from torch.utils.data import DataLoader
 from transformers import (
@@ -52,7 +53,7 @@ class Validator(BaseValidatorNeuron):
         # Init DHT
         self.dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
         # TODO bt.logging.
-        print("To join the training, use initial_peers =", [str(addr) for addr in [self.config.neuron.initial_peers]])
+        # print("To join the training, use initial_peers =", [str(addr) for addr in [self.config.neuron.initial_peers]])
         
         # Init Dendrite Pool
         self.dendrite_pool = AsyncDendritePool( wallet = self.wallet, metagraph = self.metagraph )
@@ -82,7 +83,7 @@ class Validator(BaseValidatorNeuron):
             optimizer=partial(torch.optim.AdamW, lr=self.config.neuron.lr),
             scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
             params=self.model.parameters(),
-            allow_state_sharing=False,
+            allow_state_sharing=True,
             start=True,
             prefix=f"{self.config.neuron.run_id}_state_averager_1", 
             # state_compression=hivemind.Float16Compression(),
@@ -90,7 +91,6 @@ class Validator(BaseValidatorNeuron):
             # client_mode=optimizer_args.client_mode,
             # **asdict(averager_args),
         )
-
         # Start Main Validation Loop
         bt.logging.info("Starting validator loop.")
         

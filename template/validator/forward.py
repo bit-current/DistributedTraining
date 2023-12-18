@@ -28,6 +28,7 @@ import asyncio
 
 
 async def forward(self):
+    
     """
     The forward function is called by the validator every time step.
 

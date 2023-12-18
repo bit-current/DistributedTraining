@@ -79,7 +79,8 @@ def add_args(cls, parser):
         "--neuron.device",
         type=str,
         help="Device to run on.",
-        default=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        # default=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        default=torch.device("cpu"),
     )
 
     parser.add_argument(
@@ -107,14 +108,14 @@ def add_args(cls, parser):
         "--neuron.initial_peers",
         type=str,
         help="The address for the DHT",
-        default="/ip4/54.80.217.105/tcp/8008/p2p/12D3KooWBEdZxHrv6LRwH8qioP3Fv7fK4RgiabvbJvL2giRLh7fN",
+        default="/ip4/54.80.217.105/tcp/8009/p2p/12D3KooWHfQMoqVqCqFMUNt8Dy24kfNu1PTuTLCahW4swDbpb7Zi",
     )
 
     parser.add_argument(
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="gpt2",
+        default="kmfoda/tiny-random-gpt2",
     )
 
     parser.add_argument(
@@ -135,7 +136,7 @@ def add_args(cls, parser):
         "--neuron.batch_size_train",
         type=int,
         help="The default batch size",
-        default=32,
+        default=1,
     )
 
     parser.add_argument(
@@ -179,7 +180,7 @@ def add_args(cls, parser):
             "--neuron.batch_size_test",
             type=int,
             help="The default batch size",
-            default=32,
+            default=1,
         )
 
         parser.add_argument(
@@ -207,7 +208,7 @@ def add_args(cls, parser):
             "--neuron.num_concurrent_forwards",
             type=int,
             help="The number of concurrent forwards running at any time.",
-            default=1,
+            default=16,
         )
 
         parser.add_argument(

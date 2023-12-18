@@ -23,7 +23,7 @@ Once you have installed this repo and attained your subnet via the instructions 
 ```bash
 # To run on test net
 python neurons/miner.py --netuid 34 --subtensor.network test --wallet.name miner --wallet.hotkey default --logging.debug
-python neurons/validator.py --netuid 34 --subtensor.network test --wallet.name miner --wallet.hotkey default --logging.debug
+python neurons/validator.py --netuid 34 --subtensor.network test --wallet.name validator --wallet.hotkey default --logging.debug
 # To run the miner
 python -m neurons/miner.py 
     --netuid <your netuid>  # Must be attained by following the instructions in the docs/running_on_*.md files

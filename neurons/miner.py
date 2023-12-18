@@ -51,7 +51,9 @@ class Miner(BaseMinerNeuron):
         self.device = self.config.neuron.device
 
         # Init DHT and model
-        dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
+        dht = hivemind.DHT(initial_peers=["/ip4/54.80.217.105/tcp/8009/p2p/12D3KooWHfQMoqVqCqFMUNt8Dy24kfNu1PTuTLCahW4swDbpb7Zi", 
+                                          "/ip4/54.198.90.50/tcp/8008/p2p/12D3KooWRQXo1KRH6QXYppUfSkNM17EbCvUzDbV38dHVRVmFEDZX"], 
+                           start=True)
         self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
         
         # Move the model to the appropriate device
@@ -67,9 +69,9 @@ class Miner(BaseMinerNeuron):
             target_batch_size=self.config.neuron.target_batch_size,    # after peers collectively process this many samples, average weights and begin the next epoch
             optimizer=opt,              # wrap the SGD optimizer defined above
             use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
-            matchmaking_time=10.0,       # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
-            verbose=False               # print logs incessently
+            matchmaking_time=5.0,       # when averaging parameters, gather peers in background for up to this many seconds
+            averaging_timeout=15.0,     # give up on averaging if not successful in this many seconds
+            verbose=True               # print logs incessently
         )
         
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
@@ -88,6 +90,12 @@ class Miner(BaseMinerNeuron):
     async def forward(
         self, synapse: template.protocol.Train
     ) -> template.protocol.Train:
+        
+        self.model.weight.data[...] = 42
+        self.opt.local_epoch = 42
+        bt.logging.info("Changed to 42")
+        return synapse
+        
         """
         Processes the incoming 'Train' synapse by performing a training run
 
@@ -131,10 +139,10 @@ class Miner(BaseMinerNeuron):
                 labels = labels
             )     
             # Backward pass    
-            loss = outputs.loss
             if not self.config.neuron.dont_wandb_log:
                 self.wandb.log({"loss":loss,
                             'opt_local_epoch':self.opt.local_epoch})
+            loss = outputs.loss
             loss.backward()
             # Adjust gradient
             self.opt.step()
