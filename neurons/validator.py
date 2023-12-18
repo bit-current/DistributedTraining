@@ -85,7 +85,7 @@ class Validator(BaseValidatorNeuron):
             params=self.model.parameters(),
             allow_state_sharing=True,
             start=True,
-            prefix=f"{self.config.neuron.run_id}_state_averager_1", 
+            prefix=f"{self.config.neuron.run_id}_state_averager", 
             # state_compression=hivemind.Float16Compression(),
             # bandwidth=optimizer_args.bandwidth,
             # client_mode=optimizer_args.client_mode,

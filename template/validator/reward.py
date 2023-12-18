@@ -56,7 +56,6 @@ def get_rewards(
     
     # Select the correct datapoints
     dataset_sample = self.dataset.select(random.sample(self.dataset_indices, self.config.neuron.batch_size_test))
-
     # Encode the dataset
     encoded_dataset = dataset_sample.map(self.encode, batched=True)
     

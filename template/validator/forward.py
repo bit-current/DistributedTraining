@@ -20,8 +20,6 @@
 import bittensor as bt
 
 from template.protocol import Train
-from template.validator.reward import get_rewards
-from template.utils.uids import get_random_uids
 from template.utils.misc import AsyncDendritePool
 import template
 import asyncio
@@ -38,48 +36,41 @@ async def forward(self):
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
 
     """
-    miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
-
-    datapoints_per_group = self.config.neuron.target_batch_size
-    uids_per_group = 2
-    numbers_of_groups = int(len(miner_uids)//uids_per_group)
     
-    uid_list = [miner_uids[(i*uids_per_group):((i*uids_per_group)+uids_per_group)] if i != (numbers_of_groups-1) else miner_uids[(i*uids_per_group):] for i in range(0, numbers_of_groups)]
-    dataset_indices_list = self.dataset_common_state.get_dataset_indices(groups_count = numbers_of_groups, items_per_group = datapoints_per_group) #TODO add repeat on blocked
+    #uids_per_group = 2
+    #numbers_of_groups = int(len(miner_uids)//datapoints_per_group)
+    
+    #uid_list = [miner_uids[(i*uids_per_group):((i*uids_per_group)+uids_per_group)] if i != (numbers_of_groups-1) else miner_uids[(i*uids_per_group):] for i in range(0, numbers_of_groups)]
+    
     
     if not self.config.neuron.dont_wandb_log:
-        self.wandb.log({"uids":miner_uids,
-                    "dataset_indices":dataset_indices_list})
+        self.wandb.log({"uids":self.miner_uids,
+                    "dataset_indices":self.dataset_indices_list})
 
     query_tasks = []
-    for index, uids in enumerate(uid_list):
+    #for index, uids in enumerate(uid_list):
 
-        queries = []
-        for uid in uids:
-            #TODO get the hashes of the groups
-            # Make miners return the group hashes with their losses as well.
-            queries.append(
-                template.protocol.Train( 
-                    dataset_indices = dataset_indices_list[index],
-                    run_id = self.config.neuron.run_id,
-                    batch_size = self.config.neuron.batch_size_train  #TODO let miners decide this? Based on their hardware. Then reconcile if needed?
-                )
-            )
-
-        # The dendrite client queries the network.
-        query_tasks.append(
-            self.dendrite_pool.async_forward(
-                uids,
-                queries
+    queries = []
+    for uid, uid_dataset in zip(self.miner_uids, self.dataset_indices_list):
+        #TODO get the hashes of the groups
+        # Make miners return the group hashes with their losses as well.
+        queries.append(
+            template.protocol.Train( 
+                dataset_indices = uid_dataset,
+                run_id = self.config.neuron.run_id,
+                batch_size = self.config.neuron.batch_size_train  #TODO let miners decide this? Based on their hardware. Then reconcile if needed?
             )
         )
+
+    # The dendrite client queries the network.
+    query_tasks.append(
+        self.dendrite_pool.async_forward(
+            self.miner_uids,
+            queries
+        )
+    )
     responses = await asyncio.gather(*query_tasks)
     # Log the results for monitoring purposes.
     bt.logging.info(f"Received responses: {[{'Loss':response[0].loss,'Dataset Indices':(min(responses[0][0].dataset_indices), max(responses[0][0].dataset_indices))} for response in responses if response[0].dendrite.status_code == 200 ]}")
     
-    # Adjust the scores based on responses from miners.
-    rewards = get_rewards(self, uids=miner_uids)
-
-    bt.logging.info(f"Scored responses: {rewards}")
-    # Update the scores based on the rewards.
-    self.update_scores(rewards, miner_uids)
+    return responses

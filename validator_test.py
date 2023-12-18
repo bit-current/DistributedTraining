@@ -16,7 +16,7 @@ model = nn.Linear(2, 3)
 opt = torch.optim.SGD(model.parameters(), lr=1e-5, momentum=0.9)
 
 # Create DHT: a decentralized key-value storage shared between peers
-dht = hivemind.DHT(initial_peers=["/ip4/54.80.217.105/tcp/8009/p2p/12D3KooWHfQMoqVqCqFMUNt8Dy24kfNu1PTuTLCahW4swDbpb7Zi"], 
+dht = hivemind.DHT(initial_peers=["/ip4/54.80.217.105/tcp/8009/p2p/12D3KooWQK6UNzrh59HDJe6t8unEBePU7rC1ULHHvKWULBnxknC9"], 
                    start=True)
 
 # Init State Averager
@@ -27,7 +27,7 @@ state_averager = TrainingStateAverager(
     params=model.parameters(),
     allow_state_sharing=True,
     start=True,
-    prefix="my_cifar_run_state_averager_1", 
+    prefix="my_cifar_run_state_averager", 
     # state_compression=hivemind.Float16Compression(),
     # bandwidth=optimizer_args.bandwidth,
     # client_mode=optimizer_args.client_mode,
