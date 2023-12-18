@@ -23,6 +23,7 @@ import torch
 import asyncio
 import threading
 import bittensor as bt
+import _thread
 
 from typing import List
 from traceback import print_exception
@@ -158,6 +159,7 @@ class BaseValidatorNeuron(BaseNeuron):
 
         # If someone intentionally stops the validator, it'll safely terminate operations.
         except KeyboardInterrupt:
+            _thread.interrupt_main()
             self.opt.shutdown()
             self.dht.shutdown()
             self.axon.stop()

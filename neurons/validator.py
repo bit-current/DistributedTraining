@@ -51,8 +51,6 @@ class Validator(BaseValidatorNeuron):
 
         # Init DHT
         self.dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
-        # TODO bt.logging.
-        print("To join the training, use initial_peers =", [str(addr) for addr in [self.config.neuron.initial_peers]])
         
         # Init Dendrite Pool
         self.dendrite_pool = AsyncDendritePool( wallet = self.wallet, metagraph = self.metagraph )
