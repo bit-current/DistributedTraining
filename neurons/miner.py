@@ -99,7 +99,10 @@ class Miner(BaseMinerNeuron):
         """
         
         bt.logging.info("Loading state from peers")
-        self.opt.load_state_from_peers()
+        try:
+            self.opt.load_state_from_peers()
+        except:
+            breakpoint()
         
         if self.opt.is_synchronized_with_peers():
             bt.logging.info("Miner synchronized with peers")

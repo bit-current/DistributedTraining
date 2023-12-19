@@ -160,5 +160,3 @@ cython_debug/
 #.idea/
 bittensor-subnet-template/
 wandb/
-miner_test.py
-validator_test.py

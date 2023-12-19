@@ -107,7 +107,7 @@ def add_args(cls, parser):
         "--neuron.initial_peers",
         type=str,
         help="The address for the DHT",
-        default="/ip4/79.117.44.72/tcp/10246/p2p/12D3KooWNxo1NbZvBvR4srnTgGhGuBSRisdtMXxsaavnYyxDz9Mg",
+        default="/ip4/54.80.217.105/tcp/8009/p2p/12D3KooWB4FVY7Xnir84QHfZgqVamzxUhze5jasNZd5ZiQ3dLcRo",
     )
 
     parser.add_argument(

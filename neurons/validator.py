@@ -20,20 +20,13 @@
 import hivemind
 import time
 
-# Bittensor
 import bittensor as bt
 
 import torch
 from datasets import load_dataset
 from hivemind.optim.state_averager import TrainingStateAverager
-#from optimum.bettertransformer import BetterTransformer
 from torch.utils.data import DataLoader
-from transformers import (
-    AdamW,
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    get_linear_schedule_with_warmup,
-)
+from transformers import AutoTokenizer
 from functools import partial
 from template.utils.misc import AsyncDendritePool, load_wandb
 from template.utils.uids import get_random_uids
