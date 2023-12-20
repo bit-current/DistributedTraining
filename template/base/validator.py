@@ -18,19 +18,18 @@
 # DEALINGS IN THE SOFTWARE.
 
 
-import copy
-import torch
-import asyncio
-import threading
-import bittensor as bt
 import _thread
-
-from typing import List
+import asyncio
+import copy
+import threading
 from traceback import print_exception
+from typing import List
 
+import bittensor as bt
+import torch
 from template.base.neuron import BaseNeuron
-from template.validator.reward import get_rewards
 from template.utils.uids import get_random_uids
+from template.validator.reward import get_rewards
 
 
 class BaseValidatorNeuron(BaseNeuron):
@@ -50,7 +49,9 @@ class BaseValidatorNeuron(BaseNeuron):
 
         # Set up initial scoring weights for validation
         bt.logging.info("Building validation weights.")
-        self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32).to(self.device)
+        self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32).to(
+            self.device
+        )
 
         # Init sync with the network. Updates the metagraph.
         self.sync()
@@ -87,15 +88,12 @@ class BaseValidatorNeuron(BaseNeuron):
                 pass
 
         except Exception as e:
-            bt.logging.error(
-                f"Failed to create Axon initialize with exception: {e}"
-            )
+            bt.logging.error(f"Failed to create Axon initialize with exception: {e}")
             pass
 
     async def concurrent_forward(self):
         coroutines = [
-            self.forward()
-            for _ in range(self.config.neuron.num_concurrent_forwards)
+            self.forward() for _ in range(self.config.neuron.num_concurrent_forwards)
         ]
         await asyncio.gather(*coroutines)
 
@@ -133,15 +131,25 @@ class BaseValidatorNeuron(BaseNeuron):
             while True:
                 bt.logging.info(f"step({self.step}) block({self.block})")
 
-                self.miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
+                self.miner_uids = get_random_uids(
+                    self, k=self.config.neuron.sample_size
+                )
 
-                datapoints_per_group = self.config.neuron.target_batch_size 
+                datapoints_per_group = self.config.neuron.target_batch_size
 
-                self.dataset_indices_list = self.dataset_common_state.get_dataset_indices(groups_count = len(self.miner_uids), items_per_group = datapoints_per_group) #TODO add repeat on blocked
+                self.dataset_indices_list = (
+                    self.dataset_common_state.get_dataset_indices(
+                        groups_count=len(self.miner_uids),
+                        items_per_group=datapoints_per_group,
+                    )
+                )  # TODO add repeat on blocked
+
                 # Run multiple forwards concurrently.
-                _ = self.loop.run_until_complete(self.concurrent_forward()) #TODO add loss anomaly detection
-                
-                #blocking component
+                _ = self.loop.run_until_complete(
+                    self.concurrent_forward()
+                )  # TODO add loss anomaly detection
+
+                # blocking component
                 # Adjust the scores based on responses from miners.
                 rewards = get_rewards(self, uids=self.miner_uids)
 
@@ -155,6 +163,8 @@ class BaseValidatorNeuron(BaseNeuron):
                 # Sync metagraph and potentially set weights.
                 self.sync()
 
+                # Update global and local step
+                self.dataset_common_state.update_step()
                 self.step += 1
 
         # If someone intentionally stops the validator, it'll safely terminate operations.
@@ -169,9 +179,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # In case of unforeseen errors, the validator will log the error and continue operations.
         except Exception as err:
             bt.logging.error("Error during validation", str(err))
-            bt.logging.debug(
-                print_exception(type(err), err, err.__traceback__)
-            )
+            bt.logging.debug(print_exception(type(err), err, err.__traceback__))
 
     def run_in_background_thread(self):
         """
@@ -291,9 +299,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # If so, we need to add new hotkeys and moving averages.
         if len(self.hotkeys) < len(self.metagraph.hotkeys):
             # Update the size of the moving average scores.
-            new_moving_average = torch.zeros((self.metagraph.n)).to(
-                self.device
-            )
+            new_moving_average = torch.zeros((self.metagraph.n)).to(self.device)
             min_len = min(len(self.hotkeys), len(self.scores))
             new_moving_average[:min_len] = self.scores[:min_len]
             self.scores = new_moving_average

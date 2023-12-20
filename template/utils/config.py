@@ -16,12 +16,12 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import os
-import torch
 import argparse
+import os
+
 import bittensor as bt
-from loguru import logger
 import torch
+from loguru import logger
 
 
 def check_config(cls, config: "bt.Config"):
@@ -64,9 +64,7 @@ def add_args(cls, parser):
     # Netuid Arg: The netuid of the subnet to connect to.
     parser.add_argument("--netuid", type=int, help="Subnet netuid", default=1)
 
-    neuron_type = (
-        "validator" if "miner" not in cls.__name__.lower() else "miner"
-    )
+    neuron_type = "validator" if "miner" not in cls.__name__.lower() else "miner"
 
     parser.add_argument(
         "--neuron.name",
@@ -107,7 +105,7 @@ def add_args(cls, parser):
         "--neuron.initial_peers",
         type=str,
         help="The address for the DHT",
-        default="/ip4/54.80.217.105/tcp/8009/p2p/12D3KooWB4FVY7Xnir84QHfZgqVamzxUhze5jasNZd5ZiQ3dLcRo",
+        default="/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWHN8tuk2zpFHpU4C9DkRjFvw7JbGkRj3EmAGU5STpqcDL",
     )
 
     parser.add_argument(
@@ -149,14 +147,14 @@ def add_args(cls, parser):
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_test_run",
+        default="s25_run_v1",
     )
 
     parser.add_argument(
         "--neuron.dont_wandb_log",
         action="store_true",
         help="Toggles wandb logging for the project",
-        default=False
+        default=False,
     )
 
     parser.add_argument(
@@ -174,7 +172,6 @@ def add_args(cls, parser):
     )
 
     if neuron_type == "validator":
-
         parser.add_argument(
             "--neuron.batch_size_test",
             type=int,
@@ -249,7 +246,6 @@ def add_args(cls, parser):
         )
 
     else:
-
         parser.add_argument(
             "--blacklist.force_validator_permit",
             action="store_true",
