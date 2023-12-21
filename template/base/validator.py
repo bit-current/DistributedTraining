@@ -144,6 +144,7 @@ class BaseValidatorNeuron(BaseNeuron):
                         items_per_group=datapoints_per_group
                     )
                 )
+                
                 # Run multiple forwards concurrently.
                 _ = self.loop.run_until_complete(self.concurrent_forward()) #TODO add loss anomaly detection
                 
