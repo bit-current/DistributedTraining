@@ -16,7 +16,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-
+import asyncio
 import hivemind
 import time
 
@@ -42,8 +42,7 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info("load_state()")
         self.load_state()
         
-        # Initialize placeholders for async initialized attributes
-        self.dht = None
+        
         self.dataset_common_state = None
 
         # Init Dendrite Pool
@@ -62,7 +61,10 @@ class Validator(BaseValidatorNeuron):
         self.model = ModelSingleton.get_instance(self.config.neuron.model_name, self.config.neuron.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
-
+        
+        # DHT initialization
+        self.dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
+        
         # Init State Averager
         self.state_averager = TrainingStateAverager(
             dht=self.dht, 
@@ -82,8 +84,6 @@ class Validator(BaseValidatorNeuron):
         bt.logging.info("Starting validator loop.")
         
     async def async_init(self):
-        # Asynchronous DHT initialization
-        self.dht = await hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
         
         # Init Dataset
         self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
@@ -92,6 +92,7 @@ class Validator(BaseValidatorNeuron):
         # Asynchronous DatasetStateSingleton initialization 
         self.dataset_common_state = DatasetStateSingelton(self.dht, self.dataset_indices, self.config.neuron.run_id)
         await self.dataset_common_state.initialize_async()
+        bt.logging.info("Finished async intiatlization.")
         
     # Define encoding function
     def encode(self, examples):
@@ -101,8 +102,11 @@ class Validator(BaseValidatorNeuron):
         return await forward(self)
 
 
-# Main execution
-if __name__ == "__main__":
+# Async main function
+async def main():
     async with Validator() as validator:
         while True:
             await asyncio.sleep(5)
+
+if __name__ == "__main__":
+    asyncio.run(main())
