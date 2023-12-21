@@ -41,20 +41,16 @@ class Validator(BaseValidatorNeuron):
 
         bt.logging.info("load_state()")
         self.load_state()
-
-        # Init DHT
-        self.dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
         
+        # Initialize placeholders for async initialized attributes
+        self.dht = None
+        self.dataset_common_state = None
+
         # Init Dendrite Pool
         self.dendrite_pool = AsyncDendritePool( wallet = self.wallet, metagraph = self.metagraph )
 
-        # Init Dataset
-        self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
-        self.dataset_indices = [i for i in range(0, len(self.dataset))]
-        self.dataset_common_state = DatasetStateSingelton(self.dht , self.dataset_indices, self.config.neuron.run_id)
-
         # Init Loss
-        self.previous_loss = self.dataset_common_state.get_dht("loss")
+        self.previous_loss = 0
         self.latest_upload = 0
         self.latest_weight_update = 0
         self.step = 0
@@ -85,6 +81,18 @@ class Validator(BaseValidatorNeuron):
         # Start Main Validation Loop
         bt.logging.info("Starting validator loop.")
         
+    async def async_init(self):
+        # Asynchronous DHT initialization
+        self.dht = await hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
+        
+        # Init Dataset
+        self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
+        self.dataset_indices = [i for i in range(0, len(self.dataset))]
+        
+        # Asynchronous DatasetStateSingleton initialization 
+        self.dataset_common_state = DatasetStateSingelton(self.dht, self.dataset_indices, self.config.neuron.run_id)
+        await self.dataset_common_state.initialize_async()
+        
     # Define encoding function
     def encode(self, examples):
         return self.tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length', return_tensors='pt')
@@ -93,9 +101,8 @@ class Validator(BaseValidatorNeuron):
         return await forward(self)
 
 
-# The main function parses the configuration and runs the validator.
+# Main execution
 if __name__ == "__main__":
-    with Validator() as validator:
+    async with Validator() as validator:
         while True:
-            # bt.logging.info("Validator running...", time.time())
-            time.sleep(5)
+            await asyncio.sleep(5)

@@ -32,10 +32,18 @@ class DatasetStateSingelton:
             assert run_id, "run_id isn't specified when run_id can't be empty/zero/null" 
             cls.run_id = run_id
             cls.dataset_indices_original = dataset_indices
-            cls.dataset_indices = cls._instance.get_dht("dataset_indices")
-            cls.loss = cls._instance.get_dht("loss")
+            cls.dataset_indices = None
+            cls.loss = None
             
         return cls._instance
+    
+    @classmethod
+    async def initialize_async(cls):
+        if cls.dataset_indices is None:
+            cls.dataset_indices = await cls._instance.get_dht("dataset_indices")
+        if cls.loss is None:
+            cls.loss = await cls._instance.get_dht("loss")
+            
 
     @staticmethod
     def _serialize_to_string(data_str):
@@ -52,21 +60,24 @@ class DatasetStateSingelton:
         """
         # Assuming the data_str is in JSON format
         return json.loads(data_str.value)
-
-
-    def get_dht(cls, name):
-        sleep(2)
-        stored_data = cls.dht_state.get(f"{cls.run_id}_{name}")
+    
+    @classmethod
+    async def get_dht(cls, name):
+        await asyncio.sleep(2)  # Replacing sleep with asyncio.sleep
+        loop = asyncio.get_running_loop()
+        stored_data = await loop.run_in_executor(None, cls.dht_state.get, f"{cls.run_id}_{name}")
         return cls._deserialize_from_string(stored_data) if stored_data else None
-        
-    def set_dht(cls, name, value):
-        sleep(2)
+
+    @classmethod
+    async def set_dht(cls, name, value):
+        await asyncio.sleep(2)  # Replacing sleep with asyncio.sleep
         serialized_value = cls._serialize_to_string(value)
-        status = cls.dht_state.store(f"{cls.run_id}_{name}", serialized_value, get_dht_time() + cls.default_expiration_time)
+        loop = asyncio.get_running_loop()
+        status = await loop.run_in_executor(None, cls.dht_state.store, f"{cls.run_id}_{name}", serialized_value, get_dht_time() + cls.default_expiration_time)
         return status
     
 
-    def get_dataset_indices(cls, groups_count, items_per_group):
+    async def get_dataset_indices(cls, groups_count, items_per_group):
         """
         Selects m groups of n consecutive indices from a list in indices_dict[key].
         Each group of n indices is removed from the original list to ensure no replacement.
@@ -77,7 +88,7 @@ class DatasetStateSingelton:
         :param items_per_group: Number of consecutive indices in each group.
         :return: List of selected groups, each group is a list of n indices.
         """
-        indices = cls.get_dht("dataset_indices")
+        indices = await cls.get_dht("dataset_indices")
         no_value_flag = False
         try:
             no_value_flag = len(indices) < (groups_count * items_per_group)
@@ -88,7 +99,7 @@ class DatasetStateSingelton:
             bt.logging.info("Ran out of dataset indices. Reloading")
             # Not enough indices to select the required number of groups"
             # Restore all the values. Then resample.
-            cls.set_dht("dataset_indices", cls.dataset_indices_original)
+            await cls.set_dht("dataset_indices", cls.dataset_indices_original)
             try:
                 cls.epoch += 1
             except:
@@ -107,7 +118,7 @@ class DatasetStateSingelton:
 
         # Update the original list in the dictionary
         bt.logging.info("Removing selected indices from the DHT")
-        cls.set_dht("dataset_indices",indices)
+        await cls.set_dht("dataset_indices",indices)
 
         return selected_groups
         

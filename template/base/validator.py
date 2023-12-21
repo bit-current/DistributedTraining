@@ -137,7 +137,13 @@ class BaseValidatorNeuron(BaseNeuron):
 
                 datapoints_per_group = self.config.neuron.target_batch_size 
 
-                self.dataset_indices_list = self.dataset_common_state.get_dataset_indices(groups_count = len(self.miner_uids), items_per_group = datapoints_per_group) #TODO add repeat on blocked
+                 # Assuming get_dataset_indices is an async method
+                self.dataset_indices_list = self.loop.run_until_complete(
+                    self.dataset_common_state.get_dataset_indices(
+                        groups_count=len(self.miner_uids), 
+                        items_per_group=datapoints_per_group
+                    )
+                )
                 # Run multiple forwards concurrently.
                 _ = self.loop.run_until_complete(self.concurrent_forward()) #TODO add loss anomaly detection
                 
@@ -197,11 +203,12 @@ class BaseValidatorNeuron(BaseNeuron):
             self.is_running = False
             bt.logging.debug("Stopped")
 
-    def __enter__(self):
+    async def __aenter__(self):
+        await self.async_init()
         self.run_in_background_thread()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    async def __aexit__(self, exc_type, exc_value, traceback):
         """
         Stops the validator's background operations upon exiting the context.
         This method facilitates the use of the validator in a 'with' statement.

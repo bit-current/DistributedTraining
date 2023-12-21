@@ -35,7 +35,7 @@ def reward(query: int, response: int) -> float:
     return 1.0 if response == query * 2 else 0
 
 
-def get_rewards(
+async def get_rewards(
     self,
     uids: List[int],
 ) -> torch.FloatTensor:
@@ -79,7 +79,7 @@ def get_rewards(
                     "previous_loss":self.previous_loss})
     
     # Get latest previous loss from DHT
-    self.previous_loss = self.dataset_common_state.get_dht("loss")
+    self.previous_loss = await self.dataset_common_state.get_dht("loss")
     bt.logging.info(f"Previous loss:    {self.previous_loss}")
     bt.logging.info(f"Current loss:     {loss}")
     
@@ -91,7 +91,7 @@ def get_rewards(
             score = 0
         else:
             score = 1
-            self.dataset_common_state.set_dht("loss", loss)
+            await self.dataset_common_state.set_dht("loss", loss)
 
     # Log score, previous and current loss
     bt.logging.info(f"Score:            {score}")
