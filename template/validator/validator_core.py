@@ -70,20 +70,45 @@ class DatasetStateSingelton:
         # Assuming the data_str is in JSON format
         return json.loads(data_str.value)
 
-    def get_dht(cls, name):
+    def get_dht(cls, name, max_retries = 10, base_delay = 1)):
         sleep(2)
-        stored_data = cls.dht_state.get(f"{cls.run_id}_{name}")
-        return cls._deserialize_from_string(stored_data) if stored_data else None
+        
+        retries = 0
+        while retries < max_retries:
+            try:
+                stored_data = cls.dht_state.get(f"{cls.run_id}_{name}")
+                return cls._deserialize_from_string(stored_data) if stored_data else None
+            except Exception as e:
+                bt.logging.error(f"Attempt {retries + 1} to read from the DHT failed: {e}")
+                retries += 1
+                delay = (base_delay * 2 ** retries + random.uniform(0, 1))
+                bt.logging.error(f"Retrying in {delay:.2f} seconds...")
+                time.sleep(delay)
+        raise Exception("Max retries reached, operation failed.")
 
-    def set_dht(cls, name, value):
+       
+    def set_dht(cls, name, value, max_retries = 10, base_delay = 1):
         sleep(2)
         serialized_value = cls._serialize_to_string(value)
-        status = cls.dht_state.store(
-            f"{cls.run_id}_{name}",
-            serialized_value,
-            get_dht_time() + cls.default_expiration_time,
-        )
-        return status
+
+        retries = 0
+        while retries < max_retries:
+            try:
+                status = cls.dht_state.store(
+                    f"{cls.run_id}_{name}",
+                    serialized_value,
+                    get_dht_time() + cls.default_expiration_time,
+                )
+                return status
+            except Exception as e:
+                bt.logging.error(f"Attempt {retries + 1} to write to the DHT failed: {e}")
+                retries += 1
+                delay = (base_delay * 2 ** retries + random.uniform(0, 1))
+                bt.logging.error(f"Retrying in {delay:.2f} seconds...")
+                time.sleep(delay)
+        raise Exception("Max retries reached, operation failed.")
+
+
 
     def get_dataset_indices(cls, groups_count, items_per_group):
         """
