@@ -67,6 +67,13 @@ def add_args(cls, parser):
     neuron_type = "validator" if "miner" not in cls.__name__.lower() else "miner"
 
     parser.add_argument(
+        "--dht.port",
+        type=int,
+        help="Trials for this neuron go in neuron.root / (wallet_cold - wallet_hot) / neuron.name. ",
+        default=8092,
+    )
+
+    parser.add_argument(
         "--neuron.name",
         type=str,
         help="Trials for this neuron go in neuron.root / (wallet_cold - wallet_hot) / neuron.name. ",

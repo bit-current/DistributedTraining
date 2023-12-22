@@ -16,51 +16,53 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import hivemind
 import time
 import typing
 from functools import partial
+
 import bittensor as bt
+import hivemind
 
 # Bittensor Miner Template:
 import template
+import torch
+from datasets import load_dataset
 
 # import base miner class which takes care of most of the boilerplate
 from template.base.miner import BaseMinerNeuron
 from template.utils.misc import load_wandb
-
-import bittensor as bt
-import torch
-from datasets import load_dataset
-import hivemind
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    default_data_collator,
     get_linear_schedule_with_warmup,
-    default_data_collator
 )
 
 
 class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
-        
+
         # Init device
         self.device = self.config.neuron.device
 
         # Init DHT and model
-        dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
+        self.dht = hivemind.DHT(
+            host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
+            initial_peers=[self.config.neuron.initial_peers], 
+            start=True
+        )
         self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
-        
+
         # Move the model to the appropriate device
         self.model = self.model.to(self.device)
 
         # Set up a decentralized optimizer that will average with peers in background
-        opt = torch.optim.AdamW(self.model.parameters(), lr = self.config.neuron.lr)
+        opt = torch.optim.AdamW(self.model.parameters(), lr=self.config.neuron.lr)
         self.opt = hivemind.Optimizer(
-            dht=dht,                    # use a DHT that is connected with other peers
+            dht=self.dht,                    # use a DHT that is connected with other peers
             run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run
             scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
             batch_size_per_step=self.config.neuron.batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
@@ -75,7 +77,7 @@ class Miner(BaseMinerNeuron):
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
         self.tokenizer.pad_token = self.tokenizer.eos_token
-        
+
         # Load dataset
         self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
         
@@ -97,13 +99,14 @@ class Miner(BaseMinerNeuron):
         Returns:
             template.protocol.Train: The synapse object with the 'loss' field set to models loss.
         """
-        
+
         bt.logging.info("Loading state from peers")
+
         try:
             self.opt.load_state_from_peers()
-        except:
+        except Exception as e:
             breakpoint()
-        
+
         if self.opt.is_synchronized_with_peers():
             bt.logging.info("Miner synchronized with peers")
 
@@ -114,7 +117,7 @@ class Miner(BaseMinerNeuron):
 
         # Encode the dataset
         encoded_dataset = dataset.map(self.encode, batched=True)
-        
+
         # Create a PyTorch DataLoader
         dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size, collate_fn = default_data_collator)
         
@@ -126,7 +129,7 @@ class Miner(BaseMinerNeuron):
             labels = input_ids.clone()
 
             self.opt.zero_grad()
-            
+
             # Forward pass
             outputs = self.model(
                 input_ids = input_ids, 
@@ -149,7 +152,6 @@ class Miner(BaseMinerNeuron):
         bt.logging.info(f"Final Loss: {synapse.loss}")
         
         return synapse
-
 
     async def blacklist(
         self, synapse: template.protocol.Train
