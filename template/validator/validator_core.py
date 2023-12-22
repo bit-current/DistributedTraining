@@ -1,4 +1,5 @@
 import torch
+import asyncio
 from transformers import (
     AdamW,
     AutoModelForCausalLM,
@@ -28,22 +29,20 @@ class DatasetStateSingelton:
         if not cls._instance:
             cls._instance = super(DatasetStateSingelton, cls).__new__(cls, *args, **kwargs)
             cls._instance.dht_state = dht_state
-            cls.default_expiration_time = default_expiration_time
             assert run_id, "run_id isn't specified when run_id can't be empty/zero/null" 
-            cls.run_id = run_id
-            cls.dataset_indices_original = dataset_indices
-            cls.dataset_indices = None
-            cls.loss = None
-            
+            cls._instance.run_id = run_id
+            cls._instance.dataset_indices_original = dataset_indices
+            cls._instance.dataset_indices = None
+            cls._instance.loss = None
+            cls._instance.default_expiration_time = default_expiration_time
         return cls._instance
     
     @classmethod
     async def initialize_async(cls):
-        if cls.dataset_indices is None:
-            cls.dataset_indices = await cls._instance.get_dht("dataset_indices")
-        if cls.loss is None:
-            cls.loss = await cls._instance.get_dht("loss")
-            
+        if cls._instance.dataset_indices is None:
+            cls._instance.dataset_indices = await cls._instance.get_dht("dataset_indices")
+        if cls._instance.loss is None:
+            cls._instance.loss = await cls._instance.get_dht("loss")
 
     @staticmethod
     def _serialize_to_string(data_str):
@@ -61,22 +60,20 @@ class DatasetStateSingelton:
         # Assuming the data_str is in JSON format
         return json.loads(data_str.value)
     
-    @classmethod
-    async def get_dht(cls, name):
-        await asyncio.sleep(2)  # Replacing sleep with asyncio.sleep
+    async def get_dht(self, name):
+        await asyncio.sleep(2)
         loop = asyncio.get_running_loop()
-        stored_data = await loop.run_in_executor(None, cls.dht_state.get, f"{cls.run_id}_{name}")
-        return cls._deserialize_from_string(stored_data) if stored_data else None
+        stored_data = await loop.run_in_executor(None, self.dht_state.get, f"{self.run_id}_{name}")
+        return self._deserialize_from_string(stored_data) if stored_data else None
 
-    @classmethod
-    async def set_dht(cls, name, value):
-        await asyncio.sleep(2)  # Replacing sleep with asyncio.sleep
-        serialized_value = cls._serialize_to_string(value)
+    async def set_dht(self, name, value):
+        await asyncio.sleep(2)
+        serialized_value = self._serialize_to_string(value)
         loop = asyncio.get_running_loop()
-        status = await loop.run_in_executor(None, cls.dht_state.store, f"{cls.run_id}_{name}", serialized_value, get_dht_time() + cls.default_expiration_time)
+        status = await loop.run_in_executor(None, self.dht_state.store, f"{self.run_id}_{name}", serialized_value, get_dht_time() + self.default_expiration_time)
         return status
     
-
+    @classmethod
     async def get_dataset_indices(cls, groups_count, items_per_group):
         """
         Selects m groups of n consecutive indices from a list in indices_dict[key].
@@ -88,7 +85,7 @@ class DatasetStateSingelton:
         :param items_per_group: Number of consecutive indices in each group.
         :return: List of selected groups, each group is a list of n indices.
         """
-        indices = await cls.get_dht("dataset_indices")
+        indices = await cls._instance.get_dht("dataset_indices")
         no_value_flag = False
         try:
             no_value_flag = len(indices) < (groups_count * items_per_group)
@@ -99,13 +96,13 @@ class DatasetStateSingelton:
             bt.logging.info("Ran out of dataset indices. Reloading")
             # Not enough indices to select the required number of groups"
             # Restore all the values. Then resample.
-            await cls.set_dht("dataset_indices", cls.dataset_indices_original)
+            await cls._instance.set_dht("dataset_indices", cls._instance.dataset_indices_original)
             try:
                 cls.epoch += 1
             except:
                 cls.epoch = 1
 
-            return cls.get_dataset_indices(groups_count, items_per_group)
+            return await cls.get_dataset_indices(groups_count, items_per_group)
 
         selected_groups = []
         for _ in range(groups_count):
@@ -118,7 +115,7 @@ class DatasetStateSingelton:
 
         # Update the original list in the dictionary
         bt.logging.info("Removing selected indices from the DHT")
-        await cls.set_dht("dataset_indices",indices)
+        await cls._instance.set_dht("dataset_indices",indices)
 
         return selected_groups
         

@@ -70,38 +70,10 @@ class BaseValidatorNeuron(BaseNeuron):
         self.thread: threading.Thread = None
         self.lock = asyncio.Lock()
 
-    def serve_axon(self):
-        """Serve axon to enable external connections."""
-
-        bt.logging.info("serving ip to chain...")
-        try:
-            self.axon = bt.axon(wallet=self.wallet, config=self.config)
-
-            try:
-                self.subtensor.serve_axon(
-                    netuid=self.config.netuid,
-                    axon=self.axon,
-                )
-            except Exception as e:
-                bt.logging.error(f"Failed to serve Axon with exception: {e}")
-                pass
-
-        except Exception as e:
-            bt.logging.error(
-                f"Failed to create Axon initialize with exception: {e}"
-            )
-            pass
 
     async def concurrent_forward(self):
         
-        self.miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
-
-        datapoints_per_group = self.config.neuron.target_batch_size 
         
-        self.dataset_indices_list = await self.dataset_common_state.get_dataset_indices(
-            groups_count=len(self.miner_uids), 
-            items_per_group=datapoints_per_group
-        )
         
         coroutines = [
             self.forward()
@@ -109,7 +81,7 @@ class BaseValidatorNeuron(BaseNeuron):
         ]
         await asyncio.gather(*coroutines)
 
-    def run(self):
+    async def run(self):
         """
         Initiates and manages the main loop for the miner on the Bittensor network. The main loop handles graceful shutdown on keyboard interrupts and logs unforeseen errors.
 
@@ -142,9 +114,20 @@ class BaseValidatorNeuron(BaseNeuron):
         try:
             while True:
                 bt.logging.info(f"step({self.step}) block({self.block})")
+                
+                self.miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
+
+                datapoints_per_group = self.config.neuron.target_batch_size 
+                
+                self.dataset_indices_list = await self.dataset_common_state.get_dataset_indices(
+                    groups_count=len(self.miner_uids), 
+                    items_per_group=datapoints_per_group
+                )
 
                 # Run multiple forwards concurrently.
-                _ = self.loop.run_until_complete(self.concurrent_forward()) #TODO add loss anomaly detection
+                #_ = self.loop.run_until_complete(self.concurrent_forward()) #TODO add loss anomaly detection
+                await self.concurrent_forward()
+                
                 
                 #blocking component
                 # Adjust the scores based on responses from miners.
@@ -178,6 +161,54 @@ class BaseValidatorNeuron(BaseNeuron):
                 print_exception(type(err), err, err.__traceback__)
             )
 
+
+    async def __aenter__(self):
+        await self.async_init()
+        #self.run_in_background_thread()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        """
+        Stops the validator's background operations upon exiting the context.
+        This method facilitates the use of the validator in a 'with' statement.
+
+        Args:
+            exc_type: The type of the exception that caused the context to be exited.
+                      None if the context was exited without an exception.
+            exc_value: The instance of the exception that caused the context to be exited.
+                       None if the context was exited without an exception.
+            traceback: A traceback object encoding the stack trace.
+                       None if the context was exited without an exception.
+        """
+        if self.is_running:
+            bt.logging.debug("Stopping validator in background thread.")
+            self.should_exit = True
+            self.thread.join(5)
+            self.is_running = False
+            bt.logging.debug("Stopped")
+            
+    def serve_axon(self):
+        """Serve axon to enable external connections."""
+
+        bt.logging.info("serving ip to chain...")
+        try:
+            self.axon = bt.axon(wallet=self.wallet, config=self.config)
+
+            try:
+                self.subtensor.serve_axon(
+                    netuid=self.config.netuid,
+                    axon=self.axon,
+                )
+            except Exception as e:
+                bt.logging.error(f"Failed to serve Axon with exception: {e}")
+                pass
+
+        except Exception as e:
+            bt.logging.error(
+                f"Failed to create Axon initialize with exception: {e}"
+            )
+            pass
+        
     def run_in_background_thread(self):
         """
         Starts the validator's operations in a background thread upon entering the context.
@@ -194,31 +225,6 @@ class BaseValidatorNeuron(BaseNeuron):
     def stop_run_thread(self):
         """
         Stops the validator's operations that are running in the background thread.
-        """
-        if self.is_running:
-            bt.logging.debug("Stopping validator in background thread.")
-            self.should_exit = True
-            self.thread.join(5)
-            self.is_running = False
-            bt.logging.debug("Stopped")
-
-    async def __aenter__(self):
-        await self.async_init()
-        self.run_in_background_thread()
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        """
-        Stops the validator's background operations upon exiting the context.
-        This method facilitates the use of the validator in a 'with' statement.
-
-        Args:
-            exc_type: The type of the exception that caused the context to be exited.
-                      None if the context was exited without an exception.
-            exc_value: The instance of the exception that caused the context to be exited.
-                       None if the context was exited without an exception.
-            traceback: A traceback object encoding the stack trace.
-                       None if the context was exited without an exception.
         """
         if self.is_running:
             bt.logging.debug("Stopping validator in background thread.")
