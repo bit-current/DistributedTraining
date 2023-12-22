@@ -93,6 +93,16 @@ class BaseValidatorNeuron(BaseNeuron):
             pass
 
     async def concurrent_forward(self):
+        
+        self.miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
+
+        datapoints_per_group = self.config.neuron.target_batch_size 
+        
+        self.dataset_indices_list = await self.dataset_common_state.get_dataset_indices(
+            groups_count=len(self.miner_uids), 
+            items_per_group=datapoints_per_group
+        )
+        
         coroutines = [
             self.forward()
             for _ in range(self.config.neuron.num_concurrent_forwards)
@@ -133,17 +143,6 @@ class BaseValidatorNeuron(BaseNeuron):
             while True:
                 bt.logging.info(f"step({self.step}) block({self.block})")
 
-                self.miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
-
-                datapoints_per_group = self.config.neuron.target_batch_size 
-
-                 # Assuming get_dataset_indices is an async method
-                self.dataset_indices_list = self.loop.run_until_complete(
-                    self.dataset_common_state.get_dataset_indices(
-                        groups_count=len(self.miner_uids), 
-                        items_per_group=datapoints_per_group
-                    )
-                )
                 # Run multiple forwards concurrently.
                 _ = self.loop.run_until_complete(self.concurrent_forward()) #TODO add loss anomaly detection
                 
