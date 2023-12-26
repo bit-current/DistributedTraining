@@ -39,124 +39,93 @@ from transformers import (
     default_data_collator,
     get_linear_schedule_with_warmup,
 )
+import wandb
+import traceback
+from template.utils.config import get_config
 
+# Main takes the config and starts the miner.
+def main(config):
+    # Activating Bittensor's logging with the set configurations.
+    bt.logging(config=config, logging_dir=config.full_path)
+    bt.logging.info(
+        f"Running miner for subnet: {config.netuid} on network: {config.subtensor.chain_endpoint} with config:"
+    )
 
-class Miner(BaseMinerNeuron):
-    def __init__(self, config=None):
-        super(Miner, self).__init__(config=config)
+    # This logs the active configuration to the specified logging directory for review.
+    #bt.logging.info(config)
+
+    # Step 4: Initialize Bittensor miner objects
+    # These classes are vital to interact and function within the Bittensor network.
+    bt.logging.info("Setting up bittensor objects.")
+
+    # Wallet holds cryptographic information, ensuring secure transactions and communication.
+    wallet = bt.wallet(config=config)
+    bt.logging.info(f"Wallet: {wallet}")
+
+    # subtensor manages the blockchain connection, facilitating interaction with the Bittensor blockchain.
+    subtensor = bt.subtensor(config=config)
+    bt.logging.info(f"Subtensor: {subtensor}")
+
+    # metagraph provides the network's current state, holding state about other participants in a subnet.
+    metagraph = subtensor.metagraph(config.netuid)
+    bt.logging.info(f"Metagraph: {metagraph}")
+
+    if wallet.hotkey.ss58_address not in metagraph.hotkeys:
+        bt.logging.error(
+            f"\nYour miner: {wallet} is not registered to chain connection: {subtensor} \nRun btcli register and try again. "
+        )
+        exit()
+
+    # Each miner gets a unique identity (UID) in the network for differentiation.
+    my_subnet_uid = metagraph.hotkeys.index(wallet.hotkey.ss58_address)
+    bt.logging.info(f"Running miner on uid: {my_subnet_uid}")
+
+    # Step 5: Set up miner functionalities
+    # The following functions control the miner's response to incoming requests.
 
         # Init device
-        self.device = self.config.neuron.device
+    device = config.neuron.device
 
-        # Init DHT and model
-        self.dht = hivemind.DHT(
-            host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
-            initial_peers=[self.config.neuron.initial_peers], 
-            start=True
-        )
-        self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
+    # Init DHT and model
+    dht = hivemind.DHT(
+        host_maddrs=[f"/ip4/0.0.0.0/tcp/{config.dht.port}", f"/ip4/0.0.0.0/udp/{config.dht.port}/quic"],
+        initial_peers=[config.neuron.initial_peers], 
+        start=True
+    )
+    model = AutoModelForCausalLM.from_pretrained(config.neuron.model_name)
 
-        # Move the model to the appropriate device
-        self.model = self.model.to(self.device)
+    # Move the model to the appropriate device
+    model = model.to(device)
 
-        # Set up a decentralized optimizer that will average with peers in background
-        opt = torch.optim.AdamW(self.model.parameters(), lr=self.config.neuron.lr)
-        self.opt = hivemind.Optimizer(
-            dht=self.dht,                    # use a DHT that is connected with other peers
-            run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run
-            scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
-            batch_size_per_step=self.config.neuron.batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=self.config.neuron.target_batch_size,    # after peers collectively process this many samples, average weights and begin the next epoch
-            optimizer=opt,              # wrap the SGD optimizer defined above
-            use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
-            matchmaking_time=10.0,       # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
-            verbose=False               # print logs incessently
-        )
-        
-        self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
-        # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
-        self.tokenizer.pad_token = self.tokenizer.eos_token
+    # Set up a decentralized optimizer that will average with peers in background
+    opt = torch.optim.AdamW(model.parameters(), lr=config.neuron.lr)
+    opt = hivemind.Optimizer(
+        dht=dht,                    # use a DHT that is connected with other peers
+        run_id=config.neuron.run_id,        # unique identifier of this collaborative run
+        scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
+        batch_size_per_step=config.neuron.batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
+        target_batch_size=config.neuron.target_batch_size,    # after peers collectively process this many samples, average weights and begin the next epoch
+        optimizer=opt,              # wrap the SGD optimizer defined above
+        use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
+        matchmaking_time=10.0,       # when averaging parameters, gather peers in background for up to this many seconds
+        averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
+        verbose=False               # print logs incessently
+    )
+    
+    tokenizer = AutoTokenizer.from_pretrained(config.neuron.model_name)
+    # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
+    tokenizer.pad_token = tokenizer.eos_token
 
-        # Load dataset
-        self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
-        
-
+    # Load dataset
+    dataset = load_dataset(config.neuron.dataset_name, 'wikitext-2-v1', split='train')
+    
     # Define encoding function
     def encode(self, examples):
-        return self.tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')
+        return tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')
 
-
-    async def forward(
-        self, synapse: template.protocol.Train
-    ) -> template.protocol.Train:
-        """
-        Processes the incoming 'Train' synapse by performing a training run
-
-        Args:
-            synapse (template.protocol.Train): The synapse object containing the 'dataset_indices' data.
-
-        Returns:
-            template.protocol.Train: The synapse object with the 'loss' field set to models loss.
-        """
-
-        bt.logging.info("Loading state from peers")
-
-        while not self.opt.is_synchronized_with_peers():
-            try:
-                self.opt.load_state_from_peers()
-            except Exception as e:
-                bt.logging.error("Unable to load state from peers.")
-
-        if self.opt.is_synchronized_with_peers():
-            bt.logging.info("Miner synchronized with peers")
-
-        # Select dataset indices to use for optimization step
-        dataset = self.dataset.select(synapse.dataset_indices)
-        if not self.config.neuron.dont_wandb_log:
-            self.wandb.log({"received_indices": synapse.dataset_indices})
-
-        # Encode the dataset
-        encoded_dataset = dataset.map(self.encode, batched=True)
-
-        # Create a PyTorch DataLoader
-        dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size, collate_fn = default_data_collator)
-        
-        # Train data for one epoch
-        for step, batch in enumerate(dataloader):
-            
-            input_ids = batch['input_ids'].to(self.device)
-            attention_mask = batch['attention_mask'].to(self.device)
-            labels = input_ids.clone()
-
-            self.opt.zero_grad()
-
-            # Forward pass
-            outputs = self.model(
-                input_ids = input_ids, 
-                attention_mask = attention_mask,
-                labels = labels
-            )     
-            # Backward pass    
-            loss = outputs.loss
-            if not self.config.neuron.dont_wandb_log:
-                self.wandb.log({"loss":loss,
-                            'opt_local_epoch':self.opt.local_epoch})
-            loss.backward()
-            # Adjust gradient
-            self.opt.step()
-
-            bt.logging.info(f"Step {step} Loss: {loss}")
-            
-        synapse.loss = loss
-
-        bt.logging.info(f"Final Loss: {synapse.loss}")
-        
-        return synapse
-
-    async def blacklist(
-        self, synapse: template.protocol.Train
-    ) -> typing.Tuple[bool, str]:
+    # The blacklist function decides if a request should be ignored.
+    #TODO add synapse type
+    def blacklist(synapse) -> typing.Tuple[bool, str]:
         """
         Determines whether an incoming request should be blacklisted and thus ignored. Your implementation should
         define the logic for blacklisting requests based on your needs and desired security parameters.
@@ -191,7 +160,7 @@ class Miner(BaseMinerNeuron):
 
         uid = None
         axon = None
-        for _uid, _axon in enumerate(self.metagraph.axons):
+        for _uid, _axon in enumerate(metagraph.axons):
             if _axon.hotkey == hotkey:
                 uid = _uid
                 axon = _axon
@@ -206,16 +175,16 @@ class Miner(BaseMinerNeuron):
                 f"Blacklisted a non registered hotkey's {synapse_type} request from {hotkey}",
             )
 
-        if self.config.blacklist.force_validator_permit and (not self.config.blacklist.allow_non_registered):
+        if config.blacklist.force_validator_permit and (not config.blacklist.allow_non_registered):
             # Check stake if uid is recognize
-            tao = self.metagraph.neurons[uid].stake.tao
-            if tao < self.config.neuron.vpermit_tao_limit:
+            tao = metagraph.neurons[uid].stake.tao
+            if tao < config.neuron.vpermit_tao_limit:
                 return (
                     True,
-                    f"Blacklisted a low stake {synapse_type} request: {tao} < {self.config.neuron.vpermit_tao_limit} from {hotkey}",
+                    f"Blacklisted a low stake {synapse_type} request: {tao} < {config.neuron.vpermit_tao_limit} from {hotkey}",
                 )
 
-        if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
+        if synapse.dendrite.hotkey not in metagraph.hotkeys:
             # Ignore requests from unrecognized entities.
             bt.logging.trace(
                 f"Blacklisting unrecognized hotkey {synapse.dendrite.hotkey}"
@@ -227,7 +196,10 @@ class Miner(BaseMinerNeuron):
         )
         return False, "Hotkey recognized!"
 
-    async def priority(self, synapse: template.protocol.Train) -> float:
+    # The priority function determines the order in which requests are handled.
+    # More valuable or higher-priority requests are processed before others.
+    #TODO synapse type
+    def priority(synapse) -> float:
         """
         The priority function determines the order in which requests are handled. More valuable or higher-priority
         requests are processed before others. You should design your own priority mechanism with care.
@@ -247,21 +219,143 @@ class Miner(BaseMinerNeuron):
         Example priority logic:
         - A higher stake results in a higher priority value.
         """
-        caller_uid = self.metagraph.hotkeys.index(
+        caller_uid = metagraph.hotkeys.index(
             synapse.dendrite.hotkey
         )  # Get the caller index.
         prirority = float(
-            self.metagraph.S[caller_uid]
+            metagraph.S[caller_uid]
         )  # Return the stake as the priority.
         bt.logging.trace(
             f"Prioritizing {synapse.dendrite.hotkey} with value: ", prirority
         )
         return prirority
 
+    # This is the Allocate function, which decides the miner's response to a valid, high-priority request.
+    def forward(synapse):
+        """
+        Processes the incoming 'Train' synapse by performing a training run
+
+        Args:
+            synapse (template.protocol.Train): The synapse object containing the 'dataset_indices' data.
+
+        Returns:
+            template.protocol.Train: The synapse object with the 'loss' field set to models loss.
+        """
+
+        bt.logging.info("Loading state from peers")
+
+        while not opt.is_synchronized_with_peers():
+            try:
+                opt.load_state_from_peers()
+            except Exception as e:
+                bt.logging.error("Unable to load state from peers.")
+
+        if opt.is_synchronized_with_peers():
+            bt.logging.info("Miner synchronized with peers")
+
+        # Select dataset indices to use for optimization step
+        dataset = dataset.select(synapse.dataset_indices)
+        if not config.neuron.dont_wandb_log:
+            wandb.log({"received_indices": synapse.dataset_indices})
+
+        # Encode the dataset
+        encoded_dataset = dataset.map(encode, batched=True)
+
+        # Create a PyTorch DataLoader
+        dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size, collate_fn = default_data_collator)
+        
+        # Train data for one epoch
+        for step, batch in enumerate(dataloader):
+            
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = input_ids.clone()
+
+            opt.zero_grad()
+
+            # Forward pass
+            outputs = model(
+                input_ids = input_ids, 
+                attention_mask = attention_mask,
+                labels = labels
+            )     
+            # Backward pass    
+            loss = outputs.loss
+            if not config.neuron.dont_wandb_log:
+                wandb.log({"loss":loss,
+                            'opt_local_epoch':opt.local_epoch})
+            loss.backward()
+            # Adjust gradient
+            opt.step()
+
+            bt.logging.info(f"Step {step} Loss: {loss}")
+            
+        synapse.loss = loss
+
+        bt.logging.info(f"Final Loss: {synapse.loss}")
+        
+        return synapse
+
+    # Step 6: Build and link miner functions to the axon.
+    # The axon handles request processing, allowing validators to send this process requests.
+    axon = bt.axon(wallet=wallet, config=config)
+    bt.logging.info(f"Axon {axon}")
+
+    # Attach determiners which functions are called when servicing a request.
+    bt.logging.info(f"Attaching forward function to axon.")
+    axon.attach(
+        forward_fn=forward,
+        blacklist_fn=blacklist,
+        priority_fn=priority,
+    )
+
+    # Serve passes the axon information to the network + netuid we are hosting on.
+    # This will auto-update if the axon port of external ip have changed.
+    bt.logging.info(
+        f"Serving axon {priority, forward} on network: {config.subtensor.chain_endpoint} with netuid: {config.netuid}"
+    )
+    axon.serve(netuid=config.netuid, subtensor=subtensor)
+
+    # Start  starts the miner's axon, making it active on the network.
+    bt.logging.info(f"Starting axon server on port: {config.axon.port}")
+    axon.start()
+
+    # This loop maintains the miner's operations until intentionally stopped.
+    bt.logging.info(f"Starting main loop")
+    step = 0
+    while True:
+        try:
+            # Periodically update our knowledge of the network graph.
+            if step % 5 == 0:
+                metagraph = subtensor.metagraph(config.netuid)
+                log = (
+                    f"Step:{step} | "
+                    f"Block:{metagraph.block.item()} | "
+                    f"Stake:{metagraph.S[my_subnet_uid]} | "
+                    f"Rank:{metagraph.R[my_subnet_uid]} | "
+                    f"Trust:{metagraph.T[my_subnet_uid]} | "            
+                    f"Consensus:{metagraph.C[my_subnet_uid] } | "
+                    f"Incentive:{metagraph.I[my_subnet_uid]} | "
+                    f"Emission:{metagraph.E[my_subnet_uid]}"
+                )
+                bt.logging.info(log)
+            # Check for auto update
+            #if step % 30 == 0 and config.auto_update == "yes":
+            #    util.try_update()
+            step += 1
+            time.sleep(1)
+
+        # If someone intentionally stops the miner, it'll safely terminate operations.
+        except KeyboardInterrupt:
+            axon.stop()
+            bt.logging.success("Miner killed by keyboard interrupt.")
+            break
+        # In case of unforeseen errors, the miner will log the error and continue operations.
+        except Exception as e:
+            bt.logging.error(traceback.format_exc())
+            continue
+
 
 # This is the main function, which runs the miner.
 if __name__ == "__main__":
-    with Miner() as miner:
-        while True:
-            bt.logging.info("Miner running...", time.time())
-            time.sleep(5)
+    main(get_config(neuron_type="miner"))

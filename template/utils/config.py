@@ -57,14 +57,14 @@ def check_config(cls, config: "bt.Config"):
         )
 
 
-def add_args(cls, parser):
+def add_args(parser,neuron_type = "validator"):
     """
     Adds relevant arguments to the parser for operation.
     """
     # Netuid Arg: The netuid of the subnet to connect to.
     parser.add_argument("--netuid", type=int, help="Subnet netuid", default=1)
 
-    neuron_type = "validator" if "miner" not in cls.__name__.lower() else "miner"
+    #neuron_type = "validator" if "miner" not in cls.__name__.lower() else "miner"
 
     parser.add_argument(
         "--dht.port",
@@ -268,7 +268,7 @@ def add_args(cls, parser):
         )
 
 
-def config(cls):
+def get_config(neuron_type = "validator"):
     """
     Returns the configuration object specific to this miner or validator after adding relevant arguments.
     """
@@ -277,5 +277,5 @@ def config(cls):
     bt.subtensor.add_args(parser)
     bt.logging.add_args(parser)
     bt.axon.add_args(parser)
-    cls.add_args(parser)
+    add_args(parser,neuron_type=neuron_type)
     return bt.config(parser)
