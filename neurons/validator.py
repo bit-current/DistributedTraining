@@ -33,13 +33,13 @@ import template
 from template.utils.config import get_config
 from template.utils.misc import AsyncDendritePool, load_wandb
 #from template.utils.uids import get_random_uids
-from template.validator.validator_core import DatasetStateSingelton, ModelSingleton, upload_checkpoint
+from template.validator.validator_core import DatasetStateSingelton, ModelSingleton, upload_checkpoint, DHTManager
 #from template.validator import forward
 #from template.base.validator import BaseValidatorNeuron
 from template.utils.uids import check_uid_availability
 
 from typing import List
-
+import traceback
 import random 
 import wandb
 
@@ -95,13 +95,13 @@ def get_rewards(
     # Backward pass
     loss = outputs.loss
 
-    if not config.neuron.dont_wandb_log:
-        wandb.log({"loss": loss, "previous_loss": previous_loss})
-
     # Get latest previous loss from DHT
     previous_loss = dataset_common_state.get_dht("loss")
     bt.logging.info(f"Previous loss:    {previous_loss}")
     bt.logging.info(f"Current loss:     {loss}")
+    if not config.neuron.dont_wandb_log:
+        wandb.log({"loss": loss, "previous_loss": previous_loss})
+
 
     # Compute score
     if (previous_loss is None) or ((loss - previous_loss) > 0):
@@ -122,7 +122,7 @@ def get_rewards(
 
 def get_random_uids(
     metagraph,
-    k: int, exclude
+    k: int, exclude:List[int] = None
 ) -> torch.LongTensor:
     """Returns k available random uids from the metagraph.
     Args:
@@ -211,9 +211,9 @@ def main(config):
     metagraph = subtensor.metagraph(config.netuid)
     bt.logging.info(f"Metagraph: {metagraph}")
 
-    # Optimize the blacklist list
-    blacklisted_hotkeys_set = {blacklisted_hotkey for blacklisted_hotkey in config.blacklisted_hotkeys}
-    blacklisted_coldkeys_set = {blacklisted_coldkey for blacklisted_coldkey in config.blacklisted_coldkeys}
+    # Optimize the blacklist list TODO add me
+    #blacklisted_hotkeys_set = {blacklisted_hotkey for blacklisted_hotkey in config.blacklisted_hotkeys}
+    #blacklisted_coldkeys_set = {blacklisted_coldkey for blacklisted_coldkey in config.blacklisted_coldkeys}
 
     # Step 5: Connect the validator to the network
     if wallet.hotkey.ss58_address not in metagraph.hotkeys:
@@ -241,12 +241,14 @@ def main(config):
     bt.logging.info("Starting validator loop.")
 
     # Init DHT
-    dht = hivemind.DHT(initial_peers=[config.neuron.initial_peers], start=True)
-    
+    #dht = hivemind.DHT(initial_peers=[config.neuron.initial_peers], start=True)
+    dht = DHTManager( initial_peers=[config.neuron.initial_peers], start=True, host_maddrs=[f"/ip4/0.0.0.0/tcp/32692"])#, ],
+    dataset_dht = DHTManager(logger_name="DatasetDHT", initial_peers=[config.neuron.initial_peers], start=True, host_maddrs=[f"/ip4/0.0.0.0/tcp/32693"])#host_maddrs=[f"/ip4/0.0.0.0/tcp/{config.neuron.dht_port_2}"],
+
     # Init Dataset
     dataset = load_dataset(config.neuron.dataset_name, 'wikitext-2-v1', split='train')
     dataset_indices = [i for i in range(0, len(dataset))]
-    dataset_common_state = DatasetStateSingelton(dht , dataset_indices, config.neuron.run_id)
+    dataset_common_state = DatasetStateSingelton(dataset_dht , dataset_indices, config.neuron.run_id)
 
     # Init Loss
     previous_loss = dataset_common_state.get_dht("loss")
@@ -285,8 +287,8 @@ def main(config):
         return tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length', return_tensors='pt')
 
     if not config.neuron.dont_wandb_log:
-        wandb.log({"uids":miner_uids,
-                    "dataset_indices":dataset_indices_list})
+        wandb = load_wandb(config, wallet)
+
 
     step = 0
  
@@ -302,6 +304,7 @@ def main(config):
             k=config.neuron.sample_size
         )
 
+
         datapoints_per_group = config.neuron.target_batch_size
 
         dataset_indices_list = (
@@ -310,6 +313,10 @@ def main(config):
                 items_per_group=datapoints_per_group,
             )
         )  # TODO add repeat on blocked
+
+        if not config.neuron.dont_wandb_log:
+            wandb.log({"uids":miner_uids,
+                        "dataset_indices":dataset_indices_list})
 
         # Run multiple forwards concurrently.
         
@@ -375,7 +382,11 @@ def main(config):
                 timeout=120,
             )
 
-            bt.logging.info(f"Received responses: {[{'Loss':response.loss,'Dataset Indices':(min(response.dataset_indices), max(response.dataset_indices)), 'IP':response.dendrite.ip, 'Port':response.dendrite.port, 'Hotkey':response.dendrite.hotkey} for response in responses[0] if response.dendrite.status_code == 200 ]}")
+            try:
+                bt.logging.info(f"Received responses: {[{'Loss':response.loss,'Dataset Indices':(min(response.dataset_indices), max(response.dataset_indices)), 'IP':response.dendrite.ip, 'Port':response.dendrite.port, 'Hotkey':response.dendrite.hotkey} for response in responses[0] if response.dendrite.status_code == 200 ]}")
+            except TypeError:
+                if responses is None:
+                    bt.logging.info("Empty response")
     
             # Calculate response score            
 
@@ -399,7 +410,7 @@ def main(config):
                 device = "cuda"
             ) 
 
-            bt.logging.info(f"Scored responses: {rewards}")
+            bt.logging.info(f"Scored responses: {new_rewards}")
             # Update the scores based on the rewards.
             scores = update_scores(scores, new_rewards, miner_uids)
             # Check if we should exit.
@@ -429,7 +440,8 @@ def main(config):
             # End the current step and prepare for the next iteration.
             step += 1
             # Sleep for a duration equivalent to the block time (i.e., time between successive blocks).
-            time.sleep(bt.__blocktime__)
+            # time.sleep(bt.__blocktime__)
+            time.sleep(10)
 
         # If we encounter an unexpected error, log it for debugging.
         except RuntimeError as e:
@@ -441,6 +453,7 @@ def main(config):
             bt.logging.success("Keyboard interrupt detected. Exiting validator.")
             #opt.shutdown()
             dht.shutdown()
+            dataset_dht.shutdown()
             exit()
 
 # The main function parses the configuration and runs the validator.

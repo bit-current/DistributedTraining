@@ -13,8 +13,24 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-# Otherwise just use time.time, as per here: https://github.com/learning-at-home/hivemind/blob/d20e81017481aa2028efc33217522248aabd7d95/hivemind/utils/timed_storage.py#L12
+import threading
+import logging
+from hivemind import DHT
 
+
+class DHTManager(DHT):
+    def __init__(self,logger_name="OptimDHT", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.logger = logging.getLogger(logger_name)
+        logging.basicConfig(filename='dht_operations.log', level=logging.INFO)
+
+    def get(self, key, *args, **kwargs):
+        self.logger.info(f"Getting key: {key}, args: {args}, kwargs: {kwargs}")
+        return super().get(key, *args, **kwargs)
+
+    def store(self, key, value, *args, **kwargs):
+        self.logger.info(f"Storing key: {key}, value: {value}, args: {args}, kwargs: {kwargs}")
+        return super().store(key, value, *args, **kwargs)
 
 class DatasetStateSingelton:
     """
@@ -70,7 +86,7 @@ class DatasetStateSingelton:
         # Assuming the data_str is in JSON format
         return json.loads(data_str.value)
 
-    def get_dht(cls, name, max_retries = 10, base_delay = 1)):
+    def get_dht(cls, name, max_retries = 10, base_delay = 1):
         sleep(2)
         
         retries = 0

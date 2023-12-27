@@ -252,6 +252,20 @@ def add_args(parser,neuron_type = "validator"):
             default=4096,
         )
 
+        parser.add_argument(
+            "--neuron.dht_port_1",
+            type=int,
+            help="dht_1 port number (optimizer).",
+            default=4096,
+        )
+
+        parser.add_argument(
+            "--neuron.dht_port_2",
+            type=int,
+            help="dht_2 port number (dataset)",
+            default=4096,
+        )
+
     else:
         parser.add_argument(
             "--blacklist.force_validator_permit",
