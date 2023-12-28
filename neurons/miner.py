@@ -18,6 +18,7 @@
 
 import hivemind
 import time
+import pickle
 import typing
 from functools import partial
 import bittensor as bt
@@ -33,16 +34,114 @@ import bittensor as bt
 import torch
 from datasets import load_dataset
 import hivemind
+from hivemind.optim.state_averager import LRSchedulerBase
+from hivemind import DHT, Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import transformers
+from transformers.trainer import Trainer
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    get_linear_schedule_with_warmup,
-    default_data_collator
-)
+    default_data_collator,
+    TrainerCallback,
+    TrainingArguments,
+    )
 
+# Global variable
+forward_event = False
 
+class NoOpScheduler(LRSchedulerBase):
+    """Dummy scheduler for transformers.Trainer. The real scheduler is defined in Optimizer.scheduler"""
+
+    def get_lr(self):
+        return [group["lr"] for group in self.optimizer.param_groups]
+
+    def print_lr(self, *args, **kwargs):
+        if self.optimizer.scheduler:
+            return self.optimizer.scheduler.print_lr(*args, **kwargs)
+
+    def step(self):
+        self._last_lr = self.get_lr()
+
+    def state_dict(self):
+        return {}
+
+    def load_state_dict(self, *args, **kwargs):
+        bt.logging.debug("Called NoOpScheduler.load_state_dict")
+
+class CustomValidationCallback(TrainerCallback):
+    def __init__(
+        self,
+        dht: DHT,
+        optimizer: Optimizer,
+        model: torch.nn.Module,
+        #local_public_key: bytes,
+        #statistics_expiration: float,
+        #backup_every_steps: int,
+    ):
+        super().__init__()
+        self.model = model
+        self.dht, self.optimizer = dht, optimizer
+        #self.local_public_key = local_public_key
+        #self.statistics_expiration = statistics_expiration
+        self.last_reported_collaboration_step = -1
+        self.samples = 0
+        self.steps = 0
+        self.loss = 0
+        self.total_samples_processed = 0
+        #self.backup_every_steps = backup_every_steps
+        self.latest_backup = self.backup_state()
+        
+    def on_train_begin(
+        self, args: TrainingArguments, state: transformers.TrainerState, control: transformers.TrainerControl, **kwargs
+    ):
+        bt.logging.info("Loading state from peers")
+        self.optimizer.load_state_from_peers()
+    
+    def on_step_end(
+        self, args: TrainingArguments, state: transformers.TrainerState, control: transformers.TrainerControl, **kwargs
+    ):
+        control.should_log = True
+        if not self.params_are_finite():
+            self.restore_from_backup(self.latest_backup)
+            return control
+        
+        global forward_event
+        if forward_event:
+            # Select dataset indices for validation
+            specific_subset_dataset = self.dataset.select(self.dataset_indices)
+
+            # Replace the trainer's evaluation dataset
+            self.trainer.eval_dataset = specific_subset_dataset
+
+            # Run validation and capture loss
+            eval_result = self.trainer.evaluate()
+            self.validation_loss = eval_result['eval_loss']
+
+            # Reset flag
+            forward_event = False
+        
+        return control
+    
+    @torch.no_grad()
+    def params_are_finite(self):
+        for param in self.model.parameters():
+            if not torch.all(torch.isfinite(param)):
+                return False
+        return True
+
+    @torch.no_grad()
+    def backup_state(self) -> bytes:
+        return pickle.dumps({"model": self.model.state_dict(), "optimizer": self.optimizer.state_dict()})
+
+    @torch.no_grad()
+    def restore_from_backup(self, backup: bytes):
+        state = pickle.loads(backup)
+        self.model.load_state_dict(state["model"])
+        self.optimizer.load_state_dict(state["optimizer"])
+            
+            
 class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
@@ -59,7 +158,7 @@ class Miner(BaseMinerNeuron):
 
         # Set up a decentralized optimizer that will average with peers in background
         opt = torch.optim.AdamW(self.model.parameters(), lr = self.config.neuron.lr)
-        self.opt = hivemind.Optimizer(
+        optimizer = hivemind.Optimizer(
             dht=dht,                    # use a DHT that is connected with other peers
             run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run
             scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
@@ -69,7 +168,7 @@ class Miner(BaseMinerNeuron):
             use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
             matchmaking_time=10.0,       # when averaging parameters, gather peers in background for up to this many seconds
             averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
-            verbose=False               # print logs incessently
+            verbose=True                # print logs incessently
         )
         
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
@@ -77,12 +176,46 @@ class Miner(BaseMinerNeuron):
         self.tokenizer.pad_token = self.tokenizer.eos_token
         
         # Load dataset
-        self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
+        dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
+        
+        # Encode the dataset
+        encoded_dataset = dataset.map(self.encode, batched=True)
+        
+        
+        # Initialize the Trainer
+        self.trainer = Trainer(
+            model=self.model,
+            #args=training_args,
+            train_dataset=encoded_dataset,
+            eval_dataset=encoded_dataset,
+            optimizers=(optimizer, NoOpScheduler(optimizer)),
+            data_collator=default_data_collator,
+            tokenizer=self.tokenizer,
+            callbacks=[
+                CustomValidationCallback(
+                    dht,
+                    optimizer,
+                    self.model
+                )
+            ],
+        )
+        
+        self.trainer.remove_callback(transformers.trainer_callback.PrinterCallback)
+        self.trainer.remove_callback(transformers.trainer_callback.ProgressCallback)
         
 
-    # Define encoding function
     def encode(self, examples):
-        return self.tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')
+        # Tokenize the text
+        tokenized_examples = self.tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')
+
+        # For language modeling tasks, the labels are usually the same as the input_ids
+        tokenized_examples['labels'] = tokenized_examples['input_ids'].copy()
+
+        return tokenized_examples
+
+    # # Define encoding function
+    # def encode(self, examples):
+    #     return self.tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')
 
 
     async def forward(
@@ -97,54 +230,17 @@ class Miner(BaseMinerNeuron):
         Returns:
             template.protocol.Train: The synapse object with the 'loss' field set to models loss.
         """
-        
-        bt.logging.info("Loading state from peers")
-        try:
-            self.opt.load_state_from_peers()
-        except:
-            breakpoint()
-        
-        if self.opt.is_synchronized_with_peers():
-            bt.logging.info("Miner synchronized with peers")
-
-        # Select dataset indices to use for optimization step
-        dataset = self.dataset.select(synapse.dataset_indices)
+        global forward_event
+        forward_event = True
+        self.dataset_indices = synapse.dataset_indices
         if not self.config.neuron.dont_wandb_log:
             self.wandb.log({"received_indices": synapse.dataset_indices})
-
-        # Encode the dataset
-        encoded_dataset = dataset.map(self.encode, batched=True)
         
-        # Create a PyTorch DataLoader
-        dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size, collate_fn = default_data_collator)
-        
-        # Train data for one epoch
-        for step, batch in enumerate(dataloader):
-            
-            input_ids = batch['input_ids'].to(self.device)
-            attention_mask = batch['attention_mask'].to(self.device)
-            labels = input_ids.clone()
+        # Wait for the validation to complete inside on_step_end inside CustomValidationCallback
+        while forward_event:
+            await asyncio.sleep(0.1)  # Avoid busy waiting
 
-            self.opt.zero_grad()
-            
-            # Forward pass
-            outputs = self.model(
-                input_ids = input_ids, 
-                attention_mask = attention_mask,
-                labels = labels
-            )     
-            # Backward pass    
-            loss = outputs.loss
-            if not self.config.neuron.dont_wandb_log:
-                self.wandb.log({"loss":loss,
-                            'opt_local_epoch':self.opt.local_epoch})
-            loss.backward()
-            # Adjust gradient
-            self.opt.step()
-
-            bt.logging.info(f"Step {step} Loss: {loss}")
-            
-        synapse.loss = loss
+        synapse.loss = self.validation_loss
 
         bt.logging.info(f"Final Loss: {synapse.loss}")
         
@@ -259,6 +355,8 @@ class Miner(BaseMinerNeuron):
 # This is the main function, which runs the miner.
 if __name__ == "__main__":
     with Miner() as miner:
+        # Start training
+        miner.trainer.train()
         while True:
             bt.logging.info("Miner running...", time.time())
             time.sleep(5)

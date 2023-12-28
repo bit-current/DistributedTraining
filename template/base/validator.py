@@ -62,18 +62,16 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.warning("axon off, not serving ip to chain.")
 
         # Create asyncio event loop to manage async tasks.
-        self.loop = asyncio.get_event_loop()
+        #self.loop = asyncio.get_event_loop()
 
         # Instantiate runners
         self.should_exit: bool = False
         self.is_running: bool = False
         self.thread: threading.Thread = None
-        self.lock = asyncio.Lock()
+        #self.lock = asyncio.Lock()
 
 
     async def concurrent_forward(self):
-        
-        
         
         coroutines = [
             self.forward()
@@ -128,10 +126,9 @@ class BaseValidatorNeuron(BaseNeuron):
                 #_ = self.loop.run_until_complete(self.concurrent_forward()) #TODO add loss anomaly detection
                 await self.concurrent_forward()
                 
-                
                 #blocking component
                 # Adjust the scores based on responses from miners.
-                rewards = get_rewards(self, uids=self.miner_uids)
+                rewards = await get_rewards(self, uids=self.miner_uids)
 
                 bt.logging.info(f"Scored responses: {rewards}")
                 # Update the scores based on the rewards.
