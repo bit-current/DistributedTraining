@@ -13,6 +13,9 @@ from hivemind.optim.state_averager import LRSchedulerBase
 from hivemind import DHT, Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import requests
+from ipaddress import ip_address
+
 import transformers
 from transformers.trainer import Trainer
 from transformers import (
@@ -134,9 +137,23 @@ if __name__ == "__main__":
     
     # Init device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    use_google_dns = True
+    if use_google_dns:
+        request = requests.get("https://api.ipify.org")
+        request.raise_for_status()
 
+        address = request.text
+        print(f"Received public IP address of this machine: {address}")
+        version = ip_address(address).version
+        announce_maddrs = [f"/ip{version}/{address}/tcp/8009"]
+    
     # Init DHT and model
-    dht = hivemind.DHT(initial_peers=["/ip4/54.80.217.105/tcp/8008/p2p/12D3KooWSbFMuUgZNsN7uBNN71UyJg93ek3Msd6dumusEj48tG2f"], start=True)
+    dht = hivemind.DHT(
+        initial_peers=[
+            "/ip4/54.80.217.105/tcp/8008/p2p/12D3KooWSbFMuUgZNsN7uBNN71UyJg93ek3Msd6dumusEj48tG2f"], 
+        host_maddrs=[f"/ip4/0.0.0.0/tcp/8009", f"/ip4/0.0.0.0/udp/8009/quic"],
+        announce_maddrs = announce_maddrs,
+        start=True)
     model = AutoModelForCausalLM.from_pretrained("kmfoda/tiny-random-gpt2")
     
     # Move the model to the appropriate device
