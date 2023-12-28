@@ -108,7 +108,7 @@ def add_args(cls, parser):
         "--neuron.initial_peers",
         type=str,
         help="The address for the DHT",
-        default="/ip4/54.80.217.105/tcp/8009/p2p/12D3KooWHfQMoqVqCqFMUNt8Dy24kfNu1PTuTLCahW4swDbpb7Zi",
+        default="/ip4/54.80.217.105/tcp/8009/p2p/12D3KooWB4FVY7Xnir84QHfZgqVamzxUhze5jasNZd5ZiQ3dLcRo",
     )
 
     parser.add_argument(
@@ -136,7 +136,7 @@ def add_args(cls, parser):
         "--neuron.batch_size_train",
         type=int,
         help="The default batch size",
-        default=1,
+        default=8,
     )
 
     parser.add_argument(
@@ -150,7 +150,7 @@ def add_args(cls, parser):
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_test_run",
+        default="funnybizz",
     )
 
     parser.add_argument(
@@ -180,7 +180,7 @@ def add_args(cls, parser):
             "--neuron.batch_size_test",
             type=int,
             help="The default batch size",
-            default=1,
+            default=8,
         )
 
         parser.add_argument(
@@ -208,7 +208,7 @@ def add_args(cls, parser):
             "--neuron.num_concurrent_forwards",
             type=int,
             help="The number of concurrent forwards running at any time.",
-            default=16,
+            default=1,
         )
 
         parser.add_argument(
