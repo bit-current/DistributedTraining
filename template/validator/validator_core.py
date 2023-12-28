@@ -6,6 +6,7 @@ from transformers import (
     AutoTokenizer,
     get_linear_schedule_with_warmup,
 )
+from hivemind.utils import switch_to_uvloop
 from hivemind.utils.timed_storage import get_dht_time
 # Otherwise just use time.time, as per here: https://github.com/learning-at-home/hivemind/blob/d20e81017481aa2028efc33217522248aabd7d95/hivemind/utils/timed_storage.py#L12
 
