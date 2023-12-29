@@ -29,7 +29,7 @@ import torch
 from datasets import load_dataset
 
 # import base miner class which takes care of most of the boilerplate
-from template.base.miner import BaseMinerNeuron
+#from template.base.miner import BaseMinerNeuron
 from template.utils.misc import load_wandb
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -125,7 +125,7 @@ def main(config):
 
     # The blacklist function decides if a request should be ignored.
     #TODO add synapse type
-    def blacklist(synapse) -> typing.Tuple[bool, str]:
+    def blacklist(synapse: template.protocol.Train) -> typing.Tuple[bool, str]:
         """
         Determines whether an incoming request should be blacklisted and thus ignored. Your implementation should
         define the logic for blacklisting requests based on your needs and desired security parameters.
@@ -199,7 +199,7 @@ def main(config):
     # The priority function determines the order in which requests are handled.
     # More valuable or higher-priority requests are processed before others.
     #TODO synapse type
-    def priority(synapse) -> float:
+    def priority(synapse: template.protocol.Train) -> float:
         """
         The priority function determines the order in which requests are handled. More valuable or higher-priority
         requests are processed before others. You should design your own priority mechanism with care.
@@ -231,7 +231,7 @@ def main(config):
         return prirority
 
     # This is the Allocate function, which decides the miner's response to a valid, high-priority request.
-    def forward(synapse):
+    def forward(synapse: template.protocol.Train) -> template.protocol.Train:
         """
         Processes the incoming 'Train' synapse by performing a training run
 
