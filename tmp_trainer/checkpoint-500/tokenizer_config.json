@@ -1,0 +1,29 @@
+{
+  "add_bos_token": false,
+  "add_prefix_space": false,
+  "added_tokens_decoder": {
+    "50256": {
+      "content": "<|endoftext|>",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    }
+  },
+  "bos_token": "<|endoftext|>",
+  "clean_up_tokenization_spaces": true,
+  "eos_token": "<|endoftext|>",
+  "errors": "replace",
+  "max_length": 512,
+  "model_max_length": 512,
+  "pad_to_multiple_of": null,
+  "pad_token": "<|endoftext|>",
+  "pad_token_type_id": 0,
+  "padding_side": "right",
+  "stride": 0,
+  "tokenizer_class": "GPT2Tokenizer",
+  "truncation_side": "right",
+  "truncation_strategy": "longest_first",
+  "unk_token": "<|endoftext|>"
+}
