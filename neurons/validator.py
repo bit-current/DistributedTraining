@@ -89,7 +89,7 @@ class Validator(BaseValidatorNeuron):
             optimizer=partial(torch.optim.AdamW, lr=self.config.neuron.lr),
             scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
             params=self.model.parameters(),
-            allow_state_sharing=False,
+            allow_state_sharing=True,
             start=True,
             prefix=f"{self.config.neuron.run_id}_state_averager", 
             # state_compression=hivemind.Float16Compression(),
