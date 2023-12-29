@@ -33,10 +33,12 @@ from template.utils.misc import load_wandb
 
 import bittensor as bt
 import torch
+import asyncio
+
 from datasets import load_dataset
 import hivemind
 from hivemind.optim.state_averager import LRSchedulerBase
-from hivemind import DHT, Optimizer
+from hivemind import DHT, Optimizer, utils
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import transformers
@@ -49,8 +51,10 @@ from transformers import (
     TrainingArguments,
     )
 
-# Global variable
+# Global variables
 forward_event = False
+dataset_indices = None
+validation_loss = 0
 
 class NoOpScheduler(LRSchedulerBase):
     """Dummy scheduler for transformers.Trainer. The real scheduler is defined in Optimizer.scheduler"""
@@ -77,6 +81,7 @@ class CustomValidationCallback(TrainerCallback):
         dht: DHT,
         optimizer: Optimizer,
         model: torch.nn.Module,
+        trainer: Trainer,
         #local_public_key: bytes,
         #statistics_expiration: float,
         #backup_every_steps: int,
@@ -84,6 +89,7 @@ class CustomValidationCallback(TrainerCallback):
         super().__init__()
         self.model = model
         self.dht, self.optimizer = dht, optimizer
+        self.trainer = trainer
         #self.local_public_key = local_public_key
         #self.statistics_expiration = statistics_expiration
         self.last_reported_collaboration_step = -1
@@ -109,16 +115,18 @@ class CustomValidationCallback(TrainerCallback):
             return control
         
         global forward_event
+        global dataset_indices
+        global validation_loss
         if forward_event:
             # Select dataset indices for validation
-            specific_subset_dataset = self.dataset.select(self.dataset_indices)
+            specific_subset_dataset = self.trainer.train_dataset.select(dataset_indices)
 
             # Replace the trainer's evaluation dataset
             self.trainer.eval_dataset = specific_subset_dataset
 
             # Run validation and capture loss
             eval_result = self.trainer.evaluate()
-            self.validation_loss = eval_result['eval_loss']
+            validation_loss = eval_result['eval_loss']
 
             # Reset flag
             forward_event = False
@@ -158,22 +166,20 @@ class Miner(BaseMinerNeuron):
             address = request.text
             print(f"Received public IP address of this machine: {address}")
             version = ip_address(address).version
-            announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
-        
-        # Init DHT and model
+            announce_maddrs = [f"/ip{version}/{address}/tcp/8009"]
+    
+        # Init DHT
         dht = hivemind.DHT(
-            initial_peers=[self.config.neuron.initial_peers], 
-            host_maddrs=[
-                f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", 
-                f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"
-                ],
+            initial_peers=[
+                "/ip4/54.80.217.105/tcp/8008/p2p/12D3KooWMn1xWT1j4zHk8pjDA9kpqp6penpFCFM7SW46JtNMunKi"], 
+            host_maddrs=[f"/ip4/0.0.0.0/tcp/8009", 
+                        f"/ip4/0.0.0.0/udp/8009/quic"],
             announce_maddrs = announce_maddrs,
             start=True)
+        
+        utils.log_visible_maddrs(dht.get_visible_maddrs(), only_p2p=True)
 
-        # Init DHT and model
-
-
-        dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
+        # Init model
         self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
         
         # Move the model to the appropriate device
@@ -185,8 +191,8 @@ class Miner(BaseMinerNeuron):
             dht=dht,                    # use a DHT that is connected with other peers
             run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run
             scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
-            batch_size_per_step=self.config.neuron.batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=self.config.neuron.target_batch_size,    # after peers collectively process this many samples, average weights and begin the next epoch
+            batch_size_per_step=1,     # each call to opt.step adds this many samples towards the next epoch
+            target_batch_size=10,    # after peers collectively process this many samples, average weights and begin the next epoch
             optimizer=opt,              # wrap the SGD optimizer defined above
             use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
             matchmaking_time=10.0,       # when averaging parameters, gather peers in background for up to this many seconds
@@ -214,15 +220,16 @@ class Miner(BaseMinerNeuron):
             optimizers=(optimizer, NoOpScheduler(optimizer)),
             data_collator=default_data_collator,
             tokenizer=self.tokenizer,
-            callbacks=[
-                CustomValidationCallback(
+            )
+        
+        self.trainer.add_callback(
+            CustomValidationCallback(
                     dht,
                     optimizer,
-                    self.model
+                    self.model,
+                    self.trainer
                 )
-            ],
-        )
-        
+            )
         self.trainer.remove_callback(transformers.trainer_callback.PrinterCallback)
         self.trainer.remove_callback(transformers.trainer_callback.ProgressCallback)
         
@@ -255,7 +262,8 @@ class Miner(BaseMinerNeuron):
         """
         global forward_event
         forward_event = True
-        self.dataset_indices = synapse.dataset_indices
+        global dataset_indices
+        dataset_indices = synapse.dataset_indices
         if not self.config.neuron.dont_wandb_log:
             self.wandb.log({"received_indices": synapse.dataset_indices})
         
@@ -263,7 +271,8 @@ class Miner(BaseMinerNeuron):
         while forward_event:
             await asyncio.sleep(0.1)  # Avoid busy waiting
 
-        synapse.loss = self.validation_loss
+        global validation_loss
+        synapse.loss = validation_loss
 
         bt.logging.info(f"Final Loss: {synapse.loss}")
         

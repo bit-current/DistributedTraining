@@ -160,3 +160,5 @@ cython_debug/
 #.idea/
 bittensor-subnet-template/
 wandb/
+*/tmp_trainer/
+tmp_trainer/

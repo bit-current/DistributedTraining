@@ -150,8 +150,9 @@ if __name__ == "__main__":
     # Init DHT and model
     dht = hivemind.DHT(
         initial_peers=[
-            "/ip4/54.80.217.105/tcp/8008/p2p/12D3KooWSbFMuUgZNsN7uBNN71UyJg93ek3Msd6dumusEj48tG2f"], 
-        host_maddrs=[f"/ip4/0.0.0.0/tcp/8009", f"/ip4/0.0.0.0/udp/8009/quic"],
+            "/ip4/54.80.217.105/tcp/8008/p2p/12D3KooWMn1xWT1j4zHk8pjDA9kpqp6penpFCFM7SW46JtNMunKi"], 
+        host_maddrs=[f"/ip4/0.0.0.0/tcp/8009", 
+                     f"/ip4/0.0.0.0/udp/8009/quic"],
         announce_maddrs = announce_maddrs,
         start=True)
     model = AutoModelForCausalLM.from_pretrained("kmfoda/tiny-random-gpt2")
