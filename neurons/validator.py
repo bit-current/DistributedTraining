@@ -19,7 +19,8 @@
 import asyncio
 import hivemind
 import time
-
+import requests
+from ipaddress import ip_address
 import bittensor as bt
 
 import torch
@@ -62,8 +63,25 @@ class Validator(BaseValidatorNeuron):
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         
-        # DHT initialization
-        self.dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
+        use_google_dns = True
+        if use_google_dns:
+            request = requests.get("https://api.ipify.org")
+            request.raise_for_status()
+
+            address = request.text
+            print(f"Received public IP address of this machine: {address}")
+            version = ip_address(address).version
+            announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
+        
+        # Init DHT
+        self.dht = hivemind.DHT(
+            initial_peers=[self.config.neuron.initial_peers], 
+            host_maddrs=[
+                f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", 
+                f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"
+                ],
+            announce_maddrs = announce_maddrs,
+            start=True)
         
         # Init State Averager
         self.state_averager = TrainingStateAverager(

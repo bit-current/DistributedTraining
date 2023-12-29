@@ -22,7 +22,8 @@ import pickle
 import typing
 from functools import partial
 import bittensor as bt
-
+import requests
+from ipaddress import ip_address
 # Bittensor Miner Template:
 import template
 
@@ -148,8 +149,30 @@ class Miner(BaseMinerNeuron):
         
         # Init device
         self.device = self.config.neuron.device
+        
+        use_google_dns = True
+        if use_google_dns:
+            request = requests.get("https://api.ipify.org")
+            request.raise_for_status()
+
+            address = request.text
+            print(f"Received public IP address of this machine: {address}")
+            version = ip_address(address).version
+            announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
+        
+        # Init DHT and model
+        dht = hivemind.DHT(
+            initial_peers=[self.config.neuron.initial_peers], 
+            host_maddrs=[
+                f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", 
+                f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"
+                ],
+            announce_maddrs = announce_maddrs,
+            start=True)
 
         # Init DHT and model
+
+
         dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
         self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
         
@@ -167,7 +190,7 @@ class Miner(BaseMinerNeuron):
             optimizer=opt,              # wrap the SGD optimizer defined above
             use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
             matchmaking_time=10.0,       # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
+            averaging_timeout=15.0,     # give up on averaging if not successful in this many seconds
             verbose=True                # print logs incessently
         )
         
