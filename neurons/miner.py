@@ -166,14 +166,13 @@ class Miner(BaseMinerNeuron):
             address = request.text
             print(f"Received public IP address of this machine: {address}")
             version = ip_address(address).version
-            announce_maddrs = [f"/ip{version}/{address}/tcp/8009"]
+            announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
     
         # Init DHT
         dht = hivemind.DHT(
-            initial_peers=[
-                "/ip4/54.80.217.105/tcp/8008/p2p/12D3KooWMn1xWT1j4zHk8pjDA9kpqp6penpFCFM7SW46JtNMunKi"], 
-            host_maddrs=[f"/ip4/0.0.0.0/tcp/8009", 
-                        f"/ip4/0.0.0.0/udp/8009/quic"],
+            initial_peers=[self.config.neuron.initial_peers], 
+            host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", 
+                        f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
             announce_maddrs = announce_maddrs,
             start=True)
         
@@ -191,8 +190,8 @@ class Miner(BaseMinerNeuron):
             dht=dht,                    # use a DHT that is connected with other peers
             run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run
             scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
-            batch_size_per_step=1,     # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=10,    # after peers collectively process this many samples, average weights and begin the next epoch
+            batch_size_per_step=self.config.neuron.batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
+            target_batch_size=self.config.neuron.target_batch_size,    # after peers collectively process this many samples, average weights and begin the next epoch
             optimizer=opt,              # wrap the SGD optimizer defined above
             use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
             matchmaking_time=10.0,       # when averaging parameters, gather peers in background for up to this many seconds

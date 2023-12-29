@@ -81,7 +81,8 @@ class Validator(BaseValidatorNeuron):
                 f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"
                 ],
             announce_maddrs = announce_maddrs,
-            start=True)
+            start=True,
+            daemon=True)
         
         # Init State Averager
         self.state_averager = TrainingStateAverager(
