@@ -85,6 +85,7 @@ class BaseMinerNeuron(BaseNeuron):
             Exception: For unforeseen errors during the miner's operation, which are logged for diagnosis.
         """
 
+        
         # Check that miner is registered on the network.
         self.sync()
 
@@ -99,6 +100,7 @@ class BaseMinerNeuron(BaseNeuron):
         self.axon.start()
         bt.logging.info(f"Miner starting at block: {self.block}")
 
+        
         # This loop maintains the miner's operations until intentionally stopped.
         try:
             while not self.should_exit:
