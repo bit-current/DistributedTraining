@@ -89,27 +89,30 @@ def main(config):
     # Init DHT and model
     dht = hivemind.DHT(
         host_maddrs=[f"/ip4/0.0.0.0/tcp/{config.dht.port}", f"/ip4/0.0.0.0/udp/{config.dht.port}/quic"],
+        announce_maddrs=[f"/ip4/38.79.71.1/tcp/{config.dht.port}", f"/ip4/38.79.71.1/udp/{config.dht.port}/quic"],
         initial_peers=[config.neuron.initial_peers], 
-        start=True
+        start=True,
+        client_mode = False
     )
     model = AutoModelForCausalLM.from_pretrained(config.neuron.model_name)
 
     # Move the model to the appropriate device
     model = model.to(device)
-
     # Set up a decentralized optimizer that will average with peers in background
     opt = torch.optim.AdamW(model.parameters(), lr=config.neuron.lr)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda t: 1.0 / max(1, t))
+
     opt = hivemind.Optimizer(
         dht=dht,                    # use a DHT that is connected with other peers
         run_id=config.neuron.run_id,        # unique identifier of this collaborative run
-        scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
+        scheduler=scheduler,
         batch_size_per_step=config.neuron.batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
         target_batch_size=config.neuron.target_batch_size,    # after peers collectively process this many samples, average weights and begin the next epoch
         optimizer=opt,              # wrap the SGD optimizer defined above
-        use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
-        matchmaking_time=10.0,       # when averaging parameters, gather peers in background for up to this many seconds
-        averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
-        verbose=False               # print logs incessently
+        #use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
+        matchmaking_time=120.0,       # when averaging parameters, gather peers in background for up to this many seconds
+        averaging_timeout=120.0,     # give up on averaging if not successful in this many seconds
+        verbose=True               # print logs incessently
     )
     
     tokenizer = AutoTokenizer.from_pretrained(config.neuron.model_name)
