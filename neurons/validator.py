@@ -242,8 +242,12 @@ def main(config):
 
     # Init DHT
     #dht = hivemind.DHT(initial_peers=[config.neuron.initial_peers], start=True)
-    dht = DHTManager( initial_peers=[config.neuron.initial_peers], start=True, host_maddrs=[f"/ip4/0.0.0.0/tcp/32692"])#, ],
-    dataset_dht = DHTManager(logger_name="DatasetDHT", initial_peers=[config.neuron.initial_peers], start=True, host_maddrs=[f"/ip4/0.0.0.0/tcp/32693"])#host_maddrs=[f"/ip4/0.0.0.0/tcp/{config.neuron.dht_port_2}"],
+    #dht = DHTManager( initial_peers=[config.neuron.initial_peers], start=True, host_maddrs=[f"/ip4/0.0.0.0/tcp/42175"], client_mode=False)#, ],
+    dht = hivemind.DHT(initial_peers=[config.neuron.initial_peers], start=True, 
+            host_maddrs=[f"/ip4/0.0.0.0/tcp/42175"], 
+            announce_maddrs=["/ip4/24.109.105.158/tcp/42175"],
+            client_mode=False)#, ],)
+    dataset_dht = dict()#DHTManager(logger_name="DatasetDHT", initial_peers=[config.neuron.initial_peers], start=True, host_maddrs=[f"/ip4/0.0.0.0/tcp/32693"])#host_maddrs=[f"/ip4/0.0.0.0/tcp/{config.neuron.dht_port_2}"],
 
     # Init Dataset
     dataset = load_dataset(config.neuron.dataset_name, 'wikitext-2-v1', split='train')
@@ -265,14 +269,18 @@ def main(config):
     tokenizer.pad_token = tokenizer.eos_token
 
     # Init State Averager
+    opt = torch.optim.AdamW(model.parameters(), lr=config.neuron.lr)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda t: 1.0 / max(1, t))
+
     state_averager = TrainingStateAverager(
         dht=dht, 
-        optimizer=partial(torch.optim.AdamW, lr=config.neuron.lr),
-        scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
+        optimizer=opt,
+        scheduler=scheduler,
         params=model.parameters(),
-        allow_state_sharing=False,
+        allow_state_sharing=True,
         start=True,
         prefix=f"{config.neuron.run_id}_state_averager", 
+        client_mode=False,
         # state_compression=hivemind.Float16Compression(),
         # bandwidth=optimizer_args.bandwidth,
         # client_mode=optimizer_args.client_mode,
