@@ -57,6 +57,7 @@ class DatasetStateSingelton:
                 cls, *args, **kwargs
             )
             cls._instance.dht_state = dht_state
+            #cls._instance.dht_state = dict()
             cls.default_expiration_time = default_expiration_time
             assert run_id, "run_id isn't specified when run_id can't be empty/zero/null"
             cls.run_id = run_id
@@ -87,6 +88,13 @@ class DatasetStateSingelton:
         return json.loads(data_str.value)
 
     def get_dht(cls, name, max_retries = 10, base_delay = 1):
+        
+        #For testing
+        if type(cls._instance.dht_state) == dict:
+            try:
+                return cls._instance.dht_state[name]
+            except KeyError:
+                return None
         sleep(2)
         
         retries = 0
@@ -104,6 +112,12 @@ class DatasetStateSingelton:
 
        
     def set_dht(cls, name, value, max_retries = 10, base_delay = 1):
+
+        #For testing
+        if type(cls._instance.dht_state) == dict:
+            cls._instance.dht_state[name] = value
+            return
+
         sleep(2)
         serialized_value = cls._serialize_to_string(value)
 
