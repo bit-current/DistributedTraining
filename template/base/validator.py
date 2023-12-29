@@ -114,7 +114,7 @@ class BaseValidatorNeuron(BaseNeuron):
                 bt.logging.info(f"step({self.step}) block({self.block})")
                 
                 self.miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
-
+                
                 datapoints_per_group = self.config.neuron.target_batch_size 
                 
                 self.dataset_indices_list = await self.dataset_common_state.get_dataset_indices(

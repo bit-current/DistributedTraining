@@ -230,8 +230,8 @@ class Miner(BaseMinerNeuron):
                     self.trainer
                 )
             )
-        self.trainer.remove_callback(transformers.trainer_callback.PrinterCallback)
-        self.trainer.remove_callback(transformers.trainer_callback.ProgressCallback)
+        #self.trainer.remove_callback(transformers.trainer_callback.PrinterCallback)
+        #self.trainer.remove_callback(transformers.trainer_callback.ProgressCallback)
         
 
     def encode(self, examples):
