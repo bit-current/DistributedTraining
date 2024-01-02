@@ -86,6 +86,7 @@ async def get_rewards(
     # Compute score
     if self.previous_loss == None:
         score = 1
+        await self.dataset_common_state.set_dht("loss", loss)
     else:    
         if (loss - self.previous_loss) > 0:
             score = 0

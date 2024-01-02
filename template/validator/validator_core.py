@@ -62,17 +62,29 @@ class DatasetStateSingelton:
         return json.loads(data_str.value)
     
     async def get_dht(self, name):
-        await asyncio.sleep(2)
-        loop = asyncio.get_running_loop()
-        stored_data = await loop.run_in_executor(None, self.dht_state.get, f"{self.run_id}_{name}")
-        return self._deserialize_from_string(stored_data) if stored_data else None
+        
+        if type(self._instance.dht_state) == dict:
+            try:
+                return self._instance.dht_state[name]
+            except KeyError:
+                return None
+                
+        # await asyncio.sleep(2)
+        # loop = asyncio.get_running_loop()
+        # stored_data = await loop.run_in_executor(None, self.dht_state.get, f"{self.run_id}_{name}")
+        # return self._deserialize_from_string(stored_data) if stored_data else None
 
     async def set_dht(self, name, value):
-        await asyncio.sleep(2)
-        serialized_value = self._serialize_to_string(value)
-        loop = asyncio.get_running_loop()
-        status = await loop.run_in_executor(None, self.dht_state.store, f"{self.run_id}_{name}", serialized_value, get_dht_time() + self.default_expiration_time)
-        return status
+        
+        if type(self._instance.dht_state) == dict:
+            self._instance.dht_state[name] = value
+            return
+
+        # await asyncio.sleep(2)
+        # serialized_value = self._serialize_to_string(value)
+        # loop = asyncio.get_running_loop()
+        # status = await loop.run_in_executor(None, self.dht_state.store, f"{self.run_id}_{name}", serialized_value, get_dht_time() + self.default_expiration_time)
+        # return status
     
     @classmethod
     async def get_dataset_indices(cls, groups_count, items_per_group):

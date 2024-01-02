@@ -83,6 +83,8 @@ class Validator(BaseValidatorNeuron):
             announce_maddrs = announce_maddrs,
             start=True,
             daemon=True)
+
+        self.dataset_dict = dict()
         
         # Init State Averager
         self.state_averager = TrainingStateAverager(
@@ -109,7 +111,7 @@ class Validator(BaseValidatorNeuron):
         self.dataset_indices = [i for i in range(0, len(self.dataset))]
         
         # Asynchronous DatasetStateSingleton initialization 
-        self.dataset_common_state = DatasetStateSingelton(self.dht, self.dataset_indices, self.config.neuron.run_id)
+        self.dataset_common_state = DatasetStateSingelton(self.dataset_dict, self.dataset_indices, self.config.neuron.run_id)
         await self.dataset_common_state.initialize_async()
         bt.logging.info("Finished async intiatlization.")
         
