@@ -3,3 +3,4 @@ datasets
 transformers
 hivemind
 wandb
+accelerate
