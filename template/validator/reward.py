@@ -55,14 +55,13 @@ def get_rewards(
     except Exception as e:
         breakpoint()
 
-    global_step = self.dataset_common_state.get_dht("step")
-    if global_step % 100 == 0:
+    self.global_step = self.dataset_common_state.get_dht("step")
+    if self.global_step % 100 == 0:
         self.dataset_indices_list_test = (
             self.dataset_common_state.get_dataset_indices_test(
                 self.config.neuron.batch_size_test
             )
         )
-
     # Select the correct datapoints
     dataset_sample = self.dataset.select(self.dataset_indices_list_test)
 

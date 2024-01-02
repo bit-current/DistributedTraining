@@ -134,7 +134,6 @@ class BaseValidatorNeuron(BaseNeuron):
                 self.miner_uids = get_random_uids(
                     self, k=self.config.neuron.sample_size
                 )
-
                 datapoints_per_group = self.config.neuron.target_batch_size
 
                 self.dataset_indices_list = (

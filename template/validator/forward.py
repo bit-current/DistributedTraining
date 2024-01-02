@@ -35,7 +35,6 @@ async def forward(self):
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
 
     """
-    
     if not self.config.neuron.dont_wandb_log:
         self.wandb.log({"uids":self.miner_uids,
                     "dataset_indices":self.dataset_indices_list})

@@ -52,6 +52,10 @@ class Validator(BaseValidatorNeuron):
         self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
         self.dataset_indices = [i for i in range(0, len(self.dataset))]
         self.dataset_common_state = DatasetStateSingelton(self.dht , self.dataset_indices, self.config.neuron.run_id)
+        self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_train")
+        if self.dataset_indices_list_test is None:
+            self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_test")
+        self.global_step = self.dataset_common_state.get_dht("step")
 
         # Init Loss
         self.previous_loss = self.dataset_common_state.get_dht("loss")

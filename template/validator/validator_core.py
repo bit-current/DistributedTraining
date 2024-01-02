@@ -70,7 +70,7 @@ class DatasetStateSingelton:
         # Assuming the data_str is in JSON format
         return json.loads(data_str.value)
 
-    def get_dht(cls, name, max_retries = 10, base_delay = 1)):
+    def get_dht(cls, name, max_retries = 10, base_delay = 1):
         sleep(2)
         
         retries = 0
