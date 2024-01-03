@@ -213,11 +213,15 @@ class Miner(BaseMinerNeuron):
         # Encode the dataset
         encoded_dataset = dataset.map(self.encode, batched=True)
         
-        
+        training_args = TrainingArguments(
+            learning_rate=self.config.neuron.lr,
+            output_dir="results"
+        )
+
         # Initialize the Trainer
         self.trainer = Trainer(
             model=self.model,
-            #args=training_args,
+            args=training_args,
             train_dataset=encoded_dataset,
             eval_dataset=encoded_dataset,
             optimizers=(optimizer, NoOpScheduler(optimizer)),
@@ -392,6 +396,3 @@ if __name__ == "__main__":
     with Miner() as miner:
         # Start training
         miner.trainer.train()
-        while True:
-            bt.logging.info("Miner running...", time.time())
-            time.sleep(5)
