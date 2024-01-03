@@ -23,6 +23,8 @@ import time
 import bittensor as bt
 
 import torch
+import requests
+from ipaddress import ip_address
 from datasets import load_dataset
 from hivemind.optim.state_averager import TrainingStateAverager
 from torch.utils.data import DataLoader
@@ -43,7 +45,23 @@ class Validator(BaseValidatorNeuron):
         self.load_state()
 
         # Init DHT
-        self.dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
+        use_google_dns = True
+        if use_google_dns:
+            request = requests.get("https://api.ipify.org")
+            request.raise_for_status()
+
+            address = request.text
+            print(f"Received public IP address of this machine: {address}")
+            version = ip_address(address).version
+            announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
+
+        self.dht = hivemind.DHT(
+            host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
+            initial_peers=[self.config.neuron.initial_peers], 
+            announce_maddrs = announce_maddrs,
+            start=True,
+            # dameon=True
+        )
         
         # Init Dendrite Pool
         self.dendrite_pool = AsyncDendritePool( wallet = self.wallet, metagraph = self.metagraph )

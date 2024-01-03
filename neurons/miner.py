@@ -19,6 +19,7 @@
 import time
 import typing
 from functools import partial
+from ipaddress import ip_address
 
 import bittensor as bt
 import hivemind
@@ -39,7 +40,8 @@ from transformers import (
     default_data_collator,
     get_linear_schedule_with_warmup,
 )
-
+import requests
+from hivemind import utils
 
 class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
@@ -49,11 +51,23 @@ class Miner(BaseMinerNeuron):
         self.device = self.config.neuron.device
 
         # Init DHT and model
+        use_google_dns = True
+        if use_google_dns:
+            request = requests.get("https://api.ipify.org")
+            request.raise_for_status()
+
+            address = request.text
+            print(f"Received public IP address of this machine: {address}")
+            version = ip_address(address).version
+            announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
+
         self.dht = hivemind.DHT(
             host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
             initial_peers=[self.config.neuron.initial_peers], 
+            announce_maddrs = announce_maddrs,
             start=True
         )
+        utils.log_visible_maddrs(self.dht.get_visible_maddrs(), only_p2p=True)
         self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
 
         # Move the model to the appropriate device
