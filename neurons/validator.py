@@ -69,7 +69,7 @@ class Validator(BaseValidatorNeuron):
             request.raise_for_status()
 
             address = request.text
-            print(f"Received public IP address of this machine: {address}")
+            bt.logging.info(f"Received public IP address of this machine: {address}")
             version = ip_address(address).version
             announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
         else:
