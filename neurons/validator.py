@@ -74,6 +74,9 @@ class Validator(BaseValidatorNeuron):
         if self.dataset_indices_list_test is None:
             self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_test")
         self.global_step = self.dataset_common_state.get_dht("step")
+        if self.global_step is None:
+            self.global_step = 0
+            self.dataset_common_state.set_dht("step")
 
         # Init Loss
         self.previous_loss = self.dataset_common_state.get_dht("loss")
