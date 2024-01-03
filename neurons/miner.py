@@ -171,9 +171,10 @@ class Miner(BaseMinerNeuron):
             version = "4"
             address = self.config.dht.announce_ip
             announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
+        
         # Init DHT
         dht = hivemind.DHT(
-            initial_peers=[self.config.neuron.initial_peers], 
+            initial_peers=self.config.neuron.initial_peers, 
             host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", 
                         f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
             announce_maddrs = announce_maddrs,

@@ -63,6 +63,6 @@ async def forward(self):
     )
     responses = await asyncio.gather(*query_tasks)
     # Log the results for monitoring purposes.
-    bt.logging.info(f"Received responses: {[{'Loss':response.loss,'Dataset Indices':(min(response.dataset_indices), max(response.dataset_indices)), 'IP':response.dendrite.ip, 'Port':response.dendrite.port, 'Hotkey':response.dendrite.hotkey} for response in responses[0] if response.dendrite.status_code == 200 ]}")
+    bt.logging.info(f"Received responses: {[{'Loss':response.loss,'Dataset Indices':(min(response.dataset_indices), max(response.dataset_indices)), 'IP':self.metagraph.axons[index].ip, 'Port':self.metagraph.axons[index].port, 'Hotkey':self.metagraph.axons[index].hotkey} for index, response in enumerate(responses[0]) if response.dendrite.status_code == 200 ]}")
     
     return responses

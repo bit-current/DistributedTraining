@@ -113,8 +113,9 @@ def add_args(cls, parser):
     parser.add_argument(
         "--neuron.initial_peers",
         type=str,
-        help="The address for the DHT",
-        default="/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWRe4RHd5NxRhfn5rMuCk6hA9UBNnK8V3Xy3ejcFApGkRx",
+        nargs=3,
+        help="The addresses for the DHT",
+        default=["/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWRe4RHd5NxRhfn5rMuCk6hA9UBNnK8V3Xy3ejcFApGkRx", "/ip4/38.79.71.1/tcp/10263/p2p/12D3KooWMfiDM67PW6GerfahQPPdc4Bt3tkiHo8vZXieZL5mVTsc"],
     )
 
     parser.add_argument(
@@ -142,21 +143,21 @@ def add_args(cls, parser):
         "--neuron.batch_size_train",
         type=int,
         help="The default batch size",
-        default=32,
+        default=4,
     )
 
     parser.add_argument(
         "--neuron.target_batch_size",
         type=int,
         help="The default batch size",
-        default=40,
+        default=32,
     )
 
     parser.add_argument(
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_v1",
+        default="s25_run_v1",
     )
 
     parser.add_argument(
@@ -200,7 +201,7 @@ def add_args(cls, parser):
             "--neuron.batch_size_test",
             type=int,
             help="The default batch size",
-            default=32,
+            default=4,
         )
 
         parser.add_argument(
@@ -235,7 +236,7 @@ def add_args(cls, parser):
             "--neuron.sample_size",
             type=int,
             help="The number of miners to query in a single step.",
-            default=10,
+            default=20,
         )
 
         parser.add_argument(
