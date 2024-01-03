@@ -124,11 +124,11 @@ class BaseValidatorNeuron(BaseNeuron):
 
                 # Run multiple forwards concurrently.
                 #_ = self.loop.run_until_complete(self.concurrent_forward()) #TODO add loss anomaly detection
-                await self.concurrent_forward()
+                results = await self.concurrent_forward()
                 
                 #blocking component
                 # Adjust the scores based on responses from miners.
-                rewards = await get_rewards(self, uids=self.miner_uids)
+                rewards = await get_rewards(self,results=results, uids=self.miner_uids)
 
                 bt.logging.info(f"Scored responses: {rewards}")
                 # Update the scores based on the rewards.

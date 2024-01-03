@@ -180,6 +180,20 @@ def add_args(cls, parser):
         default="azawahry",
     )
 
+    parser.add_argument(
+        "--dht.use_google_dns",
+        action="store_true",
+        help="If set, we use google dns to get public IP.",
+        default=False,
+    )
+
+    parser.add_argument(
+        "--dht.announce_ip",
+        type=str,
+        help="The IP address to use in announce_maddrs",
+        #default="azawahry",
+    )
+
     if neuron_type == "validator":
 
         parser.add_argument(

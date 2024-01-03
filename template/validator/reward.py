@@ -37,6 +37,7 @@ def reward(query: int, response: int) -> float:
 
 async def get_rewards(
     self,
+    results: List,
     uids: List[int],
 ) -> torch.FloatTensor:
     """

@@ -63,8 +63,8 @@ class Validator(BaseValidatorNeuron):
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         
-        use_google_dns = True
-        if use_google_dns:
+        #use_google_dns = True
+        if self.config.dht.use_google_dns:
             request = requests.get("https://api.ipify.org")
             request.raise_for_status()
 
@@ -72,7 +72,11 @@ class Validator(BaseValidatorNeuron):
             print(f"Received public IP address of this machine: {address}")
             version = ip_address(address).version
             announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
-        
+        else:
+            version = "4"
+            address = self.config.dht.announce_ip
+            announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
+
         # Init DHT
         self.dht = hivemind.DHT(
             initial_peers=[self.config.neuron.initial_peers], 
