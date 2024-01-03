@@ -77,7 +77,6 @@ class Validator(BaseValidatorNeuron):
             address = self.config.dht.announce_ip
             announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
 
-        breakpoint()
         # Init DHT
         self.dht = hivemind.DHT(
             initial_peers=self.config.neuron.initial_peers, 
