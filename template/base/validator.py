@@ -95,7 +95,8 @@ class BaseValidatorNeuron(BaseNeuron):
         coroutines = [
             self.forward() for _ in range(self.config.neuron.num_concurrent_forwards)
         ]
-        await asyncio.gather(*coroutines)
+        responses = await asyncio.gather(*coroutines)
+        return responses
 
     async def run(self):
         """
@@ -145,12 +146,12 @@ class BaseValidatorNeuron(BaseNeuron):
                 # _ = self.loop.run_until_complete(
                 #     self.concurrent_forward()
                 # )  # TODO add loss anomaly detection
-                results = await self.concurrent_forward()
+                responses = await self.concurrent_forward()
 
                 # blocking component
                 # Adjust the scores based on responses from miners.
                 # rewards = get_rewards(self, uids=self.miner_uids)
-                rewards = await get_rewards(self, uids=self.miner_uids)
+                rewards = await get_rewards(self, uids=self.miner_uids, responses=responses)
 
                 bt.logging.info(f"Scored responses: {rewards}")
                 # Update the scores based on the rewards.

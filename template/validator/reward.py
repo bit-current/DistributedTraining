@@ -40,6 +40,7 @@ def reward(query: int, response: int) -> float:
 async def get_rewards(
     self,
     uids: List[int],
+    responses: list
 ) -> torch.FloatTensor:
     """
     Returns a tensor of rewards for the given query and responses.
@@ -64,7 +65,7 @@ async def get_rewards(
     #         )
     #     )
     if (self.step % 100 == 0) and (self.step != 0):
-        await self.dataset_common_state.get_dataset_indices_test(self.config.neuron.batch_size_test)
+        self.dataset_indices_list_test = await self.dataset_common_state.get_dataset_indices_test(self.config.neuron.batch_size_test)
     # Select the correct datapoints
     dataset_sample = self.dataset.select(self.dataset_indices_list_test)
 
@@ -108,4 +109,8 @@ async def get_rewards(
     self.previous_loss = loss
 
     # Get all the reward results by iteratively calling your reward() function.
-    return torch.FloatTensor([score for _ in uids]).to(self.device)
+    scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 for _, response in zip(uids, responses[0][0])]).to(self.device)
+    bt.logging.info(f"Scores: {scores}")
+    
+    return scores
+
