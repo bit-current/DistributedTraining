@@ -197,7 +197,7 @@ def add_args(cls, parser):
             "--neuron.batch_size_test",
             type=int,
             help="The default batch size",
-            default=32,
+            default=4,
         )
 
         parser.add_argument(
