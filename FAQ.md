@@ -1,5 +1,7 @@
 # Bitcurrent Frequently Asked Questions
 
+**What is the Bitcurrent subnet?**
+
 **What are the minimum requirements to run a validator?**
 A GPU with a minimum of 16GB RAM e.g. RTX A4000
 
