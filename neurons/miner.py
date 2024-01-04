@@ -51,19 +51,22 @@ class Miner(BaseMinerNeuron):
         self.device = self.config.neuron.device
 
         # Init DHT and model
-        use_google_dns = True
-        if use_google_dns:
+        if self.config.dht.use_google_dns:
             request = requests.get("https://api.ipify.org")
             request.raise_for_status()
 
             address = request.text
-            print(f"Received public IP address of this machine: {address}")
+            bt.logging.info(f"Received public IP address of this machine: {address}")
             version = ip_address(address).version
+            announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
+        else:
+            version = "4"
+            address = self.config.dht.announce_ip
             announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
 
         self.dht = hivemind.DHT(
             host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
-            initial_peers=[self.config.neuron.initial_peers], 
+            initial_peers=self.config.neuron.initial_peers, 
             announce_maddrs = announce_maddrs,
             start=True
         )

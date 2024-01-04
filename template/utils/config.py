@@ -74,6 +74,19 @@ def add_args(cls, parser):
     )
 
     parser.add_argument(
+        "--dht.use_google_dns",
+        action="store_true",
+        help="If set, we use google dns to get public IP.",
+        default=False,
+    )
+
+    parser.add_argument(
+        "--dht.announce_ip",
+        type=str,
+        help="The IP address to use in announce_maddrs",
+    )
+
+    parser.add_argument(
         "--neuron.name",
         type=str,
         help="Trials for this neuron go in neuron.root / (wallet_cold - wallet_hot) / neuron.name. ",
@@ -111,8 +124,9 @@ def add_args(cls, parser):
     parser.add_argument(
         "--neuron.initial_peers",
         type=str,
-        help="The address for the DHT",
-        default="/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWRe4RHd5NxRhfn5rMuCk6hA9UBNnK8V3Xy3ejcFApGkRx",
+        nargs=3,
+        help="The addresses for the DHT",
+        default=["/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWRe4RHd5NxRhfn5rMuCk6hA9UBNnK8V3Xy3ejcFApGkRx", "/ip4/38.79.71.1/tcp/10263/p2p/12D3KooWMfiDM67PW6GerfahQPPdc4Bt3tkiHo8vZXieZL5mVTsc"],
     )
 
     parser.add_argument(
@@ -140,14 +154,14 @@ def add_args(cls, parser):
         "--neuron.batch_size_train",
         type=int,
         help="The default batch size",
-        default=32,
+        default=4,
     )
 
     parser.add_argument(
         "--neuron.target_batch_size",
         type=int,
         help="The default batch size",
-        default=320,
+        default=32,
     )
 
     parser.add_argument(
