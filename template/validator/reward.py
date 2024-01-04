@@ -36,7 +36,8 @@ def reward(query: int, response: int) -> float:
     return 1.0 if response == query * 2 else 0
 
 
-def get_rewards(
+# def get_rewards(
+async def get_rewards(
     self,
     uids: List[int],
 ) -> torch.FloatTensor:
@@ -55,13 +56,15 @@ def get_rewards(
     except Exception as e:
         breakpoint()
 
-    self.global_step = self.dataset_common_state.get_dht("step")
-    if self.global_step % 100 == 0:
-        self.dataset_indices_list_test = (
-            self.dataset_common_state.get_dataset_indices_test(
-                self.config.neuron.batch_size_test
-            )
-        )
+    # self.global_step = self.dataset_common_state.get_dht("step")
+    # if self.global_step % 100 == 0:
+    #     self.dataset_indices_list_test = (
+    #         self.dataset_common_state.get_dataset_indices_test(
+    #             self.config.neuron.batch_size_test
+    #         )
+    #     )
+    if (self.step % 100 == 0) and (self.step != 0):
+        await self.dataset_common_state.get_dataset_indices_test(self.config.neuron.batch_size_test)
     # Select the correct datapoints
     dataset_sample = self.dataset.select(self.dataset_indices_list_test)
 
@@ -85,14 +88,16 @@ def get_rewards(
         self.wandb.log({"loss": loss, "previous_loss": self.previous_loss})
 
     # Get latest previous loss from DHT
-    self.previous_loss = self.dataset_common_state.get_dht("loss")
+    # self.previous_loss = self.dataset_common_state.get_dht("loss")
+    self.previous_loss = await self.dataset_common_state.get_dht("loss")
     bt.logging.info(f"Previous loss:    {self.previous_loss}")
     bt.logging.info(f"Current loss:     {loss}")
 
     # Compute score
     if (self.previous_loss is None) or ((loss - self.previous_loss) > 0):
         score = 1
-        self.dataset_common_state.set_dht("loss", float(loss))
+        # self.dataset_common_state.set_dht("loss", float(loss))
+        await self.dataset_common_state.set_dht("loss", loss)
     else:
         score = 0
 
