@@ -94,7 +94,7 @@ async def get_rewards(
     bt.logging.info(f"Current loss:     {loss}")
 
     # Compute score
-    if (self.previous_loss is None) or ((loss - self.previous_loss) > 0) or (self.previous_loss != 0):
+    if (self.previous_loss is None) or ((loss - self.previous_loss) > 0) or (self.previous_loss == 0):
         score = 1
         # self.dataset_common_state.set_dht("loss", float(loss))
         await self.dataset_common_state.set_dht("loss", loss)
