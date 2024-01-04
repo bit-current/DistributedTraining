@@ -1,11 +1,12 @@
 from template.validator.validator_core import DatasetStateSingelton, ModelSingleton, upload_checkpoint
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from functools import partial
 from hivemind.optim.state_averager import TrainingStateAverager
 import hivemind
 import torch
+import copy
 
-model = ModelSingleton.get_instance("gpt2", "cuda")
+model = AutoModelForCausalLM.from_pretrained("gpt2").to("cuda")
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
 tokenizer.pad_token = tokenizer.eos_token
 
@@ -38,6 +39,6 @@ state_averager = TrainingStateAverager(
             # **asdict(averager_args),
 )
 
-model2 = model
+model2 = copy.deepcopy(model)
 state_averager.load_state_from_peers()
 assert model != model2
