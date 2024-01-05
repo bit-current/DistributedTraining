@@ -6,12 +6,9 @@ import traceback
 import asyncio
 import template
 
-def check_uid(dendrite, axon, uid):
+async def check_uid(dendrite, axon, uid):
     try:
-        loop = asyncio.get_event_loop()
-        response = loop.run_until_complete(
-            dendrite(axon, template.protocol.IsAlive(), deserialize=False, timeout=2.3)
-        )
+        response = await dendrite(axon, template.protocol.IsAlive(), deserialize=False, timeout=2.3)
         if response.is_success:
             bt.logging.trace(f"UID {uid} is active.")
             # loop.close()
@@ -26,7 +23,7 @@ def check_uid(dendrite, axon, uid):
         return False
 
 
-def check_uid_availability(
+async def check_uid_availability(
     dendrite, metagraph: "bt.metagraph.Metagraph", uid: int, vpermit_tao_limit: int
 ) -> bool:
     """Check if uid is available. The UID should be available if it is serving and has less than vpermit_tao_limit stake
@@ -45,13 +42,13 @@ def check_uid_availability(
         if metagraph.S[uid] > vpermit_tao_limit:
             return False
     # Filter for miners that are processing other responses
-    if not check_uid(dendrite, metagraph.axons[uid], uid):
+    if not await check_uid(dendrite, metagraph.axons[uid], uid):
         return False
     # Available otherwise.
     return True
 
 
-def get_random_uids(
+async def get_random_uids(
     self, dendrite, k: int, exclude: List[int] = None
 ) -> torch.LongTensor:
     """Returns k available random uids from the metagraph.
@@ -67,8 +64,8 @@ def get_random_uids(
     avail_uids = []
 
     for uid in range(self.metagraph.n.item()):
-        uid_is_available = check_uid_availability(
-            self.metagraph, uid, self.config.neuron.vpermit_tao_limit
+        uid_is_available = await check_uid_availability(
+            dendrite, self.metagraph, uid, self.config.neuron.vpermit_tao_limit
         )
         uid_is_not_excluded = exclude is None or uid not in exclude
 

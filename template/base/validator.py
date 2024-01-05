@@ -132,8 +132,8 @@ class BaseValidatorNeuron(BaseNeuron):
             while True:
                 bt.logging.info(f"step({self.step}) block({self.block})")
 
-                self.miner_uids = get_random_uids(
-                    self, dendirte=self.dendrite, k=self.config.neuron.sample_size
+                self.miner_uids = await get_random_uids(
+                    self, dendrite=self.dendrite, k=self.config.neuron.sample_size
                 )
                 datapoints_per_group = self.config.neuron.target_batch_size
                 
