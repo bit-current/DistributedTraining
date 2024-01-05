@@ -22,6 +22,7 @@ from typing import List
 
 import bittensor as bt
 import torch
+import time
 
 
 def reward(query: int, response: int) -> float:
@@ -52,10 +53,16 @@ async def get_rewards(
     Returns:
     - torch.FloatTensor: A tensor of rewards for the given query and responses.
     """
-    try:
-        self.state_averager.load_state_from_peers()
-    except Exception as e:
-        breakpoint()
+
+    load_state_from_peers_status = False
+    retries = 0
+    while load_state_from_peers_status is False:
+        try:
+            load_state_from_peers_status = self.state_averager.load_state_from_peers()
+        except Exception as e:
+            bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
+            retries += 1
+            bt.logging.error(f"Retrying ...")
 
     # self.global_step = self.dataset_common_state.get_dht("step")
     # if self.global_step % 100 == 0:
