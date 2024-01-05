@@ -23,47 +23,9 @@ from typing import List
 import bittensor as bt
 import torch
 
+def get_loss(self, dataset_indices):
 
-def reward(query: int, response: int) -> float:
-    """
-    Reward the miner response to the dummy request. This method returns a reward
-    value for the miner, which is used to update the miner's score.
-
-    Returns:
-    - float: The reward value for the miner.
-    """
-
-    return 1.0 if response == query * 2 else 0
-
-
-def get_rewards(
-    self,
-    uids: List[int],
-) -> torch.FloatTensor:
-    """
-    Returns a tensor of rewards for the given query and responses.
-
-    Args:
-    - uids (List[int]): A list of uids that were queried.
-    - responses (List[float]): A list of responses from the miners.
-
-    Returns:
-    - torch.FloatTensor: A tensor of rewards for the given query and responses.
-    """
-    try:
-        self.state_averager.load_state_from_peers()
-    except Exception as e:
-        breakpoint()
-
-    self.global_step = self.dataset_common_state.get_dht("step")
-    if self.global_step % 100 == 0:
-        self.dataset_indices_list_test = (
-            self.dataset_common_state.get_dataset_indices_test(
-                self.config.neuron.batch_size_test
-            )
-        )
-    # Select the correct datapoints
-    dataset_sample = self.dataset.select(self.dataset_indices_list_test)
+    dataset_sample = self.dataset.select(dataset_indices)
 
     # Encode the dataset
     encoded_dataset = dataset_sample.map(self.encode, batched=True)
@@ -81,26 +43,92 @@ def get_rewards(
     # Backward pass
     loss = outputs.loss
 
+    return loss
+
+def get_local_score(self, synapse):
+
+    loss = get_loss(self, synapse.dataset_indices[-synapse.batch_size:])
+    # The miner's local score is the variance between the loss it returns and the 
+    # loss the validator calculates for the last batch of data sent to that miner
+    score = 1-(abs(loss-synapse.loss)/loss)
+
+    return score
+    
+
+async def get_rewards(
+    self,
+    uids: List[int],
+    responses: list
+) -> torch.FloatTensor:
+    """
+    Returns a tensor of rewards for the given query and responses.
+
+    Args:
+    - uids (List[int]): A list of uids that were queried.
+    - responses (List[float]): A list of responses from the miners.
+
+    Returns:
+    - torch.FloatTensor: A tensor of rewards for the given query and responses.
+    """
+
+    load_state_from_peers_status = False
+    retries = 0
+    while load_state_from_peers_status is False:
+        try:
+            load_state_from_peers_status = self.state_averager.load_state_from_peers()
+        except Exception as e:
+            bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
+            retries += 1
+            bt.logging.error(f"Retrying ...")
+
+    # self.global_step = self.dataset_common_state.get_dht("step")
+    # if self.global_step % 100 == 0:
+    #     self.dataset_indices_list_test = (
+    #         self.dataset_common_state.get_dataset_indices_test(
+    #             self.config.neuron.batch_size_test
+    #         )
+    #     )
+    if (self.step % 100 == 0) and (self.step != 0):
+        self.dataset_indices_list_test = await self.dataset_common_state.get_dataset_indices_test(self.config.neuron.batch_size_test)
+
+    # Get loss on randomly selected test dataset to be used for the Global Score
+    loss = get_loss(self, self.dataset_indices_list_test)
+
     if not self.config.neuron.dont_wandb_log:
         self.wandb.log({"loss": loss, "previous_loss": self.previous_loss})
 
     # Get latest previous loss from DHT
-    self.previous_loss = self.dataset_common_state.get_dht("loss")
-    bt.logging.info(f"Previous loss:    {self.previous_loss}")
-    bt.logging.info(f"Current loss:     {loss}")
+    # self.previous_loss = self.dataset_common_state.get_dht("loss")
+    self.previous_loss = await self.dataset_common_state.get_dht("loss")
+    bt.logging.info(f"Previous Global Loss:    {self.previous_loss}")
+    bt.logging.info(f"Current Global Loss:     {loss}")
 
-    # Compute score
-    if (self.previous_loss is None) or ((loss - self.previous_loss) > 0):
+    responses_formatted = [{'Local Loss':response.loss,'Dataset Indices':(min(response.dataset_indices), max(response.dataset_indices)), 'IP':response.dendrite.ip, 'Port':response.dendrite.port, 'Hotkey':response.dendrite.hotkey} for response in responses[0][0] if response.dendrite.status_code == 200 ]
+    
+    # Compute Global Score
+    if (self.previous_loss is None) or ((loss - self.previous_loss) < 0):
         score = 1
-        self.dataset_common_state.set_dht("loss", float(loss))
+        # self.dataset_common_state.set_dht("loss", float(loss))
+        await self.dataset_common_state.set_dht("loss", loss)
     else:
         score = 0
 
     # Log score, previous and current loss
-    bt.logging.info(f"Score:            {score}")
+    bt.logging.info(f"Global Score:            {score}")
 
     # Set previous loss to current loss
     self.previous_loss = loss
 
     # Get all the reward results by iteratively calling your reward() function.
-    return torch.FloatTensor([score for _ in uids]).to(self.device)
+    scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 for _, response in zip(uids, responses[0][0])]).to(self.device)
+    bt.logging.info(f"Global Scores: {scores}")
+
+    # Adjust Global Score with Local Score
+    test_uids_index = [uid_index for uid_index, uid in enumerate(uids) if responses[0][0][uid_index].dendrite.status_code == 200]
+    test_uids_sample_index = random.sample(test_uids_index, k = min(4, len(test_uids_index)))
+    scores = torch.FloatTensor([scores[uid_index]*get_local_score(self, responses[0][0][uid_index]) if uid_index in test_uids_sample_index else scores[uid_index] for uid_index,_ in enumerate(uids)]).to(self.device)
+    
+    bt.logging.info(f"Adjusted Global Scores: {scores}")
+    
+    return scores
+
