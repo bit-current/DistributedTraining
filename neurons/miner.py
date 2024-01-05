@@ -103,6 +103,10 @@ class Miner(BaseMinerNeuron):
     def encode(self, examples):
         return self.tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')
 
+    async def is_alive(self, synapse:  template.protocol.IsAlive) ->  template.protocol.IsAlive:
+        bt.logging.info("Responded to be Active")
+        synapse.completion = "True"
+        return synapse
 
     async def forward(
         self, synapse: template.protocol.Train
@@ -171,8 +175,8 @@ class Miner(BaseMinerNeuron):
         
         return synapse
 
-    async def blacklist(
-        self, synapse: template.protocol.Train
+    async def blacklist_base(
+        self, synapse
     ) -> typing.Tuple[bool, str]:
         """
         Determines whether an incoming request should be blacklisted and thus ignored. Your implementation should
@@ -244,7 +248,17 @@ class Miner(BaseMinerNeuron):
         )
         return False, "Hotkey recognized!"
 
-    async def priority(self, synapse: template.protocol.Train) -> float:
+    async def blacklist_is_alive( self, synapse: template.protocol.IsAlive ) -> typing.Tuple[bool, str]:
+        blacklist = await self.base_blacklist(synapse)
+        bt.logging.debug(blacklist[1])
+        return blacklist
+
+    async def blacklist_train( self, synapse: template.protocol.Train) -> typing.Tuple[bool, str]:
+        blacklist = await self.base_blacklist(synapse)
+        bt.logging.info(blacklist[1])
+        return blacklist
+
+    async def priority_base(self, synapse: template.protocol.Train) -> float:
         """
         The priority function determines the order in which requests are handled. More valuable or higher-priority
         requests are processed before others. You should design your own priority mechanism with care.

@@ -102,7 +102,7 @@ async def get_rewards(
     bt.logging.info(f"Current loss:     {loss}")
 
     # Compute score
-    if (self.previous_loss is None) or ((loss - self.previous_loss) > 0) or (self.previous_loss == 0):
+    if (self.previous_loss is None) or ((loss - self.previous_loss) < 0):
         score = 1
         # self.dataset_common_state.set_dht("loss", float(loss))
         await self.dataset_common_state.set_dht("loss", loss)
@@ -118,6 +118,5 @@ async def get_rewards(
     # Get all the reward results by iteratively calling your reward() function.
     scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 for _, response in zip(uids, responses[0][0])]).to(self.device)
     bt.logging.info(f"Scores: {scores}")
-    
     return scores
 
