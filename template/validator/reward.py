@@ -118,5 +118,6 @@ async def get_rewards(
     # Get all the reward results by iteratively calling your reward() function.
     scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 for _, response in zip(uids, responses[0][0])]).to(self.device)
     bt.logging.info(f"Scores: {scores}")
+
     return scores
 

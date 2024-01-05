@@ -52,7 +52,7 @@ class DatasetStateSingelton:
             #     cls.step = 0
             #     cls._instance.set_dht("step", cls.step)
             cls._instance.dataset_indices_train = dataset_indices
-            cls._instance.loss = 0
+            cls._instance.loss = None
 
         return cls._instance
 

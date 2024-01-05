@@ -249,12 +249,12 @@ class Miner(BaseMinerNeuron):
         return False, "Hotkey recognized!"
 
     async def blacklist_is_alive( self, synapse: template.protocol.IsAlive ) -> typing.Tuple[bool, str]:
-        blacklist = await self.base_blacklist(synapse)
+        blacklist = await self.blacklist_base(synapse)
         bt.logging.debug(blacklist[1])
         return blacklist
 
     async def blacklist_train( self, synapse: template.protocol.Train) -> typing.Tuple[bool, str]:
-        blacklist = await self.base_blacklist(synapse)
+        blacklist = await self.blacklist_base(synapse)
         bt.logging.info(blacklist[1])
         return blacklist
 

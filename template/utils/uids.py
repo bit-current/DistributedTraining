@@ -2,10 +2,32 @@ import torch
 import random
 import bittensor as bt
 from typing import List
+import traceback
+import asyncio
+import template
+
+def check_uid(dendrite, axon, uid):
+    try:
+        loop = asyncio.get_event_loop()
+        response = loop.run_until_complete(
+            dendrite(axon, template.protocol.IsAlive(), deserialize=False, timeout=2.3)
+        )
+        if response.is_success:
+            bt.logging.trace(f"UID {uid} is active.")
+            # loop.close()
+            return True
+        else:
+            bt.logging.trace(f"UID {uid} is not active.")
+            # loop.close()
+            return False
+    except Exception as e:
+        bt.logging.error(f"Error checking UID {uid}: {e}\n{traceback.format_exc()}")
+        # loop.close()
+        return False
 
 
 def check_uid_availability(
-    metagraph: "bt.metagraph.Metagraph", uid: int, vpermit_tao_limit: int
+    dendrite, metagraph: "bt.metagraph.Metagraph", uid: int, vpermit_tao_limit: int
 ) -> bool:
     """Check if uid is available. The UID should be available if it is serving and has less than vpermit_tao_limit stake
     Args:
@@ -22,12 +44,15 @@ def check_uid_availability(
     if metagraph.validator_permit[uid]:
         if metagraph.S[uid] > vpermit_tao_limit:
             return False
+    # Filter for miners that are processing other responses
+    if not check_uid(dendrite, metagraph.axons[uid], uid):
+        return False
     # Available otherwise.
     return True
 
 
 def get_random_uids(
-    self, k: int, exclude: List[int] = None
+    self, dendrite, k: int, exclude: List[int] = None
 ) -> torch.LongTensor:
     """Returns k available random uids from the metagraph.
     Args:
