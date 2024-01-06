@@ -197,7 +197,6 @@ def add_args(cls, parser):
 
     if neuron_type == "validator":
 
-<<<<<<< HEAD
         parser.add_argument(
         "--neuron.training_examples_per_miner",
         type=int,
@@ -205,8 +204,6 @@ def add_args(cls, parser):
         default=3000,
         )
 
-=======
->>>>>>> ca70df42685aac6e2f45dfe1294b185f66f53efb
         parser.add_argument(
             "--neuron.batch_size_test",
             type=int,
