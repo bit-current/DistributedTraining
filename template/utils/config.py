@@ -147,10 +147,10 @@ def add_args(cls, parser):
     )
 
     parser.add_argument(
-        "--neuron.target_batch_size",
+        "--neuron.hivemind_global_batch_size",
         type=int,
-        help="The default batch size",
-        default=32,
+        help="The hivemind global batch_size",
+        default=30000,
     )
 
     parser.add_argument(
@@ -197,6 +197,16 @@ def add_args(cls, parser):
 
     if neuron_type == "validator":
 
+<<<<<<< HEAD
+        parser.add_argument(
+        "--neuron.training_examples_per_miner",
+        type=int,
+        help="The default number of examples per miner to train on",
+        default=3000,
+        )
+
+=======
+>>>>>>> ca70df42685aac6e2f45dfe1294b185f66f53efb
         parser.add_argument(
             "--neuron.batch_size_test",
             type=int,
