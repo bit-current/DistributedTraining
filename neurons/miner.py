@@ -144,14 +144,13 @@ class Miner(BaseMinerNeuron):
         # Create a PyTorch DataLoader
         dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size, collate_fn = default_data_collator)
         
+        self.opt.zero_grad()
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
             
             input_ids = batch['input_ids'].to(self.device)
             attention_mask = batch['attention_mask'].to(self.device)
             labels = input_ids.clone()
-
-            self.opt.zero_grad()
 
             # Forward pass
             outputs = self.model(
