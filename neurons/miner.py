@@ -86,9 +86,10 @@ class Miner(BaseMinerNeuron):
             target_batch_size=self.config.neuron.hivemind_global_batch_size,    # after peers collectively process this many samples, average weights and begin the next epoch
             optimizer=opt,              # wrap the SGD optimizer defined above
             use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
-            matchmaking_time=10.0,       # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
+            matchmaking_time=15.0,       # when averaging parameters, gather peers in background for up to this many seconds
+            averaging_timeout=60.0,     # give up on averaging if not successful in this many seconds
             verbose=False               # print logs incessently
+            use_local_updates=True,
         )
         
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
@@ -164,11 +165,12 @@ class Miner(BaseMinerNeuron):
                 self.wandb.log({"loss":loss,
                             'opt_local_epoch':self.opt.local_epoch})
             loss.backward()
-            # Adjust gradient
-            self.opt.step()
 
             bt.logging.info(f"Step {step} Loss: {loss}")
             
+        # Adjust gradient
+        self.opt.step()
+        
         synapse.loss = loss
 
         bt.logging.info(f"Final Loss: {synapse.loss}")

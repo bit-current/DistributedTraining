@@ -16,12 +16,12 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import argparse
 import os
-
-import bittensor as bt
 import torch
+import argparse
+import bittensor as bt
 from loguru import logger
+import torch
 
 
 def check_config(cls, config: "bt.Config"):
@@ -64,26 +64,15 @@ def add_args(cls, parser):
     # Netuid Arg: The netuid of the subnet to connect to.
     parser.add_argument("--netuid", type=int, help="Subnet netuid", default=1)
 
-    neuron_type = "validator" if "miner" not in cls.__name__.lower() else "miner"
-
+    neuron_type = (
+        "validator" if "miner" not in cls.__name__.lower() else "miner"
+    )
+    
     parser.add_argument(
         "--dht.port",
         type=int,
         help="Trials for this neuron go in neuron.root / (wallet_cold - wallet_hot) / neuron.name. ",
-        default=8092,
-    )
-
-    parser.add_argument(
-        "--dht.use_google_dns",
-        action="store_true",
-        help="If set, we use google dns to get public IP.",
-        default=False,
-    )
-
-    parser.add_argument(
-        "--dht.announce_ip",
-        type=str,
-        help="The IP address to use in announce_maddrs",
+        default=8009,
     )
 
     parser.add_argument(
@@ -133,7 +122,7 @@ def add_args(cls, parser):
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="kmfoda/tiny-random-gpt2",
+        default="sshleifer/tiny-gpt2",
     )
 
     parser.add_argument(
@@ -175,7 +164,7 @@ def add_args(cls, parser):
         "--neuron.dont_wandb_log",
         action="store_true",
         help="Toggles wandb logging for the project",
-        default=False,
+        default=False
     )
 
     parser.add_argument(
@@ -192,8 +181,23 @@ def add_args(cls, parser):
         default="azawahry",
     )
 
+    parser.add_argument(
+        "--dht.use_google_dns",
+        action="store_true",
+        help="If set, we use google dns to get public IP.",
+        default=False,
+    )
+
+    parser.add_argument(
+        "--dht.announce_ip",
+        type=str,
+        help="The IP address to use in announce_maddrs",
+        #default="azawahry",
+    )
+
     if neuron_type == "validator":
 
+<<<<<<< HEAD
         parser.add_argument(
         "--neuron.training_examples_per_miner",
         type=int,
@@ -201,6 +205,8 @@ def add_args(cls, parser):
         default=3000,
         )
 
+=======
+>>>>>>> ca70df42685aac6e2f45dfe1294b185f66f53efb
         parser.add_argument(
             "--neuron.batch_size_test",
             type=int,
@@ -275,6 +281,7 @@ def add_args(cls, parser):
         )
 
     else:
+
         parser.add_argument(
             "--blacklist.force_validator_permit",
             action="store_true",
