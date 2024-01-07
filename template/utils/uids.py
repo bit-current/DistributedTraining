@@ -2,10 +2,29 @@ import torch
 import random
 import bittensor as bt
 from typing import List
+import traceback
+import asyncio
+import template
+
+async def check_uid(dendrite, axon, uid):
+    try:
+        response = await dendrite(axon, template.protocol.IsAlive(), deserialize=False, timeout=2.3)
+        if response.is_success:
+            bt.logging.trace(f"UID {uid} is active.")
+            # loop.close()
+            return True
+        else:
+            bt.logging.trace(f"UID {uid} is not active.")
+            # loop.close()
+            return False
+    except Exception as e:
+        bt.logging.error(f"Error checking UID {uid}: {e}\n{traceback.format_exc()}")
+        # loop.close()
+        return False
 
 
-def check_uid_availability(
-    metagraph: "bt.metagraph.Metagraph", uid: int, vpermit_tao_limit: int
+async def check_uid_availability(
+    dendrite, metagraph: "bt.metagraph.Metagraph", uid: int, vpermit_tao_limit: int
 ) -> bool:
     """Check if uid is available. The UID should be available if it is serving and has less than vpermit_tao_limit stake
     Args:
@@ -22,12 +41,15 @@ def check_uid_availability(
     if metagraph.validator_permit[uid]:
         if metagraph.S[uid] > vpermit_tao_limit:
             return False
+    # Filter for miners that are processing other responses
+    if not await check_uid(dendrite, metagraph.axons[uid], uid):
+        return False
     # Available otherwise.
     return True
 
 
-def get_random_uids(
-    self, k: int, exclude: List[int] = None
+async def get_random_uids(
+    self, dendrite, k: int, exclude: List[int] = None
 ) -> torch.LongTensor:
     """Returns k available random uids from the metagraph.
     Args:
@@ -42,8 +64,8 @@ def get_random_uids(
     avail_uids = []
 
     for uid in range(self.metagraph.n.item()):
-        uid_is_available = check_uid_availability(
-            self.metagraph, uid, self.config.neuron.vpermit_tao_limit
+        uid_is_available = await check_uid_availability(
+            dendrite, self.metagraph, uid, self.config.neuron.vpermit_tao_limit
         )
         uid_is_not_excluded = exclude is None or uid not in exclude
 

@@ -67,6 +67,13 @@ def add_args(cls, parser):
     neuron_type = (
         "validator" if "miner" not in cls.__name__.lower() else "miner"
     )
+    
+    parser.add_argument(
+        "--dht.port",
+        type=int,
+        help="Trials for this neuron go in neuron.root / (wallet_cold - wallet_hot) / neuron.name. ",
+        default=8009,
+    )
 
     parser.add_argument(
         "--neuron.name",
@@ -107,15 +114,16 @@ def add_args(cls, parser):
     parser.add_argument(
         "--neuron.initial_peers",
         type=str,
-        help="The address for the DHT",
-        default="/ip4/54.80.217.105/tcp/8009/p2p/12D3KooWB4FVY7Xnir84QHfZgqVamzxUhze5jasNZd5ZiQ3dLcRo",
+        nargs=3,
+        help="The addresses for the DHT",
+        default=["/ip4/54.89.124.220/tcp/8008/p2p/12D3KooWQxxHQeTgUrbdtPiNWxqqB4bFpn5s9mjm52VYDU9pnfsg"],
     )
 
     parser.add_argument(
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="kmfoda/tiny-random-gpt2",
+        default="sshleifer/tiny-gpt2",
     )
 
     parser.add_argument(
@@ -136,21 +144,21 @@ def add_args(cls, parser):
         "--neuron.batch_size_train",
         type=int,
         help="The default batch size",
-        default=8,
+        default=4,
     )
 
     parser.add_argument(
-        "--neuron.target_batch_size",
+        "--neuron.hivemind_global_batch_size",
         type=int,
-        help="The default batch size",
-        default=320,
+        help="The hivemind global batch_size",
+        default=30000,
     )
 
     parser.add_argument(
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="funnybizz",
+        default="s25_run_v1",
     )
 
     parser.add_argument(
@@ -174,13 +182,34 @@ def add_args(cls, parser):
         default="azawahry",
     )
 
+    parser.add_argument(
+        "--dht.use_google_dns",
+        action="store_true",
+        help="If set, we use google dns to get public IP.",
+        default=False,
+    )
+
+    parser.add_argument(
+        "--dht.announce_ip",
+        type=str,
+        help="The IP address to use in announce_maddrs",
+        #default="azawahry",
+    )
+
     if neuron_type == "validator":
+
+        parser.add_argument(
+        "--neuron.training_examples_per_miner",
+        type=int,
+        help="The default number of examples per miner to train on",
+        default=3000,
+        )
 
         parser.add_argument(
             "--neuron.batch_size_test",
             type=int,
             help="The default batch size",
-            default=8,
+            default=4,
         )
 
         parser.add_argument(
@@ -215,7 +244,7 @@ def add_args(cls, parser):
             "--neuron.sample_size",
             type=int,
             help="The number of miners to query in a single step.",
-            default=10,
+            default=20,
         )
 
         parser.add_argument(

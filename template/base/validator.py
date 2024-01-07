@@ -18,18 +18,18 @@
 # DEALINGS IN THE SOFTWARE.
 
 
-import copy
-import torch
+import _thread
 import asyncio
+import copy
 import threading
-import bittensor as bt
-
-from typing import List
 from traceback import print_exception
+from typing import List
 
+import bittensor as bt
+import torch
 from template.base.neuron import BaseNeuron
-from template.validator.reward import get_rewards
 from template.utils.uids import get_random_uids
+from template.validator.reward import get_rewards
 
 
 class BaseValidatorNeuron(BaseNeuron):
@@ -49,7 +49,9 @@ class BaseValidatorNeuron(BaseNeuron):
 
         # Set up initial scoring weights for validation
         bt.logging.info("Building validation weights.")
-        self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32).to(self.device)
+        self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32).to(
+            self.device
+        )
 
         # Init sync with the network. Updates the metagraph.
         self.sync()
@@ -86,19 +88,17 @@ class BaseValidatorNeuron(BaseNeuron):
                 pass
 
         except Exception as e:
-            bt.logging.error(
-                f"Failed to create Axon initialize with exception: {e}"
-            )
+            bt.logging.error(f"Failed to create Axon initialize with exception: {e}")
             pass
 
     async def concurrent_forward(self):
         coroutines = [
-            self.forward()
-            for _ in range(self.config.neuron.num_concurrent_forwards)
+            self.forward() for _ in range(self.config.neuron.num_concurrent_forwards)
         ]
-        await asyncio.gather(*coroutines)
+        responses = await asyncio.gather(*coroutines)
+        return responses
 
-    def run(self):
+    async def run(self):
         """
         Initiates and manages the main loop for the miner on the Bittensor network. The main loop handles graceful shutdown on keyboard interrupts and logs unforeseen errors.
 
@@ -132,17 +132,26 @@ class BaseValidatorNeuron(BaseNeuron):
             while True:
                 bt.logging.info(f"step({self.step}) block({self.block})")
 
-                self.miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
-
-                datapoints_per_group = self.config.neuron.target_batch_size 
-
-                self.dataset_indices_list = self.dataset_common_state.get_dataset_indices(groups_count = len(self.miner_uids), items_per_group = datapoints_per_group) #TODO add repeat on blocked
-                # Run multiple forwards concurrently.
-                _ = self.loop.run_until_complete(self.concurrent_forward()) #TODO add loss anomaly detection
+                self.miner_uids = await get_random_uids(
+                    self, dendrite=self.dendrite, k=self.config.neuron.sample_size
+                )
+                datapoints_per_group = self.config.neuron.target_batch_size
                 
-                #blocking component
+                self.dataset_indices_list = await self.dataset_common_state.get_dataset_indices(
+                        groups_count=len(self.miner_uids),
+                        items_per_group=datapoints_per_group,
+                )
+
+                # Run multiple forwards concurrently.
+                # _ = self.loop.run_until_complete(
+                #     self.concurrent_forward()
+                # )  # TODO add loss anomaly detection
+                responses = await self.concurrent_forward()
+
+                # blocking component
                 # Adjust the scores based on responses from miners.
-                rewards = get_rewards(self, uids=self.miner_uids)
+                # rewards = get_rewards(self, uids=self.miner_uids)
+                rewards = await get_rewards(self, uids=self.miner_uids, responses=responses)
 
                 bt.logging.info(f"Scored responses: {rewards}")
                 # Update the scores based on the rewards.
@@ -154,10 +163,13 @@ class BaseValidatorNeuron(BaseNeuron):
                 # Sync metagraph and potentially set weights.
                 self.sync()
 
+                # Update global and local step
+                # self.dataset_common_state.update_step()
                 self.step += 1
 
         # If someone intentionally stops the validator, it'll safely terminate operations.
         except KeyboardInterrupt:
+            _thread.interrupt_main()
             self.opt.shutdown()
             self.dht.shutdown()
             self.axon.stop()
@@ -167,9 +179,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # In case of unforeseen errors, the validator will log the error and continue operations.
         except Exception as err:
             bt.logging.error("Error during validation", str(err))
-            bt.logging.debug(
-                print_exception(type(err), err, err.__traceback__)
-            )
+            bt.logging.debug(print_exception(type(err), err, err.__traceback__))
 
     def run_in_background_thread(self):
         """
@@ -187,6 +197,30 @@ class BaseValidatorNeuron(BaseNeuron):
     def stop_run_thread(self):
         """
         Stops the validator's operations that are running in the background thread.
+        """
+        if self.is_running:
+            bt.logging.debug("Stopping validator in background thread.")
+            self.should_exit = True
+            self.thread.join(5)
+            self.is_running = False
+            bt.logging.debug("Stopped")
+
+    async def __aenter__(self):
+        await self.async_init()
+        #self.run_in_background_thread()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        """
+        Stops the validator's background operations upon exiting the context.
+        This method facilitates the use of the validator in a 'with' statement.
+        Args:
+            exc_type: The type of the exception that caused the context to be exited.
+                      None if the context was exited without an exception.
+            exc_value: The instance of the exception that caused the context to be exited.
+                       None if the context was exited without an exception.
+            traceback: A traceback object encoding the stack trace.
+                       None if the context was exited without an exception.
         """
         if self.is_running:
             bt.logging.debug("Stopping validator in background thread.")
@@ -290,9 +324,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # If so, we need to add new hotkeys and moving averages.
         if len(self.hotkeys) < len(self.metagraph.hotkeys):
             # Update the size of the moving average scores.
-            new_moving_average = torch.zeros((self.metagraph.n)).to(
-                self.device
-            )
+            new_moving_average = torch.zeros((self.metagraph.n)).to(self.device)
             min_len = min(len(self.hotkeys), len(self.scores))
             new_moving_average[:min_len] = self.scores[:min_len]
             self.scores = new_moving_average

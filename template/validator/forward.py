@@ -36,19 +36,11 @@ async def forward(self):
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
 
     """
-    
-    #uids_per_group = 2
-    #numbers_of_groups = int(len(miner_uids)//datapoints_per_group)
-    
-    #uid_list = [miner_uids[(i*uids_per_group):((i*uids_per_group)+uids_per_group)] if i != (numbers_of_groups-1) else miner_uids[(i*uids_per_group):] for i in range(0, numbers_of_groups)]
-    
-    
     if not self.config.neuron.dont_wandb_log:
         self.wandb.log({"uids":self.miner_uids,
                     "dataset_indices":self.dataset_indices_list})
 
     query_tasks = []
-    #for index, uids in enumerate(uid_list):
 
     queries = []
     for uid, uid_dataset in zip(self.miner_uids, self.dataset_indices_list):
@@ -71,6 +63,6 @@ async def forward(self):
     )
     responses = await asyncio.gather(*query_tasks)
     # Log the results for monitoring purposes.
-    bt.logging.info(f"Received responses: {[{'Loss':response[0].loss,'Dataset Indices':(min(responses[0][0].dataset_indices), max(responses[0][0].dataset_indices))} for response in responses if response[0].dendrite.status_code == 200 ]}")
+    bt.logging.info(f"Received responses: {[{'Loss':response.loss,'Dataset Indices':(min(response.dataset_indices), max(response.dataset_indices)), 'IP':response.dendrite.ip, 'Port':response.dendrite.port, 'Hotkey':response.dendrite.hotkey} for response in responses[0] if response.dendrite.status_code == 200 ]}")
     
     return responses

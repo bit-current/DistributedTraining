@@ -20,26 +20,22 @@
 import hivemind
 import time
 
-# Bittensor
 import bittensor as bt
 
 import torch
+import requests
+from ipaddress import ip_address
 from datasets import load_dataset
 from hivemind.optim.state_averager import TrainingStateAverager
-#from optimum.bettertransformer import BetterTransformer
 from torch.utils.data import DataLoader
-from transformers import (
-    AdamW,
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    get_linear_schedule_with_warmup,
-)
+from transformers import AutoTokenizer
 from functools import partial
 from template.utils.misc import AsyncDendritePool, load_wandb
 from template.utils.uids import get_random_uids
 from template.validator.validator_core import DatasetStateSingelton, ModelSingleton, upload_checkpoint
 from template.validator import forward
 from template.base.validator import BaseValidatorNeuron
+import asyncio
 
 class Validator(BaseValidatorNeuron):
 
@@ -50,19 +46,46 @@ class Validator(BaseValidatorNeuron):
         self.load_state()
 
         # Init DHT
-        self.dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
-        bt.logging.info("To join the training, use initial_peers =", [str(addr) for addr in [self.config.neuron.initial_peers]])
+        if self.config.dht.use_google_dns:
+            request = requests.get("https://api.ipify.org")
+            request.raise_for_status()
+
+            address = request.text
+            bt.logging.info(f"Received public IP address of this machine: {address}")
+            version = ip_address(address).version
+            announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
+        else:
+            version = "4"
+            address = self.config.dht.announce_ip
+            announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
+
+        self.dht = hivemind.DHT(
+            host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
+            initial_peers=self.config.neuron.initial_peers, 
+            announce_maddrs = announce_maddrs,
+            start=True,
+            # dameon=True
+        )
         
         # Init Dendrite Pool
         self.dendrite_pool = AsyncDendritePool( wallet = self.wallet, metagraph = self.metagraph )
 
-        # Init Dataset
-        self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
-        self.dataset_indices = [i for i in range(0, len(self.dataset))]
-        self.dataset_common_state = DatasetStateSingelton(self.dht , self.dataset_indices, self.config.neuron.run_id)
+        # # Init Dataset
+        # self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
+        # self.dataset_indices = [i for i in range(0, len(self.dataset))]
+        # self.dataset_common_state = DatasetStateSingelton(self.dht , self.dataset_indices, self.config.neuron.run_id)
+        # # self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_train")
+        # # if self.dataset_indices_list_test is None:
+        # #     self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_test")
+        # self.dataset_indices_list_test = await self.dataset_common_state.get_dataset_indices_test(self.config.neuron.batch_size)
+        # self.global_step = self.dataset_common_state.get_dht("step")
+        # if self.global_step is None:
+        #     self.global_step = 0
+        #     self.dataset_common_state.set_dht("step")
 
         # Init Loss
-        self.previous_loss = self.dataset_common_state.get_dht("loss")
+        # self.previous_loss = self.dataset_common_state.get_dht("loss")
+        self.previous_loss = None
         self.latest_upload = 0
         self.latest_weight_update = 0
         self.step = 0
@@ -89,9 +112,29 @@ class Validator(BaseValidatorNeuron):
             # client_mode=optimizer_args.client_mode,
             # **asdict(averager_args),
         )
-
+        
+        # Init a static DHT
+        self.dataset_dict = dict()
+        
         # Start Main Validation Loop
         bt.logging.info("Starting validator loop.")
+        
+    async def async_init(self):
+
+        # Init Dataset
+        self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
+        self.dataset_indices = [i for i in range(0, len(self.dataset))]
+        self.dataset_common_state = DatasetStateSingelton(self.dataset_dict , self.dataset_indices, self.config.neuron.run_id)
+        await self.dataset_common_state.initialize_async()
+        bt.logging.info("Finished async intiatlization.")
+        # self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_train")
+        # if self.dataset_indices_list_test is None:
+        #     self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_test")
+        self.dataset_indices_list_test = await self.dataset_common_state.get_dataset_indices_test(self.config.neuron.batch_size_test)
+        # self.global_step = self.dataset_common_state.get_dht("step")
+        # if self.global_step is None:
+        #     self.global_step = 0
+        #     self.dataset_common_state.set_dht("step")
         
     # Define encoding function
     def encode(self, examples):
@@ -101,9 +144,17 @@ class Validator(BaseValidatorNeuron):
         return await forward(self)
 
 
-# The main function parses the configuration and runs the validator.
-if __name__ == "__main__":
-    with Validator() as validator:
-        while True:
-            # bt.logging.info("Validator running...", time.time())
-            time.sleep(5)
+# # The main function parses the configuration and runs the validator.
+# if __name__ == "__main__":
+#     with Validator() as validator:
+#         while True:
+#             # bt.logging.info("Validator running...", time.time())
+#             time.sleep(5)
+
+# Async main function
+async def main():
+    async with Validator() as validator:
+        # The validator is now initialized and ready to use
+        await validator.run()
+
+asyncio.run(main())

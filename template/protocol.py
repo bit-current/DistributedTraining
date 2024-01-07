@@ -17,11 +17,20 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-from typing import Any, List
+from typing import Any, List, Optional
 
 import bittensor as bt
 import numpy as np
+import pydantic
 
+class IsAlive( bt.Synapse ):
+    answer: Optional[str] = None
+    completion: str = pydantic.Field(
+        "",
+        title="Completion",
+        description="Completion status of the current StreamPrompting object. "
+                    "This attribute is mutable and can be updated.",
+    )
 
 class Train( bt.Synapse ):
     """
