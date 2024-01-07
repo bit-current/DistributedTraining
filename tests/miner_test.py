@@ -84,9 +84,12 @@ for i in range(30):
         loss.backward()
         # Adjust gradient
         opt.step()
+        
+        print(f"Step {step} Loss: {loss}")
 
         print(opt.state_averager.is_alive())
         #print(opt.tracker.is_alive())
         print(opt.grad_averager)
         #print("weights post:", model.weight.data[...])
+    print(loss)
     time.sleep(10)
