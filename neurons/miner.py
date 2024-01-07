@@ -89,7 +89,6 @@ class Miner(BaseMinerNeuron):
             matchmaking_time=15.0,       # when averaging parameters, gather peers in background for up to this many seconds
             averaging_timeout=60.0,     # give up on averaging if not successful in this many seconds
             verbose=False               # print logs incessently
-            use_local_updates=True,
         )
         
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
@@ -144,6 +143,8 @@ class Miner(BaseMinerNeuron):
         # Create a PyTorch DataLoader
         dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size, collate_fn = default_data_collator)
         
+        total_loss = 0
+        
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
             
@@ -164,14 +165,16 @@ class Miner(BaseMinerNeuron):
             if not self.config.neuron.dont_wandb_log:
                 self.wandb.log({"loss":loss,
                             'opt_local_epoch':self.opt.local_epoch})
+            total_loss += loss.item()
+
             loss.backward()
             # Adjust gradient
             self.opt.step()
 
             bt.logging.info(f"Step {step} Loss: {loss}")
             
-        
-        synapse.loss = loss
+        average_loss = total_loss / len(dataloader)
+        synapse.loss = average_loss
 
         bt.logging.info(f"Final Loss: {synapse.loss}")
         
