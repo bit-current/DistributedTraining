@@ -135,7 +135,7 @@ class BaseValidatorNeuron(BaseNeuron):
                 self.miner_uids = await get_random_uids(
                     self, dendrite=self.dendrite, k=self.config.neuron.sample_size
                 )
-                datapoints_per_group = self.config.neuron.target_batch_size
+                datapoints_per_group = self.config.neuron.hivemind_global_batch_size
                 
                 self.dataset_indices_list = await self.dataset_common_state.get_dataset_indices(
                         groups_count=len(self.miner_uids),
@@ -147,12 +147,10 @@ class BaseValidatorNeuron(BaseNeuron):
                 #     self.concurrent_forward()
                 # )  # TODO add loss anomaly detection
                 responses = await self.concurrent_forward()
-
                 # blocking component
                 # Adjust the scores based on responses from miners.
                 # rewards = get_rewards(self, uids=self.miner_uids)
                 rewards = await get_rewards(self, uids=self.miner_uids, responses=responses)
-
                 bt.logging.info(f"Scored responses: {rewards}")
                 # Update the scores based on the rewards.
                 self.update_scores(rewards, self.miner_uids)

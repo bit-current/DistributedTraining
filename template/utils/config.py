@@ -116,7 +116,7 @@ def add_args(cls, parser):
         type=str,
         nargs=3,
         help="The addresses for the DHT",
-        default=["/ip4/54.89.124.220/tcp/8008/p2p/12D3KooWQxxHQeTgUrbdtPiNWxqqB4bFpn5s9mjm52VYDU9pnfsg"],
+        default=["/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWRe4RHd5NxRhfn5rMuCk6hA9UBNnK8V3Xy3ejcFApGkRx", "/ip4/38.79.71.1/tcp/10263/p2p/12D3KooWMfiDM67PW6GerfahQPPdc4Bt3tkiHo8vZXieZL5mVTsc"],
     )
 
     parser.add_argument(
@@ -193,7 +193,6 @@ def add_args(cls, parser):
         "--dht.announce_ip",
         type=str,
         help="The IP address to use in announce_maddrs",
-        #default="azawahry",
     )
 
     if neuron_type == "validator":

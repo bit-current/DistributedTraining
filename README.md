@@ -21,9 +21,6 @@ pip install -e . && python post_install.py
 
 Once you have installed this repo and attained your subnet via the instructions in the nested docs (staging, testing, or main) you can run the miner and validator with the following commands.
 ```bash
-# To run on test net
-python neurons/miner.py --netuid 34 --subtensor.network test --wallet.name miner --wallet.hotkey default --logging.debug
-python neurons/validator.py --netuid 34 --subtensor.network test --wallet.name validator --wallet.hotkey default --logging.debug
 # To run the miner
 python -m neurons/miner.py 
     --netuid <your netuid>  # Must be attained by following the instructions in the docs/running_on_*.md files
@@ -31,6 +28,9 @@ python -m neurons/miner.py
     --wallet.name <your miner wallet> # Must be created using the bittensor-cli
     --wallet.hotkey <your validator hotkey> # Must be created using the bittensor-cli
     --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
+    --axon.port <an open port to serve the bt axon on>
+    --dht.port <another open port to serve the dht axon on>
+    --dht.announce_ip <your device ip address>
 
 # To run the validator
 python -m neurons/validator.py 
@@ -39,6 +39,9 @@ python -m neurons/validator.py
     --wallet.name <your validator wallet>  # Must be created using the bittensor-cli
     --wallet.hotkey <your validator hotkey> # Must be created using the bittensor-cli
     --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
+    --axon.port <an open port to serve the bt axon on>
+    --dht.port <another open port to serve the dht axon on>
+    --dht.announce_ip <your device ip address>
 ```
 
 </div>
