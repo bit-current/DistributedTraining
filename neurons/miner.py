@@ -110,6 +110,9 @@ class Miner(BaseMinerNeuron):
         # Load dataset
         self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
         
+        # Init Wandb
+        if not self.config.neuron.dont_wandb_log:
+            self.wandb = load_wandb(self.config, self.wallet)
 
     # Define encoding function
     def encode(self, examples):
