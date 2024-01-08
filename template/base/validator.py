@@ -135,7 +135,7 @@ class BaseValidatorNeuron(BaseNeuron):
                 self.miner_uids = await get_random_uids(
                     self, dendrite=self.dendrite, k=self.config.neuron.sample_size
                 )
-                datapoints_per_group = self.config.neuron.hivemind_global_batch_size
+                datapoints_per_group = self.config.neuron.training_examples_per_miner
                 
                 self.dataset_indices_list = await self.dataset_common_state.get_dataset_indices(
                         groups_count=len(self.miner_uids),
