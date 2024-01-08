@@ -89,7 +89,7 @@ async def get_rewards(
     #         )
     #     )
     if (self.step % 100 == 0) and (self.step != 0):
-        self.dataset_indices_list_test = await self.dataset_common_state.get_dataset_indices_test(self.config.neuron.batch_size_test)
+        self.dataset_indices_list_test = await self.dataset_common_state.get_dataset_indices_test(self.config.neuron.local_batch_size_test)
 
     # Get loss on randomly selected test dataset to be used for the Global Score
     loss = get_loss(self, self.dataset_indices_list_test)

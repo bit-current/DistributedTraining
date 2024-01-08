@@ -130,7 +130,7 @@ class Validator(BaseValidatorNeuron):
         # self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_train")
         # if self.dataset_indices_list_test is None:
         #     self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_test")
-        self.dataset_indices_list_test = await self.dataset_common_state.get_dataset_indices_test(self.config.neuron.batch_size_test)
+        self.dataset_indices_list_test = await self.dataset_common_state.get_dataset_indices_test(self.config.neuron.local_batch_size_test)
         # self.global_step = self.dataset_common_state.get_dht("step")
         # if self.global_step is None:
         #     self.global_step = 0

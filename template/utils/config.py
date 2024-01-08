@@ -116,7 +116,7 @@ def add_args(cls, parser):
         type=str,
         nargs=3,
         help="The addresses for the DHT",
-        default=["/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWRe4RHd5NxRhfn5rMuCk6hA9UBNnK8V3Xy3ejcFApGkRx", "/ip4/38.79.71.1/tcp/10263/p2p/12D3KooWMfiDM67PW6GerfahQPPdc4Bt3tkiHo8vZXieZL5mVTsc"],
+        default=["/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWC3dDGUMwXDFJKsTD7tFHpvabwXEGNckC8BLnAStdxhWq"],
     )
 
     parser.add_argument(
@@ -141,17 +141,17 @@ def add_args(cls, parser):
     )
 
     parser.add_argument(
-        "--neuron.batch_size_train",
+        "--neuron.local_batch_size_train",
         type=int,
         help="The default batch size",
         default=4,
     )
 
     parser.add_argument(
-        "--neuron.hivemind_global_batch_size",
+        "--neuron.global_batch_size_train",
         type=int,
         help="The hivemind global batch_size",
-        default=30000,
+        default=320,
     )
 
     parser.add_argument(
@@ -197,15 +197,9 @@ def add_args(cls, parser):
 
     if neuron_type == "validator":
 
-        parser.add_argument(
-        "--neuron.training_examples_per_miner",
-        type=int,
-        help="The default number of examples per miner to train on",
-        default=3000,
-        )
 
         parser.add_argument(
-            "--neuron.batch_size_test",
+            "--neuron.local_batch_size_test",
             type=int,
             help="The default batch size",
             default=4,

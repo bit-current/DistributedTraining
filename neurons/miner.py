@@ -82,8 +82,8 @@ class Miner(BaseMinerNeuron):
             dht=self.dht,                    # use a DHT that is connected with other peers
             run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run
             scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
-            batch_size_per_step=self.config.neuron.batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=self.config.neuron.hivemind_global_batch_size,    # after peers collectively process this many samples, average weights and begin the next epoch
+            batch_size_per_step=self.config.neuron.local_batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
+            target_batch_size=self.config.neuron.global_batch_size_train,    # after peers collectively process this many samples, average weights and begin the next epoch
             optimizer=opt,              # wrap the SGD optimizer defined above
             use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
             matchmaking_time=15.0,       # when averaging parameters, gather peers in background for up to this many seconds
