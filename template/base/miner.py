@@ -22,17 +22,6 @@ import threading
 import traceback
 
 import bittensor as bt
-from datasets import load_dataset
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    get_linear_schedule_with_warmup,
-    default_data_collator
-)
-from torch.utils.data import DataLoader
-import hivemind
-from functools import partial
-
 from template.base.neuron import BaseNeuron
 
 
