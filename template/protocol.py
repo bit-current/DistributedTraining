@@ -82,7 +82,7 @@ class Train( bt.Synapse ):
     # optimizer_name: str = "adam"
 
     # # Required batch size
-    batch_size: int = 4
+    batch_size: int = 1
 
     # # Optional score
     loss: float = 0.0

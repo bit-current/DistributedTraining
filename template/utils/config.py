@@ -16,12 +16,12 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import argparse
 import os
-
-import bittensor as bt
 import torch
+import argparse
+import bittensor as bt
 from loguru import logger
+import torch
 
 
 def check_config(cls, config: "bt.Config"):
@@ -64,26 +64,15 @@ def add_args(cls, parser):
     # Netuid Arg: The netuid of the subnet to connect to.
     parser.add_argument("--netuid", type=int, help="Subnet netuid", default=1)
 
-    neuron_type = "validator" if "miner" not in cls.__name__.lower() else "miner"
-
+    neuron_type = (
+        "validator" if "miner" not in cls.__name__.lower() else "miner"
+    )
+    
     parser.add_argument(
         "--dht.port",
         type=int,
         help="Trials for this neuron go in neuron.root / (wallet_cold - wallet_hot) / neuron.name. ",
-        default=8092,
-    )
-
-    parser.add_argument(
-        "--dht.use_google_dns",
-        action="store_true",
-        help="If set, we use google dns to get public IP.",
-        default=False,
-    )
-
-    parser.add_argument(
-        "--dht.announce_ip",
-        type=str,
-        help="The IP address to use in announce_maddrs",
+        default=8009,
     )
 
     parser.add_argument(
@@ -97,7 +86,8 @@ def add_args(cls, parser):
         "--neuron.device",
         type=str,
         help="Device to run on.",
-        default=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        # default=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        default=torch.device("cpu"),
     )
 
     parser.add_argument(
@@ -126,14 +116,14 @@ def add_args(cls, parser):
         type=str,
         nargs=3,
         help="The addresses for the DHT",
-        default=["/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWRe4RHd5NxRhfn5rMuCk6hA9UBNnK8V3Xy3ejcFApGkRx", "/ip4/38.79.71.1/tcp/10263/p2p/12D3KooWMfiDM67PW6GerfahQPPdc4Bt3tkiHo8vZXieZL5mVTsc"],
+        default=["/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWC3dDGUMwXDFJKsTD7tFHpvabwXEGNckC8BLnAStdxhWq"],
     )
 
     parser.add_argument(
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="gpt2",
+        default="sshleifer/tiny-gpt2",
     )
 
     parser.add_argument(
@@ -151,17 +141,17 @@ def add_args(cls, parser):
     )
 
     parser.add_argument(
-        "--neuron.batch_size_train",
-        type=int,
-        help="The default batch size",
-        default=4,
-    )
-
-    parser.add_argument(
-        "--neuron.target_batch_size",
+        "--neuron.local_batch_size_train",
         type=int,
         help="The default batch size",
         default=32,
+    )
+
+    parser.add_argument(
+        "--neuron.global_batch_size_train",
+        type=int,
+        help="The hivemind global target_batch_size",
+        default=3200,
     )
 
     parser.add_argument(
@@ -175,7 +165,7 @@ def add_args(cls, parser):
         "--neuron.dont_wandb_log",
         action="store_true",
         help="Toggles wandb logging for the project",
-        default=False,
+        default=False
     )
 
     parser.add_argument(
@@ -192,12 +182,26 @@ def add_args(cls, parser):
         default="azawahry",
     )
 
+    parser.add_argument(
+        "--dht.use_google_dns",
+        action="store_true",
+        help="If set, we use google dns to get public IP.",
+        default=False,
+    )
+
+    parser.add_argument(
+        "--dht.announce_ip",
+        type=str,
+        help="The IP address to use in announce_maddrs",
+    )
+
     if neuron_type == "validator":
+
         parser.add_argument(
-            "--neuron.batch_size_test",
+            "--neuron.local_batch_size_test",
             type=int,
             help="The default batch size",
-            default=4,
+            default=32,
         )
 
         parser.add_argument(
@@ -212,6 +216,13 @@ def add_args(cls, parser):
             type=int,
             help="The number of steps before updating the model's weights",
             default=900,
+        )
+        
+        parser.add_argument(
+            "--neuron.training_examples_per_miner",
+            type=int,
+            help="The number of rows to train on per miner",
+            default=200,
         )
 
         parser.add_argument(
@@ -267,6 +278,7 @@ def add_args(cls, parser):
         )
 
     else:
+
         parser.add_argument(
             "--blacklist.force_validator_permit",
             action="store_true",
