@@ -116,14 +116,14 @@ def add_args(cls, parser):
         type=str,
         nargs=3,
         help="The addresses for the DHT",
-        default=["/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWC3dDGUMwXDFJKsTD7tFHpvabwXEGNckC8BLnAStdxhWq"],
+        default=["/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWNpcKpiJQRwkxtsUzHWWyA2CBmEVH8b7YEMfgnpWNqeTi"],
     )
 
     parser.add_argument(
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="sshleifer/tiny-gpt2",
+        default="gpt2",
     )
 
     parser.add_argument(
@@ -222,7 +222,7 @@ def add_args(cls, parser):
             "--neuron.training_examples_per_miner",
             type=int,
             help="The number of rows to train on per miner",
-            default=200,
+            default=32,
         )
 
         parser.add_argument(

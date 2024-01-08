@@ -35,6 +35,8 @@ from template.utils.uids import get_random_uids
 from template.validator.validator_core import DatasetStateSingelton, ModelSingleton, upload_checkpoint
 from template.validator import forward
 from template.base.validator import BaseValidatorNeuron
+from template.utils.misc import load_wandb
+import wandb
 import asyncio
 
 class Validator(BaseValidatorNeuron):
@@ -59,14 +61,43 @@ class Validator(BaseValidatorNeuron):
             address = self.config.dht.announce_ip
             announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
 
-        self.dht = hivemind.DHT(
-            host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
-            initial_peers=self.config.neuron.initial_peers, 
-            announce_maddrs = announce_maddrs,
-            start=True,
-            # dameon=True
-        )
+        # Init list of available DHT addresses from wandb
+        api = wandb.Api()
+        initial_peers_list = self.config.neuron.initial_peers
+        runs = api.runs(f"{self.config.neuron.wandb_entity}/{self.config.neuron.wandb_project}")
+        for ru in runs:
+            if ru.state == "running":
+                for peer in ru.config['neuron']['initial_peers']:
+                    if peer not in initial_peers_list:
+                        initial_peers_list.append(peer)
+
+        retries = 0
+        while retries <= len(initial_peers_list):
+            if retries == len(initial_peers_list):
+                raise Exception("Max retries reached, operation failed.")
+            try:
+                # Init DHT
+                self.dht = hivemind.DHT(
+                    host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
+                    initial_peers=[initial_peers_list[retries]], 
+                    announce_maddrs = announce_maddrs,
+                    start=True,
+                )
+                bt.logging.info(f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}")
+                break
+            except Exception as e:
+                bt.logging.error(f"Attempt {retries + 1} to init DHT using initial_peer as {initial_peers_list[retries]} failed with error: {e}")
+                retries += 1
+                bt.logging.error(f"Retrying...")
+
+        # Write local dht address to config
+        self.config.neuron.initial_peers = self.config.neuron.initial_peers + [str(addr) for addr in self.dht.get_visible_maddrs()]
         
+        # Init Wandb
+        if not self.config.neuron.dont_wandb_log:
+            self.wandb = load_wandb(self.config, self.wallet)
+
+
         # Init Dendrite Pool
         self.dendrite_pool = AsyncDendritePool( wallet = self.wallet, metagraph = self.metagraph )
 

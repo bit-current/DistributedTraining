@@ -42,6 +42,7 @@ from transformers import (
 )
 import requests
 from hivemind import utils
+import wandb
 
 class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
@@ -64,11 +65,22 @@ class Miner(BaseMinerNeuron):
             address = self.config.dht.announce_ip
             announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
 
+        # Init list of available DHT addresses from wandb
+        api = wandb.Api()
+        initial_peers_list = self.config.neuron.initial_peers
+        runs = api.runs(f"{self.config.neuron.wandb_entity}/{self.config.neuron.wandb_project}")
+        for ru in runs:
+            if ru.state == "running":
+                for peer in ru.config['neuron']['initial_peers']:
+                    if peer not in initial_peers_list:
+                        initial_peers_list.append(peer)
+
+        # Init DHT
         self.dht = hivemind.DHT(
             host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
-            initial_peers=self.config.neuron.initial_peers, 
+            initial_peers=initial_peers_list, 
             announce_maddrs = announce_maddrs,
-            start=True
+            start=True,
         )
         utils.log_visible_maddrs(self.dht.get_visible_maddrs(), only_p2p=True)
         self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
@@ -98,6 +110,9 @@ class Miner(BaseMinerNeuron):
         # Load dataset
         self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
         
+        # Init Wandb
+        if not self.config.neuron.dont_wandb_log:
+            self.wandb = load_wandb(self.config, self.wallet)
 
     # Define encoding function
     def encode(self, examples):
