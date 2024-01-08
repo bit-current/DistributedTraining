@@ -99,9 +99,6 @@ class BaseNeuron(ABC):
         )
         self.step = 0
 
-        if not self.config.neuron.dont_wandb_log:
-            self.wandb = load_wandb(self.config, self.wallet)
-
     @abstractmethod
     async def forward(self, synapse: bt.Synapse) -> bt.Synapse:
         ...

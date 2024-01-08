@@ -123,7 +123,7 @@ def add_args(cls, parser):
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="sshleifer/tiny-gpt2",
+        default="gpt2",
     )
 
     parser.add_argument(
