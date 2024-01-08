@@ -121,17 +121,6 @@ class Miner(BaseMinerNeuron):
             template.protocol.Train: The synapse object with the 'loss' field set to models loss.
         """
 
-        # bt.logging.info("Loading state from peers")
-
-        # while not self.opt.is_synchronized_with_peers():
-        #     try:
-        #         self.opt.load_state_from_peers()
-        #     except Exception as e:
-        #         bt.logging.error("Unable to load state from peers.")
-
-        # if self.opt.is_synchronized_with_peers():
-        #     bt.logging.info("Miner synchronized with peers")
-
         # Select dataset indices to use for optimization step
         dataset = self.dataset.select(synapse.dataset_indices)
         if not self.config.neuron.dont_wandb_log:

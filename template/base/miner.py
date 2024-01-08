@@ -76,97 +76,7 @@ class BaseMinerNeuron(BaseNeuron):
         self.thread: threading.Thread = None
         self.lock = asyncio.Lock()
         
-        self.forward_event = asyncio.Event()    
-        
-        # Init device
-        self.device = self.config.neuron.device
-
-        # Init DHT and model
-        dht = hivemind.DHT(initial_peers=[self.config.neuron.initial_peers], start=True)
-        self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
-        
-        # Move the model to the appropriate device
-        self.model = self.model.to(self.device)
-
-        # Set up a decentralized optimizer that will average with peers in background
-        opt = torch.optim.AdamW(self.model.parameters(), lr = self.config.neuron.lr)
-        self.opt = hivemind.Optimizer(
-            dht=dht,                    # use a DHT that is connected with other peers
-            run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run
-            scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
-            batch_size_per_step=self.config.neuron.batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=self.config.neuron.target_batch_size,    # after peers collectively process this many samples, average weights and begin the next epoch
-            optimizer=opt,              # wrap the SGD optimizer defined above
-            use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
-            matchmaking_time=10.0,       # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=10.0,     # give up on averaging if not successful in this many seconds
-            verbose=False               # print logs incessently
-        )
-        
-        self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
-        # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-        
-        # Load dataset
-        self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
-        
-
-    # Define encoding function
-    def encode(self, examples):
-        return self.tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')    
-                
-
-    async def training_routine(self):
-        print("Starting training routine")  # Debug print
-
-        # Encode the dataset
-        encoded_dataset = self.dataset.map(self.encode, batched=True)
-        # Create a PyTorch DataLoader
-        dataloader = DataLoader(encoded_dataset, batch_size=self.config.neuron.batch_size_train, collate_fn = default_data_collator)
-        
-        while not self.should_exit:
-            
-            # Train data for one epoch
-            for step, batch in enumerate(dataloader):                  
-
-                if self.forward_event.is_set():  # Check if the event is set
-                    print("Awaiting forward event")
-                    self.opt.tracker.pause_updates()
-                    await self.forward_event.wait()  # Only wait if the event is set    
-                    #await asyncio.sleep(1)
-                    #self.opt.load_state_from_peers()
-
-                try:
-                    
-                    input_ids = batch['input_ids'].to(self.device)
-                    attention_mask = batch['attention_mask'].to(self.device)
-                    labels = input_ids.clone()
-
-                    self.opt.zero_grad()
-                    
-                    # Forward pass
-                    outputs = self.model(
-                        input_ids = input_ids, 
-                        attention_mask = attention_mask,
-                        labels = labels
-                        )    
-                    
-                    # Backward pass    
-                    loss = outputs.loss
-                    
-                    if not self.config.neuron.dont_wandb_log:
-                        self.wandb.log({"loss":loss, 'opt_local_epoch':self.opt.local_epoch})
-                        
-                    loss.backward()
-                    self.opt.step()
-
-                    bt.logging.info(f"Step {step} Loss: {loss}")
-                except Exception as e:
-                    bt.logging.error(f"Training error at step {step}: {e}")
-            
-            
-
-    async def run(self):
+    def run(self):
         """
         Initiates and manages the main loop for the miner on the Bittensor network. The main loop handles graceful shutdown on keyboard interrupts and logs unforeseen errors.
 
@@ -203,10 +113,6 @@ class BaseMinerNeuron(BaseNeuron):
         self.axon.start()
         bt.logging.info(f"Miner starting at block: {self.block}")
         
-        print("Creating training task")  # Debug print
-        # Start training_routine as a background task
-        training_task = asyncio.create_task(self.training_routine())
-
         # This loop maintains the miner's operations until intentionally stopped.
         try:
             while not self.should_exit:
@@ -214,11 +120,9 @@ class BaseMinerNeuron(BaseNeuron):
                     self.block - self.metagraph.last_update[self.uid]
                     < self.config.neuron.epoch_length
                 ):
-                    print("running while")
                     
                     # Wait before checking again.
-                    #time.sleep(1)
-                    await asyncio.sleep(1)
+                    time.sleep(1)
 
                     # Check if we should exit.
                     if self.should_exit:
@@ -229,12 +133,11 @@ class BaseMinerNeuron(BaseNeuron):
                 self.step += 1
                 
             # Await the training task to ensure it completes before exiting
-            await training_task
         
         # If someone intentionally stops the miner, it'll safely terminate operations.
         except KeyboardInterrupt:
             self.should_exit = True
-            await training_task
+
             self.opt.shutdown()
             self.dht.shutdown()
             self.axon.stop()
@@ -244,7 +147,6 @@ class BaseMinerNeuron(BaseNeuron):
         # In case of unforeseen errors, the miner will log the error and continue operations.
         except Exception as e:
             bt.logging.error(traceback.format_exc())
-            await training_task
 
     def run_in_background_thread(self):
         """
@@ -266,21 +168,21 @@ class BaseMinerNeuron(BaseNeuron):
         if self.is_running:
             bt.logging.debug("Stopping miner in background thread.")
             self.should_exit = True
-           
+            self.thread.join(5)
             self.is_running = False
             bt.logging.debug("Stopped")
 
-    async def __aenter__(self):
+    def __enter__(self):
         """
         Starts the miner's operations in a background thread upon entering the context.
         This method facilitates the use of the miner in a 'with' statement.
         """
-        # self.run_in_background_thread()
-        await self.run()
+        #self.run_in_background_thread()
+        self.run()
         return self
     
 
-    async def __aexit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback):
         """
         Stops the miner's background operations upon exiting the context.
         This method facilitates the use of the miner in a 'with' statement.
