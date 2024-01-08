@@ -76,12 +76,24 @@ class Miner(BaseMinerNeuron):
                         initial_peers_list.append(peer)
 
         # Init DHT
-        self.dht = hivemind.DHT(
-            host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
-            initial_peers=initial_peers_list, 
-            announce_maddrs = announce_maddrs,
-            start=True,
-        )
+        retries = 0
+        while retries <= len(initial_peers_list):
+            if retries == len(initial_peers_list):
+                raise Exception("Max retries reached, operation failed.")
+            try:
+                # Init DHT
+                self.dht = hivemind.DHT(
+                    host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
+                    initial_peers=[initial_peers_list[retries]], 
+                    announce_maddrs = announce_maddrs,
+                    start=True,
+                )
+                bt.logging.info(f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}")
+                break
+            except Exception as e:
+                bt.logging.error(f"Attempt {retries + 1} to init DHT using initial_peer as {initial_peers_list[retries]} failed with error: {e}")
+                retries += 1
+                bt.logging.error(f"Retrying...")
         utils.log_visible_maddrs(self.dht.get_visible_maddrs(), only_p2p=True)
         self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
 
