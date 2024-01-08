@@ -64,9 +64,8 @@ class Validator(BaseValidatorNeuron):
             initial_peers=self.config.neuron.initial_peers, 
             announce_maddrs = announce_maddrs,
             start=True,
-            # dameon=True
         )
-        
+
         # Init Dendrite Pool
         self.dendrite_pool = AsyncDendritePool( wallet = self.wallet, metagraph = self.metagraph )
 
