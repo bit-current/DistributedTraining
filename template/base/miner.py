@@ -126,7 +126,6 @@ class BaseMinerNeuron(BaseNeuron):
         # If someone intentionally stops the miner, it'll safely terminate operations.
         except KeyboardInterrupt:
             self.should_exit = True
-
             self.opt.shutdown()
             self.dht.shutdown()
             self.axon.stop()
