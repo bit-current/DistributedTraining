@@ -98,7 +98,7 @@ class BaseValidatorNeuron(BaseNeuron):
         responses = await asyncio.gather(*coroutines)
         return responses
 
-    async def run(self):
+    def run(self):
         """
         Initiates and manages the main loop for the miner on the Bittensor network. The main loop handles graceful shutdown on keyboard interrupts and logs unforeseen errors.
 
@@ -132,26 +132,8 @@ class BaseValidatorNeuron(BaseNeuron):
             while True:
                 bt.logging.info(f"step({self.step}) block({self.block})")
 
-                self.miner_uids = get_random_uids(
-                    self, dendrite=self.dendrite, k=self.config.neuron.sample_size
-                )
-                datapoints_per_group = self.config.neuron.training_examples_per_miner
-                
-                self.dataset_indices_list = self.dataset_common_state.get_dataset_indices(
-                        groups_count=len(self.miner_uids),
-                        items_per_group=datapoints_per_group,
-                )
-
                 # Run multiple forwards concurrently.
                 _ = self.loop.run_until_complete(self.concurrent_forward()) 
-                
-                # Adjust the scores based on responses from miners.
-                rewards = get_rewards(self, uids=self.miner_uids)
-
-                bt.logging.info(f"Scored responses: {rewards}")
-                
-                # Update the scores based on the rewards.
-                self.update_scores(rewards, self.miner_uids)
                 
                 # Check if we should exit.
                 if self.should_exit:
@@ -160,8 +142,6 @@ class BaseValidatorNeuron(BaseNeuron):
                 # Sync metagraph and potentially set weights.
                 self.sync()
 
-                # Update global and local step
-                # self.dataset_common_state.update_step()
                 self.step += 1
 
         # If someone intentionally stops the validator, it'll safely terminate operations.
@@ -203,8 +183,7 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.debug("Stopped")
 
     def __enter__(self):
-        self.run()
-        #self.run_in_background_thread()
+        self.run_in_background_thread()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
