@@ -98,7 +98,7 @@ class BaseValidatorNeuron(BaseNeuron):
         responses = await asyncio.gather(*coroutines)
         return responses
 
-    def run(self):
+    async def run(self):
         """
         Initiates and manages the main loop for the miner on the Bittensor network. The main loop handles graceful shutdown on keyboard interrupts and logs unforeseen errors.
 
@@ -143,17 +143,16 @@ class BaseValidatorNeuron(BaseNeuron):
                 )
 
                 # Run multiple forwards concurrently.
-                _ = self.loop.run_until_complete(
-                    self.concurrent_forward()
-                )  # TODO add loss anomaly detection
-                #responses = await self.concurrent_forward()
-                # blocking component
+                _ = self.loop.run_until_complete(self.concurrent_forward()) 
+                
                 # Adjust the scores based on responses from miners.
                 rewards = get_rewards(self, uids=self.miner_uids)
-                #rewards = await get_rewards(self, uids=self.miner_uids, responses=responses)
+
                 bt.logging.info(f"Scored responses: {rewards}")
+                
                 # Update the scores based on the rewards.
                 self.update_scores(rewards, self.miner_uids)
+                
                 # Check if we should exit.
                 if self.should_exit:
                     break
@@ -204,8 +203,8 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.debug("Stopped")
 
     def __enter__(self):
-        #self.run()
-        self.run_in_background_thread()
+        self.run()
+        #self.run_in_background_thread()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
