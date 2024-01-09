@@ -6,9 +6,9 @@ import traceback
 import asyncio
 import template
 
-def check_uid(dendrite, axon, uid):
+async def check_uid(dendrite, axon, uid):
     try:
-        response = dendrite(axon, template.protocol.IsAlive(), deserialize=False, timeout=2.3)
+        response = await dendrite(axon, template.protocol.IsAlive(), deserialize=False, timeout=2.3)
         if response.is_success:
             bt.logging.trace(f"UID {uid} is active.")
             # loop.close()
@@ -23,7 +23,7 @@ def check_uid(dendrite, axon, uid):
         return False
 
 
-def check_uid_availability(
+async def check_uid_availability(
     dendrite, metagraph: "bt.metagraph.Metagraph", uid: int, vpermit_tao_limit: int
 ) -> bool:
     """Check if uid is available. The UID should be available if it is serving and has less than vpermit_tao_limit stake
@@ -42,8 +42,8 @@ def check_uid_availability(
         if metagraph.S[uid] > vpermit_tao_limit:
             return False
     # Filter for miners that are processing other responses
-    if not check_uid(dendrite, metagraph.axons[uid], uid):
-        return False
+    if not await check_uid(dendrite, metagraph.axons[uid], uid):
+       return False
     # Available otherwise.
     return True
 

@@ -144,7 +144,7 @@ def add_args(cls, parser):
         "--neuron.local_batch_size_train",
         type=int,
         help="The default batch size",
-        default=32,
+        default=8,
     )
 
     parser.add_argument(
@@ -201,7 +201,7 @@ def add_args(cls, parser):
             "--neuron.local_batch_size_test",
             type=int,
             help="The default batch size",
-            default=32,
+            default=8,
         )
 
         parser.add_argument(
@@ -222,7 +222,7 @@ def add_args(cls, parser):
             "--neuron.training_examples_per_miner",
             type=int,
             help="The number of rows to train on per miner",
-            default=32,
+            default=80,
         )
 
         parser.add_argument(
