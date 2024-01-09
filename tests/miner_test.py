@@ -29,13 +29,13 @@ device = "cpu"
 opt = torch.optim.AdamW(model.parameters(), lr=0.00001)
 
 version = "4"
-address = "100.26.52.69"
+address = "34.229.118.117"
 announce_maddrs = [f"/ip{version}/{address}/tcp/{8009}"]
 
 # Create DHT: a decentralized key-value storage shared between peers
 dht = hivemind.DHT(
     host_maddrs=[f"/ip4/0.0.0.0/tcp/{8009}"],
-    initial_peers=["/ip4/54.89.124.220/tcp/8008/p2p/12D3KooWRBaYDFiGsTuReihRtn9voVV1wAMxKzeeU9WDPSZjk9aX"], 
+    initial_peers=["/ip4/172.31.38.115/tcp/8008/p2p/12D3KooWJUccTxmAumNy983rahKrm7fmCguAm3ySbHpzSe1sJsCV"], 
     announce_maddrs = announce_maddrs,
     start=True
 )
