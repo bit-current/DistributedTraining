@@ -86,8 +86,7 @@ def add_args(cls, parser):
         "--neuron.device",
         type=str,
         help="Device to run on.",
-        # default=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-        default=torch.device("cpu"),
+        default=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
 
     parser.add_argument(
