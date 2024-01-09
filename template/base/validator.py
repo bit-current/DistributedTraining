@@ -132,9 +132,40 @@ class BaseValidatorNeuron(BaseNeuron):
             while True:
                 bt.logging.info(f"step({self.step}) block({self.block})")
 
-                # Run multiple forwards concurrently.
-                _ = self.loop.run_until_complete(self.concurrent_forward()) 
+                self.miner_uids = self.loop.run_until_complete(get_random_uids(
+                    self, dendrite=self.dendrite, k=self.config.neuron.sample_size
+                ))
+                datapoints_per_group = self.config.neuron.training_examples_per_miner
                 
+                self.dataset_indices_list = self.dataset_common_state.get_dataset_indices(
+                        groups_count=len(self.miner_uids),
+                        items_per_group=datapoints_per_group,
+                )
+
+                # Run multiple forwards concurrently.
+                responses = self.loop.run_until_complete(self.concurrent_forward()) 
+                
+                # Log the results for monitoring purposes.
+                bt.logging.info(
+                    "Received responses: " + str([
+                        {
+                            'Loss': response.loss,
+                            'Dataset Indices': (min(response.dataset_indices), max(response.dataset_indices)),
+                            'IP': response.dendrite.ip,
+                            'Port': response.dendrite.port,
+                            'Hotkey': response.dendrite.hotkey
+                        } for response in responses[0][0] if response.dendrite.status_code == 200
+                    ])
+                )
+                
+                # Adjust the scores based on responses from miners.
+                rewards = get_rewards(self, uids=self.miner_uids, responses=responses)
+
+                bt.logging.info(f"Scored responses: {rewards}")
+                
+                # Update the scores based on the rewards.
+                self.update_scores(rewards, self.miner_uids)
+
                 # Check if we should exit.
                 if self.should_exit:
                     break
@@ -183,7 +214,7 @@ class BaseValidatorNeuron(BaseNeuron):
             bt.logging.debug("Stopped")
 
     def __enter__(self):
-        self.run_in_background_thread()
+        self.run()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):

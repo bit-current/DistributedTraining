@@ -83,7 +83,7 @@ class Validator(BaseValidatorNeuron):
         self.device = self.config.neuron.device
 
         # Init Model
-        self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -161,5 +161,4 @@ class Validator(BaseValidatorNeuron):
 if __name__ == "__main__":
     with Validator() as validator:
         while True:
-            bt.logging.info("Validator running...", time.time())
             time.sleep(5)
