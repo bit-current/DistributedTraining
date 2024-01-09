@@ -53,17 +53,23 @@ class DatasetStateSingelton:
             #     cls._instance.set_dht("step", cls.step)
             cls._instance.dataset_indices_train = dataset_indices
             cls._instance.loss = None
+            cls._instance.set_dht("dataset_indices_train", cls._instance.dataset_indices_train)
+            cls._instance.set_dht("loss", cls._instance.loss)
+            if cls._instance.dataset_indices_train is None:
+                cls._instance.dataset_indices_train = cls._instance.get_dht("dataset_indices_train")
+            if cls._instance.loss is None:
+                cls._instance.loss = cls._instance.get_dht("loss")
 
         return cls._instance
 
-    @classmethod
-    async def initialize_async(cls):
-        await cls._instance.set_dht("dataset_indices_train", cls._instance.dataset_indices_train)
-        await cls._instance.set_dht("loss", cls._instance.loss)
-        if cls._instance.dataset_indices_train is None:
-            cls._instance.dataset_indices_train = await cls._instance.get_dht("dataset_indices_train")
-        if cls._instance.loss is None:
-            cls._instance.loss = await cls._instance.get_dht("loss")
+    # @classmethod
+    # async def initialize_async(cls):
+    #     await cls._instance.set_dht("dataset_indices_train", cls._instance.dataset_indices_train)
+    #     await cls._instance.set_dht("loss", cls._instance.loss)
+    #     if cls._instance.dataset_indices_train is None:
+    #         cls._instance.dataset_indices_train = await cls._instance.get_dht("dataset_indices_train")
+    #     if cls._instance.loss is None:
+    #         cls._instance.loss = await cls._instance.get_dht("loss")
 
 
     @staticmethod
@@ -98,7 +104,7 @@ class DatasetStateSingelton:
     #             time.sleep(delay)
     #     raise Exception("Max retries reached, operation failed.")
 
-    async def get_dht(self, name):
+    def get_dht(self, name):
 
         if type(self._instance.dht_state) == dict:
             try:
@@ -128,7 +134,7 @@ class DatasetStateSingelton:
     #     raise Exception("Max retries reached, operation failed.")
 
 
-    async def set_dht(self, name, value):
+    def set_dht(self, name, value):
 
         if type(self._instance.dht_state) == dict:
             self._instance.dht_state[name] = value
@@ -136,7 +142,7 @@ class DatasetStateSingelton:
 
 
     @classmethod
-    async def get_dataset_indices(cls, groups_count, items_per_group):
+    def get_dataset_indices(cls, groups_count, items_per_group):
         """
         Selects m groups of n consecutive indices from a list in indices_dict[key].
         Each group of n indices is removed from the original list to ensure no replacement.
@@ -148,7 +154,7 @@ class DatasetStateSingelton:
         :return: List of selected groups, each group is a list of n indices.
         """
         # indices = cls.get_dht("dataset_indices_train")
-        indices = await cls._instance.get_dht("dataset_indices_train")
+        indices = cls._instance.get_dht("dataset_indices_train")
         no_value_flag = False
 
         try:
@@ -161,14 +167,14 @@ class DatasetStateSingelton:
             # Not enough indices to select the required number of groups"
             # Restore all the values. Then resample.
             # cls.set_dht("dataset_indices_train", cls.dataset_indices_original)
-            await cls._instance.set_dht("dataset_indices_train", cls._instance.dataset_indices_original)
+            cls._instance.set_dht("dataset_indices_train", cls._instance.dataset_indices_original)
             try:
                 cls.epoch += 1
             except:
                 cls.epoch = 1
 
             # return cls.get_dataset_indices(groups_count, items_per_group)
-            return await cls.get_dataset_indices(groups_count, items_per_group)
+            return cls.get_dataset_indices(groups_count, items_per_group)
 
         selected_groups = []
         for _ in range(groups_count):
@@ -182,13 +188,13 @@ class DatasetStateSingelton:
         # Update the original list in the dictionary
         bt.logging.info("Removing selected indices from the DHT")
         # cls.set_dht("dataset_indices_train", indices)
-        await cls._instance.set_dht("dataset_indices_train",indices)
+        cls._instance.set_dht("dataset_indices_train",indices)
 
         return selected_groups
 
     # def get_dataset_indices_test(cls, batch_size):
     @classmethod
-    async def get_dataset_indices_test(cls, batch_size):
+    def get_dataset_indices_test(cls, batch_size):
         """
         Selects m groups of n consecutive indices from a list in indices_dict[key].
         Each group of n indices is removed from the original list to ensure no replacement.
@@ -196,20 +202,20 @@ class DatasetStateSingelton:
         :return: List of selected groups, each group is a list of n indices.
         """
         # dataset_indices_train = cls.get_dht("dataset_indices_train")
-        dataset_indices_train = await cls._instance.get_dht("dataset_indices_train")
+        dataset_indices_train = cls._instance.get_dht("dataset_indices_train")
 
         # Select test indices
         start = random.choice(range(len(dataset_indices_train) - batch_size + 1))
         dataset_indices_test = dataset_indices_train[start : start + batch_size]
         # cls.set_dht("dataset_indices_test", dataset_indices_test)
-        await cls._instance.set_dht("dataset_indices_test", dataset_indices_test)
+        cls._instance.set_dht("dataset_indices_test", dataset_indices_test)
 
         # Remove test indices from train indices
         dataset_indices_train = (
             dataset_indices_train[:start] + dataset_indices_train[start + batch_size :]
         )
         # cls.set_dht("dataset_indices_train", dataset_indices_train)
-        await cls._instance.set_dht("dataset_indices_train", dataset_indices_train)
+        cls._instance.set_dht("dataset_indices_train", dataset_indices_train)
 
 
         return dataset_indices_test

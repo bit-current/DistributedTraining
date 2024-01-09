@@ -98,7 +98,7 @@ class BaseValidatorNeuron(BaseNeuron):
         responses = await asyncio.gather(*coroutines)
         return responses
 
-    async def run(self):
+    def run(self):
         """
         Initiates and manages the main loop for the miner on the Bittensor network. The main loop handles graceful shutdown on keyboard interrupts and logs unforeseen errors.
 
@@ -132,25 +132,25 @@ class BaseValidatorNeuron(BaseNeuron):
             while True:
                 bt.logging.info(f"step({self.step}) block({self.block})")
 
-                self.miner_uids = await get_random_uids(
+                self.miner_uids = get_random_uids(
                     self, dendrite=self.dendrite, k=self.config.neuron.sample_size
                 )
                 datapoints_per_group = self.config.neuron.training_examples_per_miner
                 
-                self.dataset_indices_list = await self.dataset_common_state.get_dataset_indices(
+                self.dataset_indices_list = self.dataset_common_state.get_dataset_indices(
                         groups_count=len(self.miner_uids),
                         items_per_group=datapoints_per_group,
                 )
 
                 # Run multiple forwards concurrently.
-                # _ = self.loop.run_until_complete(
-                #     self.concurrent_forward()
-                # )  # TODO add loss anomaly detection
-                responses = await self.concurrent_forward()
+                _ = self.loop.run_until_complete(
+                    self.concurrent_forward()
+                )  # TODO add loss anomaly detection
+                #responses = await self.concurrent_forward()
                 # blocking component
                 # Adjust the scores based on responses from miners.
-                # rewards = get_rewards(self, uids=self.miner_uids)
-                rewards = await get_rewards(self, uids=self.miner_uids, responses=responses)
+                rewards = get_rewards(self, uids=self.miner_uids)
+                #rewards = await get_rewards(self, uids=self.miner_uids, responses=responses)
                 bt.logging.info(f"Scored responses: {rewards}")
                 # Update the scores based on the rewards.
                 self.update_scores(rewards, self.miner_uids)
@@ -203,33 +203,9 @@ class BaseValidatorNeuron(BaseNeuron):
             self.is_running = False
             bt.logging.debug("Stopped")
 
-    async def __aenter__(self):
-        await self.async_init()
-        #self.run_in_background_thread()
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        """
-        Stops the validator's background operations upon exiting the context.
-        This method facilitates the use of the validator in a 'with' statement.
-        Args:
-            exc_type: The type of the exception that caused the context to be exited.
-                      None if the context was exited without an exception.
-            exc_value: The instance of the exception that caused the context to be exited.
-                       None if the context was exited without an exception.
-            traceback: A traceback object encoding the stack trace.
-                       None if the context was exited without an exception.
-        """
-        if self.is_running:
-            bt.logging.debug("Stopping validator in background thread.")
-            self.should_exit = True
-            self.thread.join(5)
-            self.is_running = False
-            bt.logging.debug("Stopped")
-
     def __enter__(self):
-        self.run()
-        # self.run_in_background_thread()
+        #self.run()
+        self.run_in_background_thread()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
