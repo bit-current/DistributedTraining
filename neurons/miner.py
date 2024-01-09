@@ -64,7 +64,7 @@ class Miner(BaseMinerNeuron):
             version = "4"
             address = self.config.dht.announce_ip
             announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
-
+        
         # Init list of available DHT addresses from wandb
         api = wandb.Api()
         initial_peers_list = self.config.neuron.initial_peers
@@ -74,7 +74,7 @@ class Miner(BaseMinerNeuron):
                 for peer in ru.config['neuron']['initial_peers']:
                     if peer not in initial_peers_list:
                         initial_peers_list.append(peer)
-
+        
         # Init DHT
         retries = 0
         while retries <= len(initial_peers_list):

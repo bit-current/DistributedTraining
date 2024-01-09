@@ -45,7 +45,7 @@ class Validator(BaseValidatorNeuron):
 
         bt.logging.info("load_state()")
         self.load_state()
-        
+
         self.init_dht()
 
         # Init Wandb

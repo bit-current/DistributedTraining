@@ -144,17 +144,16 @@ class BaseValidatorNeuron(BaseNeuron):
 
                 # Run multiple forwards concurrently.
                 responses = self.loop.run_until_complete(self.concurrent_forward()) 
-                
                 # Log the results for monitoring purposes.
                 bt.logging.info(
                     "Received responses: " + str([
                         {
                             'Loss': response.loss,
                             'Dataset Indices': (min(response.dataset_indices), max(response.dataset_indices)),
-                            'IP': response.dendrite.ip,
-                            'Port': response.dendrite.port,
-                            'Hotkey': response.dendrite.hotkey
-                        } for response in responses[0][0] if response.dendrite.status_code == 200
+                            'IP': self.metagraph.axons[uid].ip,
+                            'Port': self.metagraph.axons[uid].port,
+                            'Hotkey': self.metagraph.axons[uid].hotkey
+                        } for response, uid in zip(responses[0][0],self.miner_uids) if response.dendrite.status_code == 200
                     ])
                 )
                 
