@@ -40,7 +40,7 @@ async def forward(self):
 
     """
     
-    self.miner_uids = get_random_uids(
+    self.miner_uids = await get_random_uids(
         self, dendrite=self.dendrite, k=self.config.neuron.sample_size
         )
     datapoints_per_group = self.config.neuron.training_examples_per_miner

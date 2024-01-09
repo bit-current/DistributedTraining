@@ -48,7 +48,7 @@ async def check_uid_availability(
     return True
 
 
-def get_random_uids(
+async def get_random_uids(
     self, dendrite, k: int, exclude: List[int] = None
 ) -> torch.LongTensor:
     """Returns k available random uids from the metagraph.
@@ -64,7 +64,7 @@ def get_random_uids(
     avail_uids = []
 
     for uid in range(self.metagraph.n.item()):
-        uid_is_available = check_uid_availability(
+        uid_is_available = await check_uid_availability(
             dendrite, self.metagraph, uid, self.config.neuron.vpermit_tao_limit
         )
         uid_is_not_excluded = exclude is None or uid not in exclude
