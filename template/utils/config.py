@@ -157,7 +157,7 @@ def add_args(cls, parser):
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_run_v1",
+        default="s25_run_v2",
     )
 
     parser.add_argument(
@@ -171,7 +171,7 @@ def add_args(cls, parser):
         "--neuron.wandb_project",
         type=str,
         help="The wandb project to log to",
-        default="subnet25",
+        default="bitcurrent_test",
     )
 
     parser.add_argument(
@@ -200,7 +200,7 @@ def add_args(cls, parser):
             "--neuron.local_batch_size_test",
             type=int,
             help="The default batch size",
-            default=10,
+            default=20,
         )
 
         parser.add_argument(
