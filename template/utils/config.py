@@ -171,7 +171,7 @@ def add_args(cls, parser):
         "--neuron.wandb_project",
         type=str,
         help="The wandb project to log to",
-        default="bitcurrent_test",
+        default="subnet25",
     )
 
     parser.add_argument(
