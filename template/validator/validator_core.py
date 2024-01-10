@@ -77,7 +77,7 @@ class DatasetState:
             selected_groups.append(group)
             indices = indices[:start] + indices[start + items_per_group:]
 
-        print("Removing selected indices from the DHT")
+        bt.logging.info("Removing selected indices from the DHT")
         self.set_dht("dataset_indices_train", indices)
         return selected_groups
 
