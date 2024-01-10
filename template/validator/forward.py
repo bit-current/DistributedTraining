@@ -21,6 +21,9 @@ import bittensor as bt
 
 from template.protocol import Train
 from template.utils.misc import AsyncDendritePool
+from template.validator.reward import get_rewards
+from template.utils.uids import get_random_uids
+
 import template
 import asyncio
 
@@ -36,6 +39,17 @@ async def forward(self):
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
 
     """
+    
+    self.miner_uids = await get_random_uids(
+        self, dendrite=self.dendrite, k=self.config.neuron.sample_size
+    )
+    datapoints_per_group = self.config.neuron.training_examples_per_miner
+    
+    self.dataset_indices_list = self.dataset_common_state.get_dataset_indices(
+            groups_count=len(self.miner_uids),
+            items_per_group=datapoints_per_group,
+    )
+
     if not self.config.neuron.dont_wandb_log:
         self.wandb.log({"uids":self.miner_uids,
                     "dataset_indices":self.dataset_indices_list})
@@ -62,7 +76,26 @@ async def forward(self):
         )
     )
     responses = await asyncio.gather(*query_tasks)
+
     # Log the results for monitoring purposes.
-    bt.logging.info(f"Received responses: {[{'Loss':response.loss,'Dataset Indices':(min(response.dataset_indices), max(response.dataset_indices)), 'IP':response.dendrite.ip, 'Port':response.dendrite.port, 'Hotkey':response.dendrite.hotkey} for response in responses[0] if response.dendrite.status_code == 200 ]}")
+    bt.logging.info(
+        "Received responses: " + str([
+            {
+                'Loss': response.loss,
+                'Dataset Indices': (min(response.dataset_indices), max(response.dataset_indices)),
+                'IP': self.metagraph.axons[uid].ip,
+                'Port': self.metagraph.axons[uid].port,
+                'Hotkey': self.metagraph.axons[uid].hotkey
+            } for response, uid in zip(responses[0],self.miner_uids) if response.dendrite.status_code == 200
+        ])
+    )
     
+    # Adjust the scores based on responses from miners.
+    rewards = get_rewards(self, uids=self.miner_uids, responses=responses)
+
+    bt.logging.info(f"Scored responses: {rewards}")
+    
+    # Update the scores based on the rewards.
+    self.update_scores(rewards, self.miner_uids)
+
     return responses

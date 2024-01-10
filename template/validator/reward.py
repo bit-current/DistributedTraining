@@ -55,7 +55,7 @@ def get_local_score(self, synapse):
     return score
     
 
-async def get_rewards(
+def get_rewards(
     self,
     uids: List[int],
     responses: list
@@ -89,7 +89,7 @@ async def get_rewards(
     #         )
     #     )
     if (self.step % 100 == 0) and (self.step != 0):
-        self.dataset_indices_list_test = await self.dataset_common_state.get_dataset_indices_test(self.config.neuron.local_batch_size_test)
+        self.dataset_indices_list_test = self.dataset_common_state.get_dataset_indices_test(self.config.neuron.local_batch_size_test)
 
     # Get loss on randomly selected test dataset to be used for the Global Score
     loss = get_loss(self, self.dataset_indices_list_test)
@@ -99,17 +99,15 @@ async def get_rewards(
 
     # Get latest previous loss from DHT
     # self.previous_loss = self.dataset_common_state.get_dht("loss")
-    self.previous_loss = await self.dataset_common_state.get_dht("loss")
+    self.previous_loss = self.dataset_common_state.get_dht("loss")
     bt.logging.info(f"Previous Global Loss:    {self.previous_loss}")
     bt.logging.info(f"Current Global Loss:     {loss}")
 
-    responses_formatted = [{'Local Loss':response.loss,'Dataset Indices':(min(response.dataset_indices), max(response.dataset_indices)), 'IP':response.dendrite.ip, 'Port':response.dendrite.port, 'Hotkey':response.dendrite.hotkey} for response in responses[0][0] if response.dendrite.status_code == 200 ]
-    
     # Compute Global Score
-    if (self.previous_loss is None) or ((loss - self.previous_loss) < 0):
+    if ((self.previous_loss is None) or ((loss - self.previous_loss) < 0)) and (responses[0] != []):
         score = 1
         # self.dataset_common_state.set_dht("loss", float(loss))
-        await self.dataset_common_state.set_dht("loss", loss)
+        self.dataset_common_state.set_dht("loss", loss)
     else:
         score = 0
 
@@ -118,15 +116,21 @@ async def get_rewards(
 
     # Set previous loss to current loss
     self.previous_loss = loss
-
+    
     # Get all the reward results by iteratively calling your reward() function.
-    scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 for _, response in zip(uids, responses[0][0])]).to(self.device)
+    scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 
+                                for _, response in zip(uids, responses[0])]).to(self.device)
     bt.logging.info(f"Global Scores: {scores}")
 
     # Adjust Global Score with Local Score
-    test_uids_index = [uid_index for uid_index, uid in enumerate(uids) if responses[0][0][uid_index].dendrite.status_code == 200]
+    test_uids_index = [uid_index for uid_index, uid in enumerate(uids) 
+                       if responses[0][uid_index].dendrite.status_code == 200]
+    
     test_uids_sample_index = random.sample(test_uids_index, k = min(4, len(test_uids_index)))
-    scores = torch.FloatTensor([scores[uid_index]*get_local_score(self, responses[0][0][uid_index]) if uid_index in test_uids_sample_index else scores[uid_index] for uid_index,_ in enumerate(uids)]).to(self.device)
+    
+    scores = torch.FloatTensor([scores[uid_index] * get_local_score(self, responses[0][uid_index]) 
+                                if uid_index in test_uids_sample_index else scores[uid_index] 
+                                for uid_index,_ in enumerate(uids)]).to(self.device)
     
     bt.logging.info(f"Adjusted Global Scores: {scores}")
     
