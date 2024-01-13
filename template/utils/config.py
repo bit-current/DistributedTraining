@@ -86,8 +86,7 @@ def add_args(cls, parser):
         "--neuron.device",
         type=str,
         help="Device to run on.",
-        # default=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-        default=torch.device("cpu"),
+        default=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
 
     parser.add_argument(
@@ -123,14 +122,14 @@ def add_args(cls, parser):
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="gpt2",
+        default="sshleifer/tiny-gpt2",
     )
 
     parser.add_argument(
         "--neuron.lr",
         type=float,
         help="The learning rate",
-        default=0.00001,
+        default=0.0001,
     )
 
     parser.add_argument(
@@ -144,7 +143,7 @@ def add_args(cls, parser):
         "--neuron.local_batch_size_train",
         type=int,
         help="The default batch size",
-        default=32,
+        default=20,
     )
 
     parser.add_argument(
@@ -158,7 +157,7 @@ def add_args(cls, parser):
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_run_v1",
+        default="s25_run_v2",
     )
 
     parser.add_argument(
@@ -201,7 +200,7 @@ def add_args(cls, parser):
             "--neuron.local_batch_size_test",
             type=int,
             help="The default batch size",
-            default=32,
+            default=20,
         )
 
         parser.add_argument(
@@ -222,7 +221,7 @@ def add_args(cls, parser):
             "--neuron.training_examples_per_miner",
             type=int,
             help="The number of rows to train on per miner",
-            default=32,
+            default=200,
         )
 
         parser.add_argument(

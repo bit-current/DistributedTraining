@@ -43,7 +43,7 @@ async def check_uid_availability(
             return False
     # Filter for miners that are processing other responses
     if not await check_uid(dendrite, metagraph.axons[uid], uid):
-        return False
+       return False
     # Available otherwise.
     return True
 

@@ -1,12 +1,9 @@
 # Bitcurrent Frequently Asked Questions
 
-**What is the Bitcurrent subnet?**
+**What is the Bitcurrent subnet?** Bitcurrent is a subnet that aims to train a Large Language Model (LLM) using distributed and decntralised compute. Miners are asked to train the collective model on a specific datasets and Validators verify that each Miner has honestly trained on their bespoke data.
 
 **What are the minimum requirements to run a validator?**
 A GPU with a minimum of 16GB RAM e.g. RTX A4000
 
 **What are the minimum requirements to run a miner?**
 A GPU with a minimum of 16GB RAM e.g. RTX A4000
-
-**Why are all miners rewards the same?**
-This is still a very early version of this subnet. For current versions, all miners get an equal reward if the loss of global shared model state reduces when tested against an anonymous test dataset.
