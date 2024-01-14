@@ -16,6 +16,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+import re
 import time
 import typing
 from functools import partial
@@ -23,15 +24,11 @@ from ipaddress import ip_address
 
 import bittensor as bt
 import hivemind
-
-# Bittensor Miner Template:
-import template
+import requests
 import torch
+import wandb
 from datasets import load_dataset
-
-# import base miner class which takes care of most of the boilerplate
-from template.base.miner import BaseMinerNeuron
-from template.utils.misc import load_wandb
+from hivemind import utils
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import (
@@ -40,9 +37,14 @@ from transformers import (
     default_data_collator,
     get_linear_schedule_with_warmup,
 )
-import requests
-from hivemind import utils
-import wandb
+
+# Bittensor Miner Template:
+import template
+
+# import base miner class which takes care of most of the boilerplate
+from template.base.miner import BaseMinerNeuron
+from template.utils.misc import load_wandb
+
 
 class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
@@ -64,17 +66,19 @@ class Miner(BaseMinerNeuron):
             version = "4"
             address = self.config.dht.announce_ip
             announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
-        
+
         # Init list of available DHT addresses from wandb
         api = wandb.Api()
         initial_peers_list = self.config.neuron.initial_peers
-        runs = api.runs(f"{self.config.neuron.wandb_entity}/{self.config.neuron.wandb_project}")
+        runs = api.runs(
+            f"{self.config.neuron.wandb_entity}/{self.config.neuron.wandb_project}"
+        )
         for ru in runs:
             if ru.state == "running":
-                for peer in ru.config['neuron']['initial_peers']:
+                for peer in ru.config["neuron"]["initial_peers"]:
                     if peer not in initial_peers_list:
                         initial_peers_list.append(peer)
-        
+
         # Init DHT
         retries = 0
         while retries <= len(initial_peers_list):
@@ -83,19 +87,32 @@ class Miner(BaseMinerNeuron):
             try:
                 # Init DHT
                 self.dht = hivemind.DHT(
-                    host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
-                    initial_peers=[initial_peers_list[retries]], 
-                    announce_maddrs = announce_maddrs,
+                    host_maddrs=[
+                        f"/ip4/0.0.0.0/tcp/{self.config.dht.port}",
+                        f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic",
+                    ],
+                    initial_peers=[initial_peers_list[retries]],
+                    announce_maddrs=announce_maddrs,
                     start=True,
                 )
-                bt.logging.info(f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}")
+                bt.logging.info(
+                    f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}"
+                )
                 break
             except Exception as e:
-                bt.logging.error(f"Attempt {retries + 1} to init DHT using initial_peer as {initial_peers_list[retries]} failed with error: {e}")
+                bt.logging.error(
+                    f"Attempt {retries + 1} to init DHT using initial_peer as {initial_peers_list[retries]} failed with error: {e}"
+                )
                 retries += 1
                 bt.logging.error(f"Retrying...")
         utils.log_visible_maddrs(self.dht.get_visible_maddrs(), only_p2p=True)
         self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name)
+
+        # Add DHT address to wandb config
+        self.config.neuron.initial_peers = self.config.neuron.initial_peers + [
+            re.sub("ip4/?(.*?)/", f"ip{version}/{address}/", str(addr), flags=re.DOTALL)
+            for addr in self.dht.get_visible_maddrs()
+        ]
 
         # Move the model to the appropriate device
         self.model = self.model.to(self.device)
@@ -103,34 +120,42 @@ class Miner(BaseMinerNeuron):
         # Set up a decentralized optimizer that will average with peers in background
         opt = torch.optim.AdamW(self.model.parameters(), lr=self.config.neuron.lr)
         self.opt = hivemind.Optimizer(
-            dht=self.dht,                    # use a DHT that is connected with other peers
-            run_id=self.config.neuron.run_id,        # unique identifier of this collaborative run
-            scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
-            batch_size_per_step=self.config.neuron.local_batch_size_train,     # each call to opt.step adds this many samples towards the next epoch
-            target_batch_size=self.config.neuron.global_batch_size_train,    # after peers collectively process this many samples, average weights and begin the next epoch
-            optimizer=opt,              # wrap the SGD optimizer defined above
-            use_local_updates=True,     # perform optimizer steps with local gradients, average parameters in background
-            matchmaking_time=15.0,       # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=60.0,     # give up on averaging if not successful in this many seconds
-            verbose=False               # print logs incessently
+            dht=self.dht,  # use a DHT that is connected with other peers
+            run_id=self.config.neuron.run_id,  # unique identifier of this collaborative run
+            scheduler=partial(
+                torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)
+            ),
+            batch_size_per_step=self.config.neuron.local_batch_size_train,  # each call to opt.step adds this many samples towards the next epoch
+            target_batch_size=self.config.neuron.global_batch_size_train,  # after peers collectively process this many samples, average weights and begin the next epoch
+            optimizer=opt,  # wrap the SGD optimizer defined above
+            use_local_updates=True,  # perform optimizer steps with local gradients, average parameters in background
+            matchmaking_time=15.0,  # when averaging parameters, gather peers in background for up to this many seconds
+            averaging_timeout=60.0,  # give up on averaging if not successful in this many seconds
+            verbose=False,  # print logs incessently
         )
-        
+
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         # Load dataset
-        self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
-        
+        self.dataset = load_dataset(
+            self.config.neuron.dataset_name, "wikitext-2-v1", split="train"
+        )
+
         # Init Wandb
         if not self.config.neuron.dont_wandb_log:
             self.wandb = load_wandb(self.config, self.wallet)
 
     # Define encoding function
     def encode(self, examples):
-        return self.tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length')
+        return self.tokenizer(
+            examples["text"], truncation=True, max_length=512, padding="max_length"
+        )
 
-    async def is_alive(self, synapse:  template.protocol.IsAlive) ->  template.protocol.IsAlive:
+    async def is_alive(
+        self, synapse: template.protocol.IsAlive
+    ) -> template.protocol.IsAlive:
         bt.logging.info("Responded to be Active")
         synapse.completion = "True"
         return synapse
@@ -157,30 +182,30 @@ class Miner(BaseMinerNeuron):
         encoded_dataset = dataset.map(self.encode, batched=True)
 
         # Create a PyTorch DataLoader
-        dataloader = DataLoader(encoded_dataset, batch_size=synapse.batch_size, collate_fn = default_data_collator)
-        
+        dataloader = DataLoader(
+            encoded_dataset,
+            batch_size=synapse.batch_size,
+            collate_fn=default_data_collator,
+        )
+
         total_loss = 0
-        
+
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
-            
-            input_ids = batch['input_ids'].to(self.device)
-            attention_mask = batch['attention_mask'].to(self.device)
+            input_ids = batch["input_ids"].to(self.device)
+            attention_mask = batch["attention_mask"].to(self.device)
             labels = input_ids.clone()
-            
+
             self.opt.zero_grad()
 
             # Forward pass
             outputs = self.model(
-                input_ids = input_ids, 
-                attention_mask = attention_mask,
-                labels = labels
-            )     
-            # Backward pass    
+                input_ids=input_ids, attention_mask=attention_mask, labels=labels
+            )
+            # Backward pass
             loss = outputs.loss
             if not self.config.neuron.dont_wandb_log:
-                self.wandb.log({"loss":loss,
-                            'opt_local_epoch':self.opt.local_epoch})
+                self.wandb.log({"loss": loss, "opt_local_epoch": self.opt.local_epoch})
             total_loss += loss.item()
 
             loss.backward()
@@ -188,17 +213,15 @@ class Miner(BaseMinerNeuron):
             self.opt.step()
 
             bt.logging.info(f"Step {step} Loss: {loss}")
-            
+
         average_loss = total_loss / len(dataloader)
         synapse.loss = average_loss
 
         bt.logging.info(f"Final Loss: {synapse.loss}")
-        
+
         return synapse
 
-    async def blacklist_base(
-        self, synapse
-    ) -> typing.Tuple[bool, str]:
+    async def blacklist_base(self, synapse) -> typing.Tuple[bool, str]:
         """
         Determines whether an incoming request should be blacklisted and thus ignored. Your implementation should
         define the logic for blacklisting requests based on your needs and desired security parameters.
@@ -248,7 +271,9 @@ class Miner(BaseMinerNeuron):
                 f"Blacklisted a non registered hotkey's {synapse_type} request from {hotkey}",
             )
 
-        if self.config.blacklist.force_validator_permit and (not self.config.blacklist.allow_non_registered):
+        if self.config.blacklist.force_validator_permit and (
+            not self.config.blacklist.allow_non_registered
+        ):
             # Check stake if uid is recognize
             tao = self.metagraph.neurons[uid].stake.tao
             if tao < self.config.neuron.vpermit_tao_limit:
@@ -269,12 +294,16 @@ class Miner(BaseMinerNeuron):
         )
         return False, "Hotkey recognized!"
 
-    async def blacklist_is_alive( self, synapse: template.protocol.IsAlive ) -> typing.Tuple[bool, str]:
+    async def blacklist_is_alive(
+        self, synapse: template.protocol.IsAlive
+    ) -> typing.Tuple[bool, str]:
         blacklist = await self.blacklist_base(synapse)
         bt.logging.debug(blacklist[1])
         return blacklist
 
-    async def blacklist_train( self, synapse: template.protocol.Train) -> typing.Tuple[bool, str]:
+    async def blacklist_train(
+        self, synapse: template.protocol.Train
+    ) -> typing.Tuple[bool, str]:
         blacklist = await self.blacklist_base(synapse)
         bt.logging.info(blacklist[1])
         return blacklist

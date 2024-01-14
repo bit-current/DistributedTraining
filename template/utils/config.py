@@ -16,12 +16,12 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import os
-import torch
 import argparse
+import os
+
 import bittensor as bt
-from loguru import logger
 import torch
+from loguru import logger
 
 
 def check_config(cls, config: "bt.Config"):
@@ -64,10 +64,8 @@ def add_args(cls, parser):
     # Netuid Arg: The netuid of the subnet to connect to.
     parser.add_argument("--netuid", type=int, help="Subnet netuid", default=1)
 
-    neuron_type = (
-        "validator" if "miner" not in cls.__name__.lower() else "miner"
-    )
-    
+    neuron_type = "validator" if "miner" not in cls.__name__.lower() else "miner"
+
     parser.add_argument(
         "--dht.port",
         type=int,
@@ -115,7 +113,10 @@ def add_args(cls, parser):
         type=str,
         nargs=3,
         help="The addresses for the DHT",
-        default=["/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWNpcKpiJQRwkxtsUzHWWyA2CBmEVH8b7YEMfgnpWNqeTi"],
+        default=[
+            "/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWNrfkQ8DX2RHW4c98c8As11wMNA425WTNohijyJQdA84Y",
+            "/ip4/54.205.54.19/tcp/8008/p2p/12D3KooWMY4YGYZ6JkWaCNKUeKQHAuxeQcMeoNfKHbbRXVoBaMiZ",
+        ],
     )
 
     parser.add_argument(
@@ -164,7 +165,7 @@ def add_args(cls, parser):
         "--neuron.dont_wandb_log",
         action="store_true",
         help="Toggles wandb logging for the project",
-        default=False
+        default=False,
     )
 
     parser.add_argument(
@@ -195,7 +196,6 @@ def add_args(cls, parser):
     )
 
     if neuron_type == "validator":
-
         parser.add_argument(
             "--neuron.local_batch_size_test",
             type=int,
@@ -216,7 +216,7 @@ def add_args(cls, parser):
             help="The number of steps before updating the model's weights",
             default=900,
         )
-        
+
         parser.add_argument(
             "--neuron.training_examples_per_miner",
             type=int,
@@ -277,7 +277,6 @@ def add_args(cls, parser):
         )
 
     else:
-
         parser.add_argument(
             "--blacklist.force_validator_permit",
             action="store_true",

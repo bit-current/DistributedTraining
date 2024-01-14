@@ -17,29 +17,29 @@
 # DEALINGS IN THE SOFTWARE.
 
 
-import hivemind
+import asyncio
+import re
 import time
+from functools import partial
+from ipaddress import ip_address
 
 import bittensor as bt
-
-import torch
+import hivemind
 import requests
-from ipaddress import ip_address
+import torch
+import wandb
 from datasets import load_dataset
 from hivemind.optim.state_averager import TrainingStateAverager
 from torch.utils.data import DataLoader
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from functools import partial
-from template.utils.misc import AsyncDendritePool, load_wandb
-from template.validator.validator_core import DatasetState, upload_checkpoint
-from template.validator import forward
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
 from template.base.validator import BaseValidatorNeuron
-from template.utils.misc import load_wandb
-import wandb
-import asyncio
+from template.utils.misc import AsyncDendritePool, load_wandb
+from template.validator import forward
+from template.validator.validator_core import DatasetState, upload_checkpoint
+
 
 class Validator(BaseValidatorNeuron):
-
     def __init__(self, config=None):
         super(Validator, self).__init__(config=config)
 
@@ -53,25 +53,34 @@ class Validator(BaseValidatorNeuron):
             self.wandb = load_wandb(self.config, self.wallet)
 
         # Init Dendrite Pool
-        self.dendrite_pool = AsyncDendritePool( wallet = self.wallet, metagraph = self.metagraph )
+        self.dendrite_pool = AsyncDendritePool(
+            wallet=self.wallet, metagraph=self.metagraph
+        )
 
         # # Init Dataset
-        self.dataset = load_dataset(self.config.neuron.dataset_name, 'wikitext-2-v1', split='train')
+        self.dataset = load_dataset(
+            self.config.neuron.dataset_name, "wikitext-2-v1", split="train"
+        )
         self.dataset_indices = [i for i in range(0, len(self.dataset))]
-        self.dataset_dict = dict() # Init a dict to use as placeholder DHT
-        self.dataset_common_state = DatasetState(self.dataset_dict, self.dataset_indices, self.config.neuron.run_id)
+        self.dataset_dict = dict()  # Init a dict to use as placeholder DHT
+        self.dataset_common_state = DatasetState(
+            self.dataset_dict, self.dataset_indices, self.config.neuron.run_id
+        )
 
         # self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_train")
         # if self.dataset_indices_list_test is None:
         #     self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_test")
-        
-        self.dataset_indices_list_test = self.dataset_common_state.get_dataset_indices_test(self.config.neuron.local_batch_size_test)
-        
-        
+
+        self.dataset_indices_list_test = (
+            self.dataset_common_state.get_dataset_indices_test(
+                self.config.neuron.local_batch_size_test
+            )
+        )
+
         self.global_step = self.dataset_common_state.get_dht("step")
         if self.global_step is None:
             self.global_step = 0
-            #self.dataset_common_state.set_dht("step")
+            # self.dataset_common_state.set_dht("step")
 
         # Init Loss
         self.previous_loss = None
@@ -83,28 +92,38 @@ class Validator(BaseValidatorNeuron):
         self.device = self.config.neuron.device
 
         # Init Model
-        self.model = AutoModelForCausalLM.from_pretrained(self.config.neuron.model_name).to(self.device)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.config.neuron.model_name
+        ).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         # Init State Averager
         self.state_averager = TrainingStateAverager(
-            dht=self.dht, 
+            dht=self.dht,
             optimizer=partial(torch.optim.AdamW, lr=self.config.neuron.lr),
-            scheduler=partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
+            scheduler=partial(
+                torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)
+            ),
             params=self.model.parameters(),
             allow_state_sharing=False,
             start=True,
-            prefix=f"{self.config.neuron.run_id}_state_averager", 
+            prefix=f"{self.config.neuron.run_id}_state_averager",
             # **asdict(averager_args),
         )
-                
+
         # Start Main Validation Loop
         bt.logging.info("Starting validator loop.")
-        
+
     # Define encoding function
     def encode(self, examples):
-        return self.tokenizer(examples['text'], truncation=True, max_length=512, padding='max_length', return_tensors='pt')
+        return self.tokenizer(
+            examples["text"],
+            truncation=True,
+            max_length=512,
+            padding="max_length",
+            return_tensors="pt",
+        )
 
     def init_dht(self):
         # Init DHT
@@ -124,10 +143,12 @@ class Validator(BaseValidatorNeuron):
         # Init list of available DHT addresses from wandb
         api = wandb.Api()
         initial_peers_list = self.config.neuron.initial_peers
-        runs = api.runs(f"{self.config.neuron.wandb_entity}/{self.config.neuron.wandb_project}")
+        runs = api.runs(
+            f"{self.config.neuron.wandb_entity}/{self.config.neuron.wandb_project}"
+        )
         for ru in runs:
             if ru.state == "running":
-                for peer in ru.config['neuron']['initial_peers']:
+                for peer in ru.config["neuron"]["initial_peers"]:
                     if peer not in initial_peers_list:
                         initial_peers_list.append(peer)
 
@@ -138,21 +159,31 @@ class Validator(BaseValidatorNeuron):
             try:
                 # Init DHT
                 self.dht = hivemind.DHT(
-                    host_maddrs=[f"/ip4/0.0.0.0/tcp/{self.config.dht.port}", f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic"],
-                    initial_peers=[initial_peers_list[retries]], 
-                    announce_maddrs = announce_maddrs,
+                    host_maddrs=[
+                        f"/ip4/0.0.0.0/tcp/{self.config.dht.port}",
+                        f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic",
+                    ],
+                    initial_peers=[initial_peers_list[retries]],
+                    announce_maddrs=announce_maddrs,
                     start=True,
                 )
-                bt.logging.info(f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}")
+                bt.logging.info(
+                    f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}"
+                )
                 break
             except Exception as e:
-                bt.logging.error(f"Attempt {retries + 1} to init DHT using initial_peer as {initial_peers_list[retries]} failed with error: {e}")
+                bt.logging.error(
+                    f"Attempt {retries + 1} to init DHT using initial_peer as {initial_peers_list[retries]} failed with error: {e}"
+                )
                 retries += 1
                 bt.logging.error(f"Retrying...")
 
         # Write local dht address to config
-        self.config.neuron.initial_peers = self.config.neuron.initial_peers + [str(addr) for addr in self.dht.get_visible_maddrs()]
-        
+        self.config.neuron.initial_peers = self.config.neuron.initial_peers + [
+            re.sub("ip4/?(.*?)/", f"ip{version}/{address}/", str(addr), flags=re.DOTALL)
+            for addr in self.dht.get_visible_maddrs()
+        ]
+
     async def forward(self):
         return await forward(self)
 

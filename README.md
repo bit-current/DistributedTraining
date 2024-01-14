@@ -9,12 +9,15 @@
 
 ---
 
+![Subnet25](assets/Subnet25.jpg)
+
 # Installation
 This repository requires python3.8 or higher. To install, simply clone this repository and install the requirements.
 ```bash
 git clone https://github.com/KMFODA/DistributedTraining
 cd DistributedTraining
 pip install -e . && python post_install.py
+wandb login <your_wandb_api_key>
 ```
 
 ---
