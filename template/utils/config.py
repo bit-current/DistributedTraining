@@ -123,14 +123,14 @@ def add_args(cls, parser):
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="sshleifer/tiny-gpt2",
+        default="gpt2",
     )
 
     parser.add_argument(
         "--neuron.lr",
         type=float,
         help="The learning rate",
-        default=0.001,
+        default=0.0001),
     )
 
     parser.add_argument(
@@ -151,7 +151,7 @@ def add_args(cls, parser):
         "--neuron.global_batch_size_train",
         type=int,
         help="The hivemind global target_batch_size",
-        default=3200,
+        default=16000,
     )
 
     parser.add_argument(

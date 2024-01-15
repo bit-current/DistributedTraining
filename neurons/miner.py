@@ -132,6 +132,8 @@ class Miner(BaseMinerNeuron):
             matchmaking_time=15.0,  # when averaging parameters, gather peers in background for up to this many seconds
             averaging_timeout=60.0,  # give up on averaging if not successful in this many seconds
             verbose=False,  # print logs incessently
+            grad_compression=hivemind.Float16Compression(),
+            state_averaging_compression=hivemind.Float16Compression(),
         )
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
