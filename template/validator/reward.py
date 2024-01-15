@@ -47,7 +47,7 @@ def get_loss(self, dataset_indices):
 
 def get_local_score(self, synapse):
 
-    loss = get_loss(self, synapse.dataset_indices[-synapse.batch_size:])
+    loss = get_loss(self, synapse.dataset_indices[-self.config.neuron.local_batch_size_test:])
     # The miner's local score is the variance between the loss it returns and the 
     # loss the validator calculates for the last batch of data sent to that miner
     score = 1-(abs(loss-synapse.loss)/loss)
