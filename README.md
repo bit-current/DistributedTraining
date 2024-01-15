@@ -25,7 +25,7 @@ wandb login <your_wandb_api_key>
 Once you have installed this repo and attained your subnet via the instructions in the nested docs (staging, testing, or main) you can run the miner and validator with the following commands.
 ```bash
 # To run the miner
-python -m neurons/miner.py 
+python neurons/miner.py 
     --netuid <your netuid>  # Must be attained by following the instructions in the docs/running_on_*.md files
     --subtensor.chain_endpoint <your chain url>  # Must be attained by following the instructions in the docs/running_on_*.md files
     --wallet.name <your miner wallet> # Must be created using the bittensor-cli
@@ -36,7 +36,7 @@ python -m neurons/miner.py
     --dht.announce_ip <your device ip address>
 
 # To run the validator
-python -m neurons/validator.py 
+python neurons/validator.py 
     --netuid <your netuid> # Must be attained by following the instructions in the docs/running_on_*.md files
     --subtensor.chain_endpoint <your chain url> # Must be attained by following the instructions in the docs/running_on_*.md files
     --wallet.name <your validator wallet>  # Must be created using the bittensor-cli
