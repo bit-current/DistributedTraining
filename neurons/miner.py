@@ -201,16 +201,13 @@ class Miner(BaseMinerNeuron):
 
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
-            input_ids = batch["input_ids"].to(self.device)
-            attention_mask = batch["attention_mask"].to(self.device)
-            labels = input_ids.clone()
+
+            inputs = batch.to(self.device)
 
             self.opt.zero_grad()
 
             # Forward pass
-            outputs = self.model(
-                input_ids=input_ids, attention_mask=attention_mask, labels=labels
-            )
+            outputs = self.model(input_ids=inputs, labels=inputs)
             # Backward pass
             loss = outputs.loss
             if not self.config.neuron.dont_wandb_log:

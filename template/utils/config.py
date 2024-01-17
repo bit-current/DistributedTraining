@@ -143,7 +143,7 @@ def add_args(cls, parser):
         "--neuron.local_batch_size_train",
         type=int,
         help="The default batch size",
-        default=10,
+        default=2,
     )
 
     parser.add_argument(
