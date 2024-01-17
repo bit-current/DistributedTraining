@@ -39,18 +39,16 @@ async def forward(self):
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
 
     """
-    breakpoint()
     self.miner_uids = await get_random_uids(
         self, dendrite=self.dendrite, k=self.config.neuron.sample_size
     )
-    breakpoint()
     datapoints_per_group = self.config.neuron.training_examples_per_miner
-    breakpoint()
+    import torch
+    self.miner_uids = torch.tensor([0])
     self.dataset_indices_list = self.dataset_common_state.get_dataset_indices(
             groups_count=len(self.miner_uids),
             items_per_group=datapoints_per_group,
     )
-    breakpoint()
     if not self.config.neuron.dont_wandb_log:
         self.wandb.log({"uids":self.miner_uids,
                     "dataset_indices":self.dataset_indices_list})

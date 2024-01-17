@@ -31,7 +31,7 @@ tokenizer.pad_token = tokenizer.eos_token
 class SubsetFalconLoader(IterableDataset):
     max_pages: int = 968000015
 
-    def __init__(self, batch_size, sequence_length, tokenizer, rows: typing.List[int]):
+    def __init__(self, batch_size, sequence_length, rows: typing.List[int], tokenizer = tokenizer):
         self.batch_size = batch_size
         self.sequence_length = sequence_length
         self.tokenizer = tokenizer
@@ -98,4 +98,4 @@ loader = SubsetFalconLoader(
 for i, batch in enumerate(loader):
     print(i)
     print(batch)
-breakpoint()
+# breakpoint()

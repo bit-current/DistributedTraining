@@ -37,6 +37,7 @@ from template.base.validator import BaseValidatorNeuron
 from template.utils.misc import AsyncDendritePool, load_wandb
 from template.validator import forward
 from template.validator.validator_core import DatasetState, upload_checkpoint
+from bitarray import bitarray
 
 
 class Validator(BaseValidatorNeuron):
@@ -59,7 +60,7 @@ class Validator(BaseValidatorNeuron):
 
         # # Init Dataset
         dataset_length = 968000015
-        self.dataset_indices = [i for i in range(0, dataset_length)]
+        self.dataset_indices = bitarray(dataset_length)
         self.dataset_dict = dict()  # Init a dict to use as placeholder DHT
 
         self.dataset_common_state = DatasetState(

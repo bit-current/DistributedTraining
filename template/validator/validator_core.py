@@ -12,6 +12,7 @@ from transformers import (
     AutoTokenizer,
     get_linear_schedule_with_warmup,
 )
+from bitarray import bitarray
 
 class DatasetState:
     """
@@ -69,28 +70,28 @@ class DatasetState:
             except AttributeError:
                 self.epoch = 1
             return self.get_dataset_indices(groups_count, items_per_group)
-
+        
         selected_groups = []
         for _ in range(groups_count):
-            start = random.choice(range(len(indices) - items_per_group + 1))
-            group = indices[start:start + items_per_group]
+            search_start = random.choice(range(len(indices) - items_per_group + 1))
+            start = indices.index(bitarray('0'*items_per_group), search_start)
+            group = [i for i in range(start,start + items_per_group)]
             selected_groups.append(group)
-            indices = indices[:start] + indices[start + items_per_group:]
+
+            indices[group] = True
 
         bt.logging.info("Removing selected indices from the DHT")
         self.set_dht("dataset_indices_train", indices)
         return selected_groups
 
     def get_dataset_indices_test(self, batch_size):
-        breakpoint()
         dataset_indices_train = self.get_dht("dataset_indices_train")
         start = random.choice(range(len(dataset_indices_train) - batch_size + 1))
-        dataset_indices_test = dataset_indices_train[start:start + batch_size]
+        dataset_indices_test = [i for i in range(start, start + batch_size)]
         self.set_dht("dataset_indices_test", dataset_indices_test)
-
-        dataset_indices_train = dataset_indices_train[:start] + dataset_indices_train[start + batch_size:]
+        # dataset_indices_train = dataset_indices_train[:start] + dataset_indices_train[start + batch_size:]
+        dataset_indices_train[start:start + batch_size] = True
         self.set_dht("dataset_indices_train", dataset_indices_train)
-
         return dataset_indices_test
 
     # def update_step(cls):

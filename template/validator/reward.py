@@ -22,28 +22,28 @@ from typing import List
 
 import bittensor as bt
 import torch
+from template.data.dataset import SubsetFalconLoader
 
 def get_loss(self, dataset_indices):
 
     # Create Dataloader
     dataloader = SubsetFalconLoader(
-        batch_size=self.config.neuron.local_batch_size_test, sequence_length=1024, rows=synapse.dataset_indices
+        batch_size=self.config.neuron.local_batch_size_test, sequence_length=1024, rows=dataset_indices
     )
 
     # Loop to the last batch to test the current state's loss on the last batch of test data
     for step, batch in enumerate(dataloader):
         continue
 
-    input_ids = batch["input_ids"].to(self.device)
-    attention_mask = batch["attention_mask"].to(self.device)
-    labels = input_ids.clone()
+
+    inputs = batch.to(self.device)
+    input_ids = inputs
+    labels = inputs
 
     # self.opt.zero_grad()
 
     # Forward pass
-    outputs = self.model(
-        input_ids=input_ids, attention_mask=attention_mask, labels=labels
-    )
+    outputs = self.model(input_ids=input_ids, labels=labels)
 
     # Backward pass
     loss = outputs.loss
