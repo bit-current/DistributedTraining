@@ -58,19 +58,17 @@ class Validator(BaseValidatorNeuron):
         )
 
         # # Init Dataset
-        self.dataset = load_dataset(
-            self.config.neuron.dataset_name, "wikitext-2-v1", split="train"
-        )
-        self.dataset_indices = [i for i in range(0, len(self.dataset))]
+        dataset_length = 968000015
+        self.dataset_indices = [i for i in range(0, dataset_length)]
         self.dataset_dict = dict()  # Init a dict to use as placeholder DHT
+
         self.dataset_common_state = DatasetState(
             self.dataset_dict, self.dataset_indices, self.config.neuron.run_id
         )
-
+        
         # self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_train")
         # if self.dataset_indices_list_test is None:
         #     self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_test")
-
         self.dataset_indices_list_test = (
             self.dataset_common_state.get_dataset_indices_test(
                 self.config.neuron.local_batch_size_test
@@ -109,7 +107,7 @@ class Validator(BaseValidatorNeuron):
             allow_state_sharing=False,
             start=True,
             prefix=f"{self.config.neuron.run_id}_state_averager",
-            # **asdict(averager_args),
+            state_compression=hivemind.Float16Compression(),
         )
 
         # Start Main Validation Loop

@@ -117,7 +117,7 @@ for step, batch in pb_bar:
     loss.backward()
     # Adjust gradient
     opt.step()
-    # breakpoint()
+
     # control.should_log = True
     # if not self.params_are_finite():
     #     self.restore_from_backup(self.latest_backup)

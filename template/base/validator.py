@@ -117,7 +117,6 @@ class BaseValidatorNeuron(BaseNeuron):
             KeyboardInterrupt: If the miner is stopped by a manual interruption.
             Exception: For unforeseen errors during the miner's operation, which are logged for diagnosis.
         """
-
         # Check that validator is registered on the network.
         self.sync()
 

@@ -44,6 +44,7 @@ import template
 # import base miner class which takes care of most of the boilerplate
 from template.base.miner import BaseMinerNeuron
 from template.utils.misc import load_wandb
+from template.data.dataset import SubsetFalconLoader
 
 
 class Miner(BaseMinerNeuron):
@@ -141,9 +142,10 @@ class Miner(BaseMinerNeuron):
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         # Load dataset
-        self.dataset = load_dataset(
-            self.config.neuron.dataset_name, "wikitext-2-v1", split="train"
-        )
+        # self.dataset = load_dataset(
+        #     self.config.neuron.dataset_name, "wikitext-2-v1", split="train"
+        # )
+        self.dataset_loader = ()
 
         # Init Wandb
         if not self.config.neuron.dont_wandb_log:
@@ -175,19 +177,24 @@ class Miner(BaseMinerNeuron):
             template.protocol.Train: The synapse object with the 'loss' field set to models loss.
         """
 
-        # Select dataset indices to use for optimization step
-        dataset = self.dataset.select(synapse.dataset_indices)
-        if not self.config.neuron.dont_wandb_log:
-            self.wandb.log({"received_indices": synapse.dataset_indices})
+        # # Select dataset indices to use for optimization step
+        # dataset = self.dataset.select(synapse.dataset_indices)
+        # if not self.config.neuron.dont_wandb_log:
+        #     self.wandb.log({"received_indices": synapse.dataset_indices})
 
-        # Encode the dataset
-        encoded_dataset = dataset.map(self.encode, batched=True)
+        # # Encode the dataset
+        # encoded_dataset = dataset.map(self.encode, batched=True)
 
-        # Create a PyTorch DataLoader
-        dataloader = DataLoader(
-            encoded_dataset,
-            batch_size=synapse.batch_size,
-            collate_fn=default_data_collator,
+        # # Create a PyTorch DataLoader
+        # dataloader = DataLoader(
+        #     encoded_dataset,
+        #     batch_size=synapse.batch_size,
+        #     collate_fn=default_data_collator,
+        # )
+
+        # Create Dataloader
+        dataloader = SubsetFalconLoader(
+            batch_size=synapse.batch_size, sequence_length=1024, rows=synapse.dataset_indices
         )
 
         total_loss = 0
@@ -216,7 +223,7 @@ class Miner(BaseMinerNeuron):
 
             bt.logging.info(f"Step {step} Loss: {loss}")
 
-        average_loss = total_loss / len(dataloader)
+        average_loss = total_loss / step
         synapse.loss = average_loss
 
         bt.logging.info(f"Final Loss: {synapse.loss}")

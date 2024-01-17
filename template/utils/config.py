@@ -111,7 +111,7 @@ def add_args(cls, parser):
     parser.add_argument(
         "--neuron.initial_peers",
         type=str,
-        nargs=3,
+        nargs="+",
         help="The addresses for the DHT",
         default=[
             "/ip4/69.30.85.70/tcp/22051/p2p/12D3KooWC1ipfGddeZunJe4s6bB2bhKCTCyb9FfhfR1XZwhFgBk1",
@@ -136,7 +136,7 @@ def add_args(cls, parser):
         "--neuron.dataset_name",
         type=str,
         help="The datasets the model will be trained on",
-        default="wikitext",
+        default="tiiuae/falcon-refinedweb",
     )
 
     parser.add_argument(
@@ -220,7 +220,7 @@ def add_args(cls, parser):
             "--neuron.training_examples_per_miner",
             type=int,
             help="The number of rows to train on per miner",
-            default=200,
+            default=500,
         )
 
         parser.add_argument(

@@ -82,6 +82,7 @@ class DatasetState:
         return selected_groups
 
     def get_dataset_indices_test(self, batch_size):
+        breakpoint()
         dataset_indices_train = self.get_dht("dataset_indices_train")
         start = random.choice(range(len(dataset_indices_train) - batch_size + 1))
         dataset_indices_test = dataset_indices_train[start:start + batch_size]

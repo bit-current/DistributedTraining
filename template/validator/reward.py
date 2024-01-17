@@ -25,15 +25,20 @@ import torch
 
 def get_loss(self, dataset_indices):
 
-    dataset_sample = self.dataset.select(dataset_indices)
+    # Create Dataloader
+    dataloader = SubsetFalconLoader(
+        batch_size=self.config.neuron.local_batch_size_test, sequence_length=1024, rows=synapse.dataset_indices
+    )
 
-    # Encode the dataset
-    encoded_dataset = dataset_sample.map(self.encode, batched=True)
+    # Loop to the last batch to test the current state's loss on the last batch of test data
+    for step, batch in enumerate(dataloader):
+        continue
 
-    # Move batch to device
-    input_ids = torch.tensor(encoded_dataset["input_ids"]).to(self.device)
-    attention_mask = torch.tensor(encoded_dataset["attention_mask"]).to(self.device)
-    labels = torch.tensor(encoded_dataset["input_ids"]).to(self.device)
+    input_ids = batch["input_ids"].to(self.device)
+    attention_mask = batch["attention_mask"].to(self.device)
+    labels = input_ids.clone()
+
+    # self.opt.zero_grad()
 
     # Forward pass
     outputs = self.model(
@@ -47,7 +52,7 @@ def get_loss(self, dataset_indices):
 
 def get_local_score(self, synapse):
 
-    loss = get_loss(self, synapse.dataset_indices[-self.config.neuron.local_batch_size_test:])
+    loss = get_loss(self, synapse.dataset_indices)
     # The miner's local score is the variance between the loss it returns and the 
     # loss the validator calculates for the last batch of data sent to that miner
     score = 1-(abs(loss-synapse.loss)/loss)
