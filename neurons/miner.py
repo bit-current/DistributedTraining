@@ -202,7 +202,6 @@ class Miner(BaseMinerNeuron):
 
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
-
             inputs = batch.to(self.device)
 
             # Forward pass

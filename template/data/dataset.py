@@ -22,6 +22,7 @@ import bittensor as bt
 from torch.utils.data import IterableDataset
 from transformers import AutoTokenizer
 import time
+import math
 
 model_name = "distilgpt2"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -45,36 +46,37 @@ class SubsetFalconLoader(IterableDataset):
         self.buffer = []
         self.retry_limit = 10  # Number of retries
         self.retry_delay = 5  # Seconds to wait between retries
-        # breakpoint()
         self.fetch_data_for_page(min(self.rows), len(self.rows))
         # breakpoint()
 
     def fetch_data_for_page(self, offset, length):
-        self.params["offset"] = offset
-        self.params["limit"] = length
-        attempt = 0
-        while attempt < self.retry_limit:
-            try:
-                response = requests.get(self.base_url, params=self.params)
-                response.raise_for_status()  # This will raise an HTTPError if the HTTP request returned an unsuccessful status code
+        iterations = math.ceil(length/100)
+        for iteration in range(iterations):
+            self.params["offset"] = offset + (iteration*100)
+            self.params["limit"] = min(100, length - (iteration*100))
+            attempt = 0
+            while attempt < self.retry_limit:
+                try:
+                    response = requests.get(self.base_url, params=self.params)
+                    response.raise_for_status()  # This will raise an HTTPError if the HTTP request returned an unsuccessful status code
 
-                for row in response.json()["rows"]:
-                    content = row["row"]["content"]
-                    self.buffer += self.tokenizer(content, truncation=True)["input_ids"]
-                    self.buffer += [self.tokenizer.eos_token_id]
-                break  # If the request was successful, break out of the retry loop
-            except requests.exceptions.RequestException as e:
-                attempt += 1
-                bt.logging.warning(
-                    f"Failed to fetch data, retrying. Attempt {attempt}/{self.retry_limit}"
-                )
-                if attempt < self.retry_limit:
-                    time.sleep(self.retry_delay)  # Wait before the next retry
-                else:
-                    bt.logging.error(
-                        "Maximum retry limit reached. Unable to fetch data."
+                    for row in response.json()["rows"]:
+                        content = row["row"]["content"]
+                        self.buffer += self.tokenizer(content, truncation=True)["input_ids"]
+                        self.buffer += [self.tokenizer.eos_token_id]
+                    break  # If the request was successful, break out of the retry loop
+                except requests.exceptions.RequestException as e:
+                    attempt += 1
+                    bt.logging.warning(
+                        f"Failed to fetch data, retrying. Attempt {attempt}/{self.retry_limit}"
                     )
-                    raise
+                    if attempt < self.retry_limit:
+                        time.sleep(self.retry_delay)  # Wait before the next retry
+                    else:
+                        bt.logging.error(
+                            "Maximum retry limit reached. Unable to fetch data."
+                        )
+                        raise
 
     def __iter__(self):
         while len(self.buffer) >= self.sequence_length * self.batch_size:
@@ -91,11 +93,11 @@ class SubsetFalconLoader(IterableDataset):
             self.buffer = self.buffer[self.sequence_length :]
         return torch.stack(batch)
 
-loader = SubsetFalconLoader(
-    batch_size=10, sequence_length=1024, tokenizer = tokenizer, rows=[i for i in range(0,200)]
-)
+# loader = SubsetFalconLoader(
+#     batch_size=10, sequence_length=1024, tokenizer = tokenizer, rows=[i for i in range(0,200)]
+# )
 
-for i, batch in enumerate(loader):
-    print(i)
-    print(batch)
+# for i, batch in enumerate(loader):
+#     print(i)
+#     print(batch)
 # breakpoint()
