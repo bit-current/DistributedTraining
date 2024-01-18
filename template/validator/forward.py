@@ -63,7 +63,7 @@ async def forward(self):
             template.protocol.Train( 
                 dataset_indices = uid_dataset,
                 run_id = self.config.neuron.run_id,
-                batch_size = self.config.neuron.local_batch_size_train
+                batch_size = self.config.neuron.local_batch_size_train,
                 gradient_accumilation_steps = self.config.neuron.local_gradient_accumilation_steps_train
             )
         )
@@ -97,5 +97,8 @@ async def forward(self):
     
     # Update the scores based on the rewards.
     self.update_scores(rewards, self.miner_uids)
+
+    # Update the current_epoch
+    self.current_epoch = self.opt.tracker.global_progress.epoch
 
     return responses

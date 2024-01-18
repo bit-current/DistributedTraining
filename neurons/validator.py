@@ -30,6 +30,7 @@ import torch
 import wandb
 from datasets import load_dataset
 from hivemind.optim.state_averager import TrainingStateAverager
+from hivemind.optim.progress_tracker import ProgressTracker
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -97,20 +98,44 @@ class Validator(BaseValidatorNeuron):
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # Init State Averager
-        self.state_averager = TrainingStateAverager(
-            dht=self.dht,
-            optimizer=partial(torch.optim.AdamW, lr=self.config.neuron.lr),
+        opt = torch.optim.AdamW(self.model.parameters(), lr=self.config.neuron.lr)
+        self.opt = hivemind.Optimizer(
+            dht=self.dht,  # use a DHT that is connected with other peers
+            run_id=self.config.neuron.run_id,  # unique identifier of this collaborative run
             scheduler=partial(
                 torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)
             ),
-            params=self.model.parameters(),
-            allow_state_sharing=False,
-            start=True,
-            prefix=f"{self.config.neuron.run_id}_state_averager",
-            state_compression=hivemind.Float16Compression(),
+            batch_size_per_step=self.config.neuron.local_batch_size_train,  # each call to opt.step adds this many samples towards the next epoch
+            target_batch_size=self.config.neuron.global_batch_size_train,  # after peers collectively process this many samples, average weights and begin the next epoch
+            optimizer=opt,  # wrap the SGD optimizer defined above
+            use_local_updates=False,  # perform optimizer steps with local gradients, average parameters in background
+            matchmaking_time=15.0,  # when averaging parameters, gather peers in background for up to this many seconds
+            averaging_timeout=600.0,  # give up on averaging if not successful in this many seconds
+            verbose=False,  # print logs incessently
+            grad_compression=hivemind.Float16Compression(),
+            state_averaging_compression=hivemind.Float16Compression(),
         )
 
+        # # Init State Averager
+        # self.state_averager = TrainingStateAverager(
+        #     dht=self.dht,
+        #     optimizer=self.opt,
+        #     scheduler=partial(
+        #         torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)
+        #     ),
+        #     params=self.model.parameters(),
+        #     allow_state_sharing=False,
+        #     start=True,
+        #     prefix=f"{self.config.neuron.run_id}_state_averager",
+        #     state_compression=hivemind.Float16Compression(),
+        # )
+        
+        # Init Progress Tracker
+        # self.progress_tracker = ProgressTracker(dht=self.dht, prefix=self.config.neuron.run_id, target_batch_size=self.config.neuron.global_batch_size_train, start = True)
+        
+        # Get Current Epoch
+        self.current_epoch = self.opt.tracker.global_progress.epoch
+        
         # Start Main Validation Loop
         bt.logging.info("Starting validator loop.")
 
@@ -165,6 +190,7 @@ class Validator(BaseValidatorNeuron):
                     initial_peers=[initial_peers_list[retries]],
                     announce_maddrs=announce_maddrs,
                     start=True,
+                    client_mode = True,
                 )
                 bt.logging.info(
                     f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}"

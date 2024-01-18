@@ -62,9 +62,9 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
     return outputs.loss.detach().item()
 
-def get_local_score(self, synapse, current_epoch):
+def get_local_score(self, synapse):
 
-    if self.state_averager.opt.tracker.global_progress.epoch != current_epoch:
+    if self.opt.tracker.global_progress.epoch != self.current_epoch:
         score = 1
     else:
         loss = get_loss(self, synapse.dataset_indices, synapse.batch_size, synapse.gradient_accumilation_steps)
@@ -95,7 +95,7 @@ def get_rewards(
     retries = 0
     while load_state_from_peers_status is False:
         try:
-            load_state_from_peers_status = self.state_averager.load_state_from_peers()
+            load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
         except Exception as e:
             bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
             retries += 1
@@ -151,7 +151,7 @@ def get_rewards(
     scores = torch.FloatTensor([scores[uid_index] * get_local_score(self, responses[0][uid_index]) 
                                 if uid_index in test_uids_sample_index else scores[uid_index] 
                                 for uid_index,_ in enumerate(uids)]).to(self.device)
-    
+
     bt.logging.info(f"Adjusted Global Scores: {scores}")
     
     return scores
