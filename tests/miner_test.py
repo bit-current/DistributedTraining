@@ -24,9 +24,11 @@ def encode(examples):
 # Create dataset and model, same as in the basic tutorial
 model = AutoModelForCausalLM.from_pretrained("gpt2")
 device = "cuda"
-port = 22051
-model = model.to(device)
-opt = torch.optim.AdamW(model.parameters(), lr=0.0001)
+port = 10608
+model = model.to(dtype=torch.float16, device=device)
+# model = model.to(device=device)
+opt = torch.optim.AdamW(model.parameters(), lr=0.00001)
+
 
 request = requests.get("https://api.ipify.org")
 request.raise_for_status()
@@ -63,9 +65,9 @@ opt = hivemind.Optimizer(
     use_local_updates=False,  # perform optimizer steps with local gradients, average parameters in background
     matchmaking_time=15.0,  # when averaging parameters, gather peers in background for up to this many seconds
     averaging_timeout=600.0,  # give up on averaging if not successful in this many seconds
-    grad_compression=hivemind.Float16Compression(),
-    state_averaging_compression=hivemind.Float16Compression(),
-    verbose=True,  # print logs incessently
+    # grad_compression=hivemind.Float16Compression(),
+    # state_averaging_compression=hivemind.Float16Compression(),
+    # verbose=True,  # print logs incessently
 )
 
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
@@ -94,22 +96,31 @@ dataloader = DataLoader(
     encoded_dataset, batch_size=10, collate_fn=default_data_collator
 )
 
-pb_bar = tqdm(
-    enumerate(dataloader), total=len(dataloader), dynamic_ncols=True, leave=False
-)
+# pb_bar = tqdm(
+#     enumerate(dataloader), total=len(dataloader), dynamic_ncols=True, leave=False
+# )
 
 total_loss = 0
 
 # Train data for one epoch
-for step, batch in pb_bar:
+for step, batch in enumerate(dataloader):
     input_ids = batch["input_ids"].to(device)
+    outputs = model(input_ids=input_ids, labels=input_ids)
+    loss = outputs.loss
+    loss.backward()
+    # Adjust gradient
+    opt.step()
+    print(loss)
+    continue
+    breakpoint()
+    input_ids = batch["input_ids"].to(device).half()
     attention_mask = batch["attention_mask"].to(device)
     labels = input_ids.clone()
 
     opt.zero_grad()
 
     # Forward pass
-    outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+    outputs = model(input_ids=input_ids, labels=labels)
     # Backward pass
     loss = outputs.loss
     total_loss += loss.item()
@@ -117,6 +128,7 @@ for step, batch in pb_bar:
     loss.backward()
     # Adjust gradient
     opt.step()
+    print(loss)
 
     # control.should_log = True
     # if not self.params_are_finite():
@@ -160,8 +172,8 @@ for step, batch in pb_bar:
 
     # self.samples = local_progress.samples_accumulated
 
-    # print(f"Step {step} Loss: {loss}")
-    pb_bar.set_description("Train loop: loss {:.4f} ".format(loss.item()))
+    print(f"Step {step} Loss: {loss}")
+#     pb_bar.set_description("Train loop: loss {:.4f} ".format(loss.item()))
 
-average_loss = total_loss / len(dataloader)
-print(f"Final Average Loss: {average_loss}")
+# average_loss = total_loss / len(dataloader)
+# print(f"Final Average Loss: {average_loss}")

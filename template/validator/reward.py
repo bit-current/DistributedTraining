@@ -24,38 +24,53 @@ import bittensor as bt
 import torch
 from template.data.dataset import SubsetFalconLoader
 
-def get_loss(self, dataset_indices):
+def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
     # Create Dataloader
     dataloader = SubsetFalconLoader(
-        batch_size=self.config.neuron.local_batch_size_test, sequence_length=1024, rows=dataset_indices
+        batch_size=batch_size, sequence_length=1024, rows=dataset_indices
     )
 
-    # Loop to the last batch to test the current state's loss on the last batch of test data
+    n_acc_steps = 0
+    accumulation_steps = gradient_accumilation_steps
+
+    # Train data for one epoch
     for step, batch in enumerate(dataloader):
-        continue
 
+        inputs = batch.to(self.device)
 
-    inputs = batch.to(self.device)
-    input_ids = inputs
-    labels = inputs
+        # Forward pass
+        outputs = self.model(input_ids=inputs, labels=inputs)
+        
+        # Normalize loss to account for batch accumulation
+        loss = outputs.loss / accumulation_steps  
+        
+        # Backward Pass
+        loss.backward()
 
-    # self.opt.zero_grad()
+        if (step + 1) % accumulation_steps == 0:
+            n_acc_steps += 1
+            self.opt.step()         # Adjust gradient
+            self.opt.zero_grad()    # Clear gradients
+            
+            bt.logging.info(f"Step {n_acc_steps} Loss: {outputs.loss.detach().item()}")
+            
+            if not self.config.neuron.dont_wandb_log:
+                self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
 
-    # Forward pass
-    outputs = self.model(input_ids=input_ids, labels=labels)
+        torch.cuda.empty_cache()
 
-    # Backward pass
-    loss = outputs.loss
+    return outputs.loss.detach().item()
 
-    return loss
+def get_local_score(self, synapse, current_epoch):
 
-def get_local_score(self, synapse):
-
-    loss = get_loss(self, synapse.dataset_indices)
-    # The miner's local score is the variance between the loss it returns and the 
-    # loss the validator calculates for the last batch of data sent to that miner
-    score = 1-(abs(loss-synapse.loss)/loss)
+    if self.state_averager.opt.tracker.global_progress.epoch != current_epoch:
+        score = 1
+    else:
+        loss = get_loss(self, synapse.dataset_indices, synapse.batch_size, synapse.gradient_accumilation_steps)
+        # The miner's local score is the variance between the loss it returns and the 
+        # loss the validator calculates for the last batch of data sent to that miner
+        score = 1-(abs(loss-synapse.loss)/loss)
 
     return score
     
@@ -97,7 +112,7 @@ def get_rewards(
         self.dataset_indices_list_test = self.dataset_common_state.get_dataset_indices_test(self.config.neuron.local_batch_size_test)
 
     # Get loss on randomly selected test dataset to be used for the Global Score
-    loss = get_loss(self, self.dataset_indices_list_test)
+    loss = get_loss(self, self.dataset_indices_list_test, self.config.neuron.local_batch_size_test, self.config.neuron.local_gradient_accumilation_steps_test)
 
     if not self.config.neuron.dont_wandb_log:
         self.wandb.log({"loss": loss, "previous_loss": self.previous_loss})

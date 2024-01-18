@@ -154,6 +154,13 @@ def add_args(cls, parser):
     )
 
     parser.add_argument(
+        "--neuron.local_gradient_accumilation_steps_train",
+        type=int,
+        help="The default batch size",
+        default=16,
+    )
+
+    parser.add_argument(
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
@@ -200,6 +207,13 @@ def add_args(cls, parser):
             type=int,
             help="The default batch size",
             default=4,
+        )
+
+        parser.add_argument(
+            "--neuron.local_gradient_accumilation_steps_test",
+            type=int,
+            help="The default batch size",
+            default=16,
         )
 
         parser.add_argument(

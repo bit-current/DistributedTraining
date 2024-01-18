@@ -63,7 +63,8 @@ async def forward(self):
             template.protocol.Train( 
                 dataset_indices = uid_dataset,
                 run_id = self.config.neuron.run_id,
-                batch_size = self.config.neuron.local_batch_size_train  #TODO let miners decide this? Based on their hardware. Then reconcile if needed?
+                batch_size = self.config.neuron.local_batch_size_train
+                gradient_accumilation_steps = self.config.neuron.local_gradient_accumilation_steps_train
             )
         )
 
