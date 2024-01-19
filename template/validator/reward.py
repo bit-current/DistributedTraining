@@ -31,6 +31,7 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
         batch_size=batch_size, sequence_length=1024, rows=dataset_indices
     )
 
+    total_loss = 0
     n_acc_steps = 0
     accumulation_steps = gradient_accumilation_steps
 
@@ -44,9 +45,12 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
         
         # Normalize loss to account for batch accumulation
         loss = outputs.loss / accumulation_steps  
-        
+
         # Backward Pass
         loss.backward()
+
+        # Accumulate Total Loss
+        total_loss += outputs.loss.detach().item() 
 
         if (step + 1) % accumulation_steps == 0:
             n_acc_steps += 1
@@ -60,12 +64,17 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
         torch.cuda.empty_cache()
 
-    return outputs.loss.detach().item()
+    average_loss = total_loss / step
+
+    bt.logging.info(f"Final Loss: {outputs.loss.detach().item()}")
+    bt.logging.info(f"Average Loss: {average_loss}")
+
+    return average_loss
 
 def get_local_score(self, synapse):
-
     if self.opt.tracker.global_progress.epoch != self.current_epoch:
         score = 1
+        bt.logging.info(f"Skipping local scoring as epoch has changed from {self.current_epoch} to {self.opt.tracker.global_progress.epoch}")
     else:
         loss = get_loss(self, synapse.dataset_indices, synapse.batch_size, synapse.gradient_accumilation_steps)
         # The miner's local score is the variance between the loss it returns and the 
