@@ -130,7 +130,7 @@ def add_args(cls, parser):
         "--neuron.lr",
         type=float,
         help="The learning rate",
-        default=0.001,
+        default=0.0001,
     )
 
     parser.add_argument(
@@ -158,7 +158,7 @@ def add_args(cls, parser):
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_run_v2",
+        default="s25_run_v1_1",
     )
 
     parser.add_argument(
