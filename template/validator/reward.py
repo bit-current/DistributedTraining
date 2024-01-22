@@ -101,6 +101,34 @@ def get_rewards(
     """
 
     load_state_from_peers_status = False
+    from hivemind.p2p import P2P, P2PContext, P2PDaemonError, P2PHandlerError, PeerID, ServicerBase
+    from hivemind.utils.timed_storage import DHTExpiration, ValueWithExpiration, get_dht_time
+    key_manager = self.opt.state_averager.matchmaking_kwargs
+    prefix = key_manager["prefix"]
+    peer_priority, _ = self.dht.get(f"{prefix}.all_averagers", latest=True) or ({}, None)
+    peer_priority = {PeerID(peer_id): (float(info.value), random.random()) for peer_id, info in peer_priority.items() if isinstance(info, ValueWithExpiration) and isinstance(info.value, (float, int))}
+    for peer in peer_priority: break
+    breakpoint()
+    self._p2p = await self.dht.replicate_p2p()
+
+    stub = self.opt.state_averager.get_stub(self.opt.state_averager._p2p, peer, namespace=self.opt.state_averager.prefix)
+    # stream = await stub.rpc_download_state(averaging_pb2.DownloadRequest())
+    # current_tensor_parts, tensors = [], []
+
+    # # TODO merge this with hivemind.compression.deserialize_tensor_stream
+    # async for message in aiter_with_timeout(stream, timeout=timeout):
+    #     if message.metadata:
+    #         metadata = self.serializer.loads(message.metadata)
+    #     if message.tensor_part.dtype and current_tensor_parts:
+    #         # tensor_part.dtype indicates the start of the new tensor, so we should wrap up this one
+    #         tensors.append(deserialize_torch_tensor(combine_from_streaming(current_tensor_parts)))
+    #         current_tensor_parts = []
+    #     current_tensor_parts.append(message.tensor_part)
+    # if current_tensor_parts:
+    #     tensors.append(deserialize_torch_tensor(combine_from_streaming(current_tensor_parts)))
+
+    
+    breakpoint()
     retries = 0
     while load_state_from_peers_status is False:
         try:
