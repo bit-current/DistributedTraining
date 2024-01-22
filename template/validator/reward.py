@@ -31,6 +31,7 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
         batch_size=batch_size, sequence_length=1024, rows=dataset_indices
     )
 
+    total_loss = 0
     n_acc_steps = 0
     accumulation_steps = gradient_accumilation_steps
 
@@ -44,9 +45,12 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
         
         # Normalize loss to account for batch accumulation
         loss = outputs.loss / accumulation_steps  
-        
+
         # Backward Pass
         loss.backward()
+
+        # Accumulate Total Loss
+        total_loss += outputs.loss.detach().item() 
 
         if (step + 1) % accumulation_steps == 0:
             n_acc_steps += 1
@@ -60,7 +64,12 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
         torch.cuda.empty_cache()
 
-    return outputs.loss.detach().item()
+    average_loss = total_loss / step
+
+    bt.logging.info(f"Final Loss: {outputs.loss.detach().item()}")
+    bt.logging.info(f"Average Loss: {average_loss}")
+
+    return average_loss
 
 def get_local_score(self, synapse):
 
@@ -91,23 +100,24 @@ def get_rewards(
     - torch.FloatTensor: A tensor of rewards for the given query and responses.
     """
 
-    load_state_from_peers_status = False
-    retries = 0
-    while load_state_from_peers_status is False:
-        try:
-            load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
-        except Exception as e:
-            bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
-            retries += 1
-            bt.logging.error(f"Retrying ...")
+    # load_state_from_peers_status = False
+    # retries = 0
+    # while load_state_from_peers_status is False:
+    #     try:
+    #         load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
+    #     except Exception as e:
+    #         bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
+    #         retries += 1
+    #         bt.logging.error(f"Retrying ...")
 
-    # self.global_step = self.dataset_common_state.get_dht("step")
-    # if self.global_step % 100 == 0:
-    #     self.dataset_indices_list_test = (
-    #         self.dataset_common_state.get_dataset_indices_test(
-    #             self.config.neuron.batch_size_test
-    #         )
-    #     )
+    self.global_step = self.dataset_common_state.get_dht("step")
+    bt.logging.info(f"Global Step:   {self.global_step}")
+    if (self.global_step % 100 == 0) and (self.global_step != 0):
+        self.dataset_indices_list_test = (
+            self.dataset_common_state.get_dataset_indices_test(
+                self.config.neuron.local_batch_size_test
+            )
+        )
     if (self.step % 100 == 0) and (self.step != 0):
         self.dataset_indices_list_test = self.dataset_common_state.get_dataset_indices_test(self.config.neuron.local_batch_size_test)
 

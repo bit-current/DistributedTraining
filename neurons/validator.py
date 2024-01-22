@@ -37,7 +37,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from template.base.validator import BaseValidatorNeuron
 from template.utils.misc import AsyncDendritePool, load_wandb
 from template.validator import forward
-from template.validator.validator_core import DatasetState, upload_checkpoint
+from template.validator.validator_core import DatasetState
 from bitarray import bitarray
 
 
@@ -62,10 +62,10 @@ class Validator(BaseValidatorNeuron):
         # # Init Dataset
         dataset_length = 968000015
         self.dataset_indices = bitarray(dataset_length)
-        self.dataset_dict = dict()  # Init a dict to use as placeholder DHT
+        # self.dataset_dict = dict()  # Init a dict to use as placeholder DHT
 
         self.dataset_common_state = DatasetState(
-            self.dataset_dict, self.dataset_indices, self.config.neuron.run_id
+            self.dht, self.dataset_indices, self.config.neuron.run_id
         )
         
         # self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_train")
@@ -73,7 +73,7 @@ class Validator(BaseValidatorNeuron):
         #     self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_test")
         self.dataset_indices_list_test = (
             self.dataset_common_state.get_dataset_indices_test(
-                self.config.neuron.local_batch_size_test
+                self.config.neuron.local_batch_size_test * self.config.neuron.local_gradient_accumilation_steps_test
             )
         )
 
@@ -102,9 +102,6 @@ class Validator(BaseValidatorNeuron):
         self.opt = hivemind.Optimizer(
             dht=self.dht,  # use a DHT that is connected with other peers
             run_id=self.config.neuron.run_id,  # unique identifier of this collaborative run
-            scheduler=partial(
-                torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)
-            ),
             batch_size_per_step=self.config.neuron.local_batch_size_train,  # each call to opt.step adds this many samples towards the next epoch
             target_batch_size=self.config.neuron.global_batch_size_train,  # after peers collectively process this many samples, average weights and begin the next epoch
             optimizer=opt,  # wrap the SGD optimizer defined above
@@ -115,23 +112,6 @@ class Validator(BaseValidatorNeuron):
             grad_compression=hivemind.Float16Compression(),
             state_averaging_compression=hivemind.Float16Compression(),
         )
-
-        # # Init State Averager
-        # self.state_averager = TrainingStateAverager(
-        #     dht=self.dht,
-        #     optimizer=self.opt,
-        #     scheduler=partial(
-        #         torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)
-        #     ),
-        #     params=self.model.parameters(),
-        #     allow_state_sharing=False,
-        #     start=True,
-        #     prefix=f"{self.config.neuron.run_id}_state_averager",
-        #     state_compression=hivemind.Float16Compression(),
-        # )
-        
-        # Init Progress Tracker
-        # self.progress_tracker = ProgressTracker(dht=self.dht, prefix=self.config.neuron.run_id, target_batch_size=self.config.neuron.global_batch_size_train, start = True)
         
         # Get Current Epoch
         self.current_epoch = self.opt.tracker.global_progress.epoch

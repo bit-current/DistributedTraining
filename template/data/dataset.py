@@ -47,8 +47,6 @@ class SubsetFalconLoader(IterableDataset):
         self.retry_limit = 10  # Number of retries
         self.retry_delay = 5  # Seconds to wait between retries
         self.fetch_data_for_page(min(self.rows), len(self.rows))
-        # breakpoint()
-
     def fetch_data_for_page(self, offset, length):
         iterations = math.ceil(length/100)
         for iteration in range(iterations):
@@ -92,12 +90,3 @@ class SubsetFalconLoader(IterableDataset):
             batch.append(torch.tensor(self.buffer[: self.sequence_length]))
             self.buffer = self.buffer[self.sequence_length :]
         return torch.stack(batch)
-
-# loader = SubsetFalconLoader(
-#     batch_size=10, sequence_length=1024, tokenizer = tokenizer, rows=[i for i in range(0,200)]
-# )
-
-# for i, batch in enumerate(loader):
-#     print(i)
-#     print(batch)
-# breakpoint()

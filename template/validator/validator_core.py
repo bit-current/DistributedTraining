@@ -22,24 +22,23 @@ class DatasetState:
         self.run_id = run_id
         self.dataset_indices_original = dataset_indices
         self.dataset_indices_train = dataset_indices
-        self.loss = None
-        self.epoch = 0
-        self.set_dht("dataset_indices_train", self.dataset_indices_train)
-        self.set_dht("loss", self.loss)
-        self.set_dht("epoch", self.epoch)
+        self.loss = self.get_dht("loss")
+        self.epoch = self.get_dht("epoch")
+        self.step = self.get_dht("step")
+
+        if self.step is None:
+            self.step = 0
+            self.set_dht("step", self.step)
         
-        if self.dataset_indices_train is None:
-            self.dataset_indices_train = self.get_dht("dataset_indices_train")
-        if self.loss is None:
-            self.loss = self.get_dht("loss")
         if self.epoch is None:
-            self.epoch = self.get_dht("epoch")
+            self.epoch = 0
+            self.set_dht("epoch", self.epoch)
    
     def get_dht(self, name):
         try:
-            value, expiration = self.dht.get(name, latest=True)
+            value = self.dht.get(name, latest=True)
             if value is not None:
-                return value
+                return value.value
         except Exception as e:
             print(f"Error accessing DHT: {e}")
         return None
@@ -81,44 +80,6 @@ class DatasetState:
 
         return dataset_indices_test
 
-    # def update_step(cls):
-    #     step = cls.get_dht("step")
-    #     cls.set_dht("step", step + 1)
-
-
-def upload_checkpoint(commit_message, state_averager, model, repo_path, repo_url):
-    bt.logging.info("Saving optimizer")
-    torch.save(state_averager.optimizer.state_dict(), f"{repo_path}/optimizer_state.pt")
-    timestamp_at_upload = time.time()
-    bt.logging.info("Started uploading to Model Hub")
-    model.push_to_hub(
-        repo_name=repo_path,
-        repo_url=repo_url,
-        commit_message=commit_message,
-    )
-    bt.logging.info("Finished uploading to Model Hub")
-
-if __name__ == "__main__":
-    import hivemind
-    # Initialize the dummy data and the DatasetState instance
-    dataset_length = 96015  # Reduced size for testing
-    dataset_indices = bitarray('0' * dataset_length)  # Initialize all indices to 0 (unused)
-    #dataset_dict = {}  # Dummy DHT, aka dht_state
-    dht = hivemind.DHT(start=True)
-    run_id = "dummy_run_id"
-   
-    dataset_state = DatasetState(dht, dataset_indices, run_id)
-    
-    # Test get_dataset_indices
-    selected_groups = dataset_state.get_dataset_indices(2, 500)
-    print("Selected groups for training:", selected_groups)
-    print(dataset_state.dataset_indices_train.count(0))
-    selected_groups = dataset_state.get_dataset_indices(2, 500)
-    print("Selected groups for training:", selected_groups)
-    print(dataset_state.dataset_indices_train.count(0))
-
-    # Test get_dataset_indices_test with DHT
-    test_indices = dataset_state.get_dataset_indices_test(20)
-    print(test_indices)
-    print(dht.get("dataset_indices_test"))
-    dht.shutdown()
+    def update_step(self):
+        self.step = self.get_dht("step")
+        self.set_dht("step", self.step + 1)

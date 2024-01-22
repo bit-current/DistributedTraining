@@ -122,7 +122,7 @@ def add_args(cls, parser):
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="gpt2",
+        default="kmfoda/gpt2",
     )
 
     parser.add_argument(
