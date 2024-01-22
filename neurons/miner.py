@@ -197,6 +197,7 @@ class Miner(BaseMinerNeuron):
             batch_size=synapse.batch_size, sequence_length=1024, rows=synapse.dataset_indices
         )
 
+        total_loss = 0
         n_acc_steps = 0
         accumulation_steps = self.config.neuron.local_gradient_accumilation_steps_train
 
@@ -212,6 +213,9 @@ class Miner(BaseMinerNeuron):
             
             # Backward Pass
             loss.backward()
+            
+            # Accumulate Total Loss
+            total_loss += outputs.loss.detach().item() 
 
             if (step + 1) % accumulation_steps == 0:
                 n_acc_steps += 1
@@ -225,10 +229,12 @@ class Miner(BaseMinerNeuron):
 
             torch.cuda.empty_cache()
 
-        synapse.loss = outputs.loss.detach().item()
+        average_loss = total_loss / step
+        synapse.loss = average_loss
         synapse.epoch = self.opt.tracker.local_progress.epoch
 
         bt.logging.info(f"Final Loss: {outputs.loss.detach().item()}")
+        bt.logging.info(f"Average Loss: {average_loss}")
 
         return synapse
 
