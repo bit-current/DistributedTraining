@@ -66,8 +66,8 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
     average_loss = total_loss / step
 
-    bt.logging.info(f"Final Loss: {outputs.loss.detach().item()}")
-    bt.logging.info(f"Average Loss: {average_loss}")
+    bt.logging.info(f"Final Loss:           {outputs.loss.detach().item()}")
+    bt.logging.info(f"Average Loss:         {average_loss}")
 
     return average_loss
 
@@ -77,9 +77,12 @@ def get_local_score(self, synapse):
         score = 1
     else:
         loss = get_loss(self, synapse.dataset_indices, synapse.batch_size, synapse.gradient_accumilation_steps)
+        bt.logging.info(f"Calculated Loss:  {loss}")
+        bt.logging.info(f"Synapse Loss:     {synapse.loss}")
         # The miner's local score is the variance between the loss it returns and the 
         # loss the validator calculates for the last batch of data sent to that miner
         score = 1-(abs(loss-synapse.loss)/loss)
+        bt.logging.info(f"Local Score:      {score}")
 
     return score
     
@@ -100,15 +103,15 @@ def get_rewards(
     - torch.FloatTensor: A tensor of rewards for the given query and responses.
     """
 
-    load_state_from_peers_status = False
-    retries = 0
-    while load_state_from_peers_status is False:
-        try:
-            load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
-        except Exception as e:
-            bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
-            retries += 1
-            bt.logging.error(f"Retrying ...")
+    # load_state_from_peers_status = False
+    # retries = 0
+    # while load_state_from_peers_status is False:
+    #     try:
+    #         load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
+    #     except Exception as e:
+    #         bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
+    #         retries += 1
+    #         bt.logging.error(f"Retrying ...")
 
     self.global_step = self.dataset_common_state.get_dht("step")
     bt.logging.info(f"Global Step:   {self.global_step}")
@@ -150,7 +153,7 @@ def get_rewards(
     # Get all the reward results by iteratively calling your reward() function.
     scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 
                                 for _, response in zip(uids, responses[0])]).to(self.device)
-    bt.logging.info(f"Global Scores: {scores}")
+    bt.logging.info(f"Global Scores:        {scores}")
 
     # Adjust Global Score with Local Score
     test_uids_index = [uid_index for uid_index, uid in enumerate(uids) 
@@ -162,7 +165,7 @@ def get_rewards(
                                 if uid_index in test_uids_sample_index else scores[uid_index] 
                                 for uid_index,_ in enumerate(uids)]).to(self.device)
 
-    bt.logging.info(f"Adjusted Global Scores: {scores}")
+    bt.logging.info(f"Adjusted Global Scores:   {scores}")
     
     return scores
 
