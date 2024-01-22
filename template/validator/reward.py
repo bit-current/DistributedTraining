@@ -100,15 +100,15 @@ def get_rewards(
     - torch.FloatTensor: A tensor of rewards for the given query and responses.
     """
 
-    # load_state_from_peers_status = False
-    # retries = 0
-    # while load_state_from_peers_status is False:
-    #     try:
-    #         load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
-    #     except Exception as e:
-    #         bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
-    #         retries += 1
-    #         bt.logging.error(f"Retrying ...")
+    load_state_from_peers_status = False
+    retries = 0
+    while load_state_from_peers_status is False:
+        try:
+            load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
+        except Exception as e:
+            bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
+            retries += 1
+            bt.logging.error(f"Retrying ...")
 
     self.global_step = self.dataset_common_state.get_dht("step")
     bt.logging.info(f"Global Step:   {self.global_step}")
