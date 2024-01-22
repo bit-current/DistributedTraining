@@ -1,11 +1,6 @@
 import random
-import time
-
-import bittensor as bt
-import torch
-from hivemind.utils.timed_storage import get_dht_time
-
 from bitarray import bitarray
+from hivemind.utils.timed_storage import get_dht_time
 
 class DatasetState:
     """
