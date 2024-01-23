@@ -111,6 +111,7 @@ class Validator(BaseValidatorNeuron):
             verbose=False,  # print logs incessently
             grad_compression=hivemind.Float16Compression(),
             state_averaging_compression=hivemind.Float16Compression(),
+            client_mode = True,
         )
         
         # Get Current Epoch

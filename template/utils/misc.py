@@ -145,7 +145,7 @@ class AsyncDendritePool:
 def load_wandb(config, wallet):
 
     #signature = wallet.hotkey.sign(config.neuron.run_id).hex() #Extra for verification if needed
-    run_name = config.neuron.run_id + "_" + wallet.hotkey.ss58_address#+ signature 
+    run_name = f"{config.neuron.run_id}_{config.neuron.name}_{wallet.hotkey.ss58_address}" #+ signature 
     wandb_run = wandb.init(
         id = run_name,
         name=run_name,
