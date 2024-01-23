@@ -91,7 +91,7 @@ def add_args(cls, parser):
         "--neuron.epoch_length",
         type=int,
         help="The default epoch length (how often we set weights, measured in 12 second blocks).",
-        default=100,
+        default=5,
     )
 
     parser.add_argument(
@@ -157,7 +157,7 @@ def add_args(cls, parser):
         "--neuron.local_gradient_accumilation_steps_train",
         type=int,
         help="The default batch size",
-        default=16,
+        default=1,
     )
 
     parser.add_argument(
@@ -213,7 +213,7 @@ def add_args(cls, parser):
             "--neuron.local_gradient_accumilation_steps_test",
             type=int,
             help="The default batch size",
-            default=16,
+            default=1,
         )
 
         parser.add_argument(
