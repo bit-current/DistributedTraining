@@ -1,6 +1,7 @@
 import random
 from bitarray import bitarray
 from hivemind.utils.timed_storage import get_dht_time
+import bittensor as bt
 
 class DatasetState:
     """
@@ -35,7 +36,7 @@ class DatasetState:
             if value is not None:
                 return value.value
         except Exception as e:
-            print(f"Error accessing DHT: {e}")
+            bt.logging.error(f"Error accessing DHT: {e}")
         return None
 
     def set_dht(self, name, value):
@@ -43,9 +44,9 @@ class DatasetState:
             expiration_time = get_dht_time() + self.default_expiration_time
             store_ok = self.dht.store(name, value, expiration_time=expiration_time)
             if not store_ok:
-                print(f"Failed to store key: {name}")
+                bt.logging.error(f"Failed to store key: {name}")
         except Exception as e:
-            print(f"Error storing to DHT: {e}")
+            bt.logging.error(f"Error storing to DHT: {e}")
     
     def get_dataset_indices(self, groups_count, items_per_group):
         

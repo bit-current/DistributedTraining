@@ -23,6 +23,7 @@ from typing import List
 import bittensor as bt
 import torch
 from template.data.dataset import SubsetFalconLoader
+from hivemind.utils.timed_storage import get_dht_time
 
 def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
@@ -150,6 +151,11 @@ def get_rewards(
     # Set previous loss to current loss
     self.previous_loss = loss
     
+    # Write loss to dht
+    store_loss = self.dataset_common_state.store_dht("loss", loss, get_dht_time() + self.default_expiration_time )
+    if not store_loss:
+        bt.logging.error(f"Failed to store key: loss")
+
     # Get all the reward results by iteratively calling your reward() function.
     scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 
                                 for _, response in zip(uids, responses[0])]).to(self.device)
