@@ -152,7 +152,7 @@ def get_rewards(
     self.previous_loss = loss
     
     # Write loss to dht
-    store_loss = self.dataset_common_state.store_dht("loss", loss, get_dht_time() + self.default_expiration_time )
+    store_loss = self.dataset_common_state.set_dht("loss", loss, get_dht_time() + self.default_expiration_time )
     if not store_loss:
         bt.logging.error(f"Failed to store key: loss")
 
