@@ -55,8 +55,6 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
         if (step + 1) % accumulation_steps == 0:
             n_acc_steps += 1
-            self.opt.step()         # Adjust gradient
-            self.opt.zero_grad()    # Clear gradients
             
             bt.logging.info(f"Step {n_acc_steps} Loss: {outputs.loss.detach().item()}")
             
@@ -104,17 +102,19 @@ def get_rewards(
     - torch.FloatTensor: A tensor of rewards for the given query and responses.
     """
 
-    # load_state_from_peers_status = False
-    # retries = 0
-    # while load_state_from_peers_status is False:
-    #     try:
-    #         load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
-    #     except Exception as e:
-    #         bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
-    #         retries += 1
-    #         bt.logging.error(f"Retrying ...")
+    load_state_from_peers_status = False
+    retries = 0
+    while load_state_from_peers_status is False:
+        try:
+            load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
+        except Exception as e:
+            bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
+            retries += 1
+            bt.logging.error(f"Retrying ...")
 
-    self.global_step = self.dataset_common_state.get_dht("step")
+    global_step = self.dataset_common_state.get_dht("step")
+    if global_step is not None:
+        self.global_step = global_step
     bt.logging.info(f"Global Step:   {self.global_step}")
     if (self.global_step % 100 == 0) and (self.global_step != 0):
         self.dataset_indices_list_test = (
@@ -122,9 +122,6 @@ def get_rewards(
                 self.config.neuron.local_batch_size_test
             )
         )
-    if (self.step % 100 == 0) and (self.step != 0):
-        self.dataset_indices_list_test = self.dataset_common_state.get_dataset_indices_test(self.config.neuron.local_batch_size_test)
-
     # Get loss on randomly selected test dataset to be used for the Global Score
     loss = get_loss(self, self.dataset_indices_list_test, self.config.neuron.local_batch_size_test, self.config.neuron.local_gradient_accumilation_steps_test)
 
@@ -133,7 +130,9 @@ def get_rewards(
 
     # Get latest previous loss from DHT
     # self.previous_loss = self.dataset_common_state.get_dht("loss")
-    self.previous_loss = self.dataset_common_state.get_dht("loss")
+    previous_loss = self.dataset_common_state.get_dht("loss")
+    if previous_loss is not None:
+        self.previous_loss = previous_loss
     bt.logging.info(f"Previous Global Loss:    {self.previous_loss}")
     bt.logging.info(f"Current Global Loss:     {loss}")
 
@@ -152,9 +151,7 @@ def get_rewards(
     self.previous_loss = loss
     
     # Write loss to dht
-    store_loss = self.dataset_common_state.set_dht("loss", loss, get_dht_time() + self.default_expiration_time )
-    if not store_loss:
-        bt.logging.error(f"Failed to store key: loss")
+    self.dataset_common_state.set_dht("loss", loss)
 
     # Get all the reward results by iteratively calling your reward() function.
     scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 

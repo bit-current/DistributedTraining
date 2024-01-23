@@ -150,14 +150,14 @@ def add_args(cls, parser):
         "--neuron.global_batch_size_train",
         type=int,
         help="The hivemind global target_batch_size",
-        default=8000,
+        default=1600,
     )
 
     parser.add_argument(
         "--neuron.local_gradient_accumilation_steps_train",
         type=int,
         help="The default batch size",
-        default=1,
+        default=16,
     )
 
     parser.add_argument(
@@ -213,7 +213,7 @@ def add_args(cls, parser):
             "--neuron.local_gradient_accumilation_steps_test",
             type=int,
             help="The default batch size",
-            default=1,
+            default=16,
         )
 
         parser.add_argument(

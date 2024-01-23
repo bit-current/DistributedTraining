@@ -16,7 +16,7 @@ parser.add_argument(
         "--global_batch_size_train",
         type=int,
         help="The hivemind global target_batch_size",
-        default=8000,
+        default=1600,
 )
 parser.add_argument(
     "--run_id",

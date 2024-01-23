@@ -43,6 +43,7 @@ async def forward(self):
     self.miner_uids = await get_random_uids(
         self, dendrite=self.dendrite, k=self.config.neuron.sample_size
     )
+    bt.logging.info(f"UIDs:  {self.miner_uids}")
     datapoints_per_group = self.config.neuron.training_examples_per_miner
     self.dataset_indices_list = self.dataset_common_state.get_dataset_indices(
             groups_count=len(self.miner_uids),
@@ -101,6 +102,8 @@ async def forward(self):
     self.current_epoch = self.opt.tracker.global_progress.epoch
 
     # Update global step
-    self.dataset_common_state.update_step()
+    step_update_status = self.dataset_common_state.update_step()
+    if step_update_status is None:
+        self.global_step += 1
 
     return responses

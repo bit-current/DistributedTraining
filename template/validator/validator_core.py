@@ -78,4 +78,7 @@ class DatasetState:
 
     def update_step(self):
         self.step = self.get_dht("step")
-        self.set_dht("step", self.step + 1)
+        if self.step is not None:
+            self.set_dht("step", self.step + 1)
+        else:
+            return None
