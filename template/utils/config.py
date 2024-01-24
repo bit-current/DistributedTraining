@@ -114,7 +114,7 @@ def add_args(cls, parser):
         nargs="+",
         help="The addresses for the DHT",
         default=[
-            "/ip4/69.30.85.69/tcp/22162/p2p/12D3KooWGjNpqMSQaWudtrBseypWVRMccRiQAWzV1QoPzbki8fRs",
+            "/ip4/69.30.85.69/tcp/22162/p2p/12D3KooWGc1irEf5N4Mz4Mxt59TVLDrfMaQffi3ELjTkd6N5rwv6",
         ],
     )
 
@@ -129,7 +129,7 @@ def add_args(cls, parser):
         "--neuron.lr",
         type=float,
         help="The learning rate",
-        default=0.0001
+        default=0.00001
     )
 
     parser.add_argument(
@@ -143,7 +143,7 @@ def add_args(cls, parser):
         "--neuron.local_batch_size_train",
         type=int,
         help="The default batch size",
-        default=1,
+        default=4,
     )
 
     parser.add_argument(
@@ -157,7 +157,7 @@ def add_args(cls, parser):
         "--neuron.local_gradient_accumilation_steps_train",
         type=int,
         help="The default batch size",
-        default=16,
+        default=4,
     )
 
     parser.add_argument(
@@ -206,14 +206,14 @@ def add_args(cls, parser):
             "--neuron.local_batch_size_test",
             type=int,
             help="The default batch size",
-            default=1,
+            default=4,
         )
 
         parser.add_argument(
             "--neuron.local_gradient_accumilation_steps_test",
             type=int,
             help="The default batch size",
-            default=16,
+            default=4,
         )
 
         parser.add_argument(
