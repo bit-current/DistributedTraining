@@ -129,7 +129,7 @@ class Miner(BaseMinerNeuron):
             batch_size_per_step=self.config.neuron.local_batch_size_train,  # each call to opt.step adds this many samples towards the next epoch
             target_batch_size=self.config.neuron.global_batch_size_train,  # after peers collectively process this many samples, average weights and begin the next epoch
             optimizer=opt,  # wrap the SGD optimizer defined above
-            use_local_updates=False,  # perform optimizer steps with local gradients, average parameters in background
+            use_local_updates=True,  # perform optimizer steps with local gradients, average parameters in background
             matchmaking_time=15.0,  # when averaging parameters, gather peers in background for up to this many seconds
             averaging_timeout=600.0,  # give up on averaging if not successful in this many seconds
             verbose=False,  # print logs incessently

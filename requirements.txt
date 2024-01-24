@@ -4,3 +4,4 @@ datasets
 transformers
 hivemind
 wandb
+bitarray
