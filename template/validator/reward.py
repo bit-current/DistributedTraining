@@ -45,7 +45,7 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
         outputs = self.model(input_ids=inputs, labels=inputs)
         
         # Zero gradients
-        self.opt.zero_grad()
+        # self.opt.zero_grad()
 
         # Normalize loss to account for batch accumulation
         # loss = outputs.loss / accumulation_steps 
@@ -58,7 +58,7 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
         loss.backward()
 
         # Adjust gradient
-        self.opt.step()
+        # self.opt.step()
 
         # if (step + 1) % accumulation_steps == 0:
         #     n_acc_steps += 1
