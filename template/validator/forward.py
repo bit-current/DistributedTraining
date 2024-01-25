@@ -99,7 +99,7 @@ async def forward(self):
     self.update_scores(rewards, self.miner_uids)
 
     # Update the current_epoch
-    self.current_epoch = self.opt.tracker.global_progress.epoch
+    self.current_epoch = 1 # Dummy fix need to switch to self.tracker.global_progress.epoch
 
     # Update global step
     step_update_status = self.dataset_common_state.update_step()

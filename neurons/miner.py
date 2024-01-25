@@ -135,6 +135,16 @@ class Miner(BaseMinerNeuron):
             state_averaging_compression=hivemind.Float16Compression(),
         )
 
+        load_state_from_peers_status = False
+        retries = 0
+        while load_state_from_peers_status is False:
+            try:
+                load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
+            except Exception as e:
+                bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
+                retries += 1
+                bt.logging.error(f"Retrying ...")
+
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
         self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -206,26 +216,37 @@ class Miner(BaseMinerNeuron):
             # Forward pass
             outputs = self.model(input_ids=inputs, labels=inputs)
             
+            # Zero gradients
+            self.opt.zero_grad()
+
             # Normalize loss to account for batch accumulation
-            loss = outputs.loss / accumulation_steps  
-            
-            # Backward Pass
-            loss.backward()
+            # loss = outputs.loss / accumulation_steps 
+            loss = outputs.loss
             
             # Accumulate Total Loss
             total_loss += outputs.loss.detach().item() 
+            
+            # Backward Pass
+            loss.backward()
 
-            if (step + 1) % accumulation_steps == 0:
-                n_acc_steps += 1
-                self.opt.step()         # Adjust gradient
-                self.opt.zero_grad()    # Clear gradients
-                
-                bt.logging.info(f"Step {n_acc_steps} Loss: {outputs.loss.detach().item()}")
-                
-                if not self.config.neuron.dont_wandb_log:
-                    self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
+            # Adjust gradient
+            self.opt.step()
 
-            torch.cuda.empty_cache()
+            # if (step + 1) % accumulation_steps == 0:
+            #     n_acc_steps += 1
+            #     self.opt.step()         # Adjust gradient
+            #     self.opt.zero_grad()    # Clear gradients
+                
+            #     bt.logging.info(f"Step {n_acc_steps} Loss: {outputs.loss.detach().item()}")
+                
+            #     if not self.config.neuron.dont_wandb_log:
+            #         self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
+
+            # torch.cuda.empty_cache()
+            bt.logging.info(f"Step {step} Loss: {outputs.loss.detach().item()}")
+        
+            if not self.config.neuron.dont_wandb_log:
+                self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
 
         average_loss = total_loss / step
         synapse.loss = average_loss

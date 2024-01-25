@@ -44,24 +44,36 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
         # Forward pass
         outputs = self.model(input_ids=inputs, labels=inputs)
         
-        # Normalize loss to account for batch accumulation
-        loss = outputs.loss / accumulation_steps  
+        # Zero gradients
+        self.opt.zero_grad()
 
-        # Backward Pass
-        loss.backward()
+        # Normalize loss to account for batch accumulation
+        # loss = outputs.loss / accumulation_steps 
+        loss = outputs.loss
 
         # Accumulate Total Loss
         total_loss += outputs.loss.detach().item() 
 
-        if (step + 1) % accumulation_steps == 0:
-            n_acc_steps += 1
-            
-            bt.logging.info(f"Step {n_acc_steps} Loss: {outputs.loss.detach().item()}")
-            
-            if not self.config.neuron.dont_wandb_log:
-                self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
+        # Backward Pass
+        loss.backward()
 
-        torch.cuda.empty_cache()
+        # Adjust gradient
+        self.opt.step()
+
+        # if (step + 1) % accumulation_steps == 0:
+        #     n_acc_steps += 1
+            
+        #     bt.logging.info(f"Step {n_acc_steps} Loss: {outputs.loss.detach().item()}")
+            
+        #     if not self.config.neuron.dont_wandb_log:
+        #         self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
+
+        # torch.cuda.empty_cache()
+
+        bt.logging.info(f"Step {step} Loss: {outputs.loss.detach().item()}")
+    
+        if not self.config.neuron.dont_wandb_log:
+            self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
 
     average_loss = total_loss / step
 
@@ -72,7 +84,7 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
 def get_local_score(self, synapse):
 
-    if self.opt.tracker.global_progress.epoch != self.current_epoch:
+    if False: # Dummy fix need to switch to if self.tracker.global_progress.epoch != self.current_epoch:
         score = 1
     else:
         loss = get_loss(self, synapse.dataset_indices, synapse.batch_size, synapse.gradient_accumilation_steps)
@@ -106,7 +118,7 @@ def get_rewards(
     retries = 0
     while load_state_from_peers_status is False:
         try:
-            load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
+            load_state_from_peers_status = self.state_averager.load_state_from_peers()
         except Exception as e:
             bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
             retries += 1
