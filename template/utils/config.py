@@ -91,7 +91,7 @@ def add_args(cls, parser):
         "--neuron.epoch_length",
         type=int,
         help="The default epoch length (how often we set weights, measured in 12 second blocks).",
-        default=100,
+        default=5,
     )
 
     parser.add_argument(
@@ -111,11 +111,11 @@ def add_args(cls, parser):
     parser.add_argument(
         "--neuron.initial_peers",
         type=str,
-        nargs=3,
+        nargs="+",
         help="The addresses for the DHT",
         default=[
             "/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWNrfkQ8DX2RHW4c98c8As11wMNA425WTNohijyJQdA84Y",
-            "/ip4/54.205.54.19/tcp/8008/p2p/12D3KooWMY4YGYZ6JkWaCNKUeKQHAuxeQcMeoNfKHbbRXVoBaMiZ",
+            "/ip4/54.205.54.19/tcp/8008/p2p/12D3KooWMY4YGYZ6JkWaCNKUeKQHAuxeQcMeoNfKHbbRXVoBaMiZ"
         ],
     )
 
@@ -123,28 +123,28 @@ def add_args(cls, parser):
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="sshleifer/tiny-gpt2",
+        default="kmfoda/gpt2-677m",
     )
 
     parser.add_argument(
         "--neuron.lr",
         type=float,
         help="The learning rate",
-        default=0.0001,
+        default=0.001
     )
 
     parser.add_argument(
         "--neuron.dataset_name",
         type=str,
         help="The datasets the model will be trained on",
-        default="wikitext",
+        default="tiiuae/falcon-refinedweb",
     )
 
     parser.add_argument(
         "--neuron.local_batch_size_train",
         type=int,
         help="The default batch size",
-        default=20,
+        default=4,
     )
 
     parser.add_argument(
@@ -155,10 +155,18 @@ def add_args(cls, parser):
     )
 
     parser.add_argument(
+        "--neuron.local_gradient_accumilation_steps_train",
+        type=int,
+        help="The default batch size",
+        default=1,
+    )
+
+    parser.add_argument(
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_run_v1_1",
+        default="s25_run_v2_1",
+
     )
 
     parser.add_argument(
@@ -200,7 +208,14 @@ def add_args(cls, parser):
             "--neuron.local_batch_size_test",
             type=int,
             help="The default batch size",
-            default=20,
+            default=4,
+        )
+
+        parser.add_argument(
+            "--neuron.local_gradient_accumilation_steps_test",
+            type=int,
+            help="The default batch size",
+            default=1,
         )
 
         parser.add_argument(
@@ -221,7 +236,7 @@ def add_args(cls, parser):
             "--neuron.training_examples_per_miner",
             type=int,
             help="The number of rows to train on per miner",
-            default=200,
+            default=500,
         )
 
         parser.add_argument(

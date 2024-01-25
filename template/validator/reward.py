@@ -22,35 +22,78 @@ from typing import List
 
 import bittensor as bt
 import torch
+from template.data.dataset import SubsetFalconLoader
+from hivemind.utils.timed_storage import get_dht_time
 
-def get_loss(self, dataset_indices):
+def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
-    dataset_sample = self.dataset.select(dataset_indices)
-
-    # Encode the dataset
-    encoded_dataset = dataset_sample.map(self.encode, batched=True)
-
-    # Move batch to device
-    input_ids = torch.tensor(encoded_dataset["input_ids"]).to(self.device)
-    attention_mask = torch.tensor(encoded_dataset["attention_mask"]).to(self.device)
-    labels = torch.tensor(encoded_dataset["input_ids"]).to(self.device)
-
-    # Forward pass
-    outputs = self.model(
-        input_ids=input_ids, attention_mask=attention_mask, labels=labels
+    # Create Dataloader
+    dataloader = SubsetFalconLoader(
+        batch_size=batch_size, sequence_length=1024, rows=dataset_indices
     )
 
-    # Backward pass
-    loss = outputs.loss
+    total_loss = 0
+    n_acc_steps = 0
+    accumulation_steps = gradient_accumilation_steps
 
-    return loss
+    # Train data for one epoch
+    for step, batch in enumerate(dataloader):
+
+        inputs = batch.to(self.device)
+
+        # Forward pass
+        outputs = self.model(input_ids=inputs, labels=inputs)
+        
+        # Zero gradients
+        # self.opt.zero_grad()
+
+        # Normalize loss to account for batch accumulation
+        # loss = outputs.loss / accumulation_steps 
+        loss = outputs.loss
+
+        # Accumulate Total Loss
+        total_loss += outputs.loss.detach().item() 
+
+        # Backward Pass
+        loss.backward()
+
+        # Adjust gradient
+        # self.opt.step()
+
+        # if (step + 1) % accumulation_steps == 0:
+        #     n_acc_steps += 1
+            
+        #     bt.logging.info(f"Step {n_acc_steps} Loss: {outputs.loss.detach().item()}")
+            
+        #     if not self.config.neuron.dont_wandb_log:
+        #         self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
+
+        # torch.cuda.empty_cache()
+
+        bt.logging.info(f"Step {step} Loss: {outputs.loss.detach().item()}")
+    
+        if not self.config.neuron.dont_wandb_log:
+            self.wandb.log({"loss": outputs.loss.detach().item()})
+
+    average_loss = total_loss / step
+
+    bt.logging.info(f"Final Loss:           {outputs.loss.detach().item()}")
+    bt.logging.info(f"Average Loss:         {average_loss}")
+
+    return average_loss
 
 def get_local_score(self, synapse):
 
-    loss = get_loss(self, synapse.dataset_indices[-synapse.batch_size:])
-    # The miner's local score is the variance between the loss it returns and the 
-    # loss the validator calculates for the last batch of data sent to that miner
-    score = 1-(abs(loss-synapse.loss)/loss)
+    if False: # Dummy fix need to switch to if self.tracker.global_progress.epoch != self.current_epoch:
+        score = 1
+    else:
+        loss = get_loss(self, synapse.dataset_indices, synapse.batch_size, synapse.gradient_accumilation_steps)
+        bt.logging.info(f"Calculated Loss:  {loss}")
+        bt.logging.info(f"Synapse Loss:     {synapse.loss}")
+        # The miner's local score is the variance between the loss it returns and the 
+        # loss the validator calculates for the last batch of data sent to that miner
+        score = 1-(abs(loss-synapse.loss)/loss)
+        bt.logging.info(f"Local Score:      {score}")
 
     return score
     
@@ -81,25 +124,27 @@ def get_rewards(
             retries += 1
             bt.logging.error(f"Retrying ...")
 
-    # self.global_step = self.dataset_common_state.get_dht("step")
-    # if self.global_step % 100 == 0:
-    #     self.dataset_indices_list_test = (
-    #         self.dataset_common_state.get_dataset_indices_test(
-    #             self.config.neuron.batch_size_test
-    #         )
-    #     )
-    if (self.step % 100 == 0) and (self.step != 0):
-        self.dataset_indices_list_test = self.dataset_common_state.get_dataset_indices_test(self.config.neuron.local_batch_size_test)
-
+    global_step = self.dataset_common_state.get_dht("step")
+    if global_step is not None:
+        self.global_step = global_step
+    bt.logging.info(f"Global Step:   {self.global_step}")
+    if (self.global_step % 100 == 0) and (self.global_step != 0):
+        self.dataset_indices_list_test = (
+            self.dataset_common_state.get_dataset_indices_test(
+                self.config.neuron.local_batch_size_test
+            )
+        )
     # Get loss on randomly selected test dataset to be used for the Global Score
-    loss = get_loss(self, self.dataset_indices_list_test)
+    loss = get_loss(self, self.dataset_indices_list_test, self.config.neuron.local_batch_size_test, self.config.neuron.local_gradient_accumilation_steps_test)
 
     if not self.config.neuron.dont_wandb_log:
         self.wandb.log({"loss": loss, "previous_loss": self.previous_loss})
 
     # Get latest previous loss from DHT
     # self.previous_loss = self.dataset_common_state.get_dht("loss")
-    self.previous_loss = self.dataset_common_state.get_dht("loss")
+    previous_loss = self.dataset_common_state.get_dht("loss")
+    if previous_loss is not None:
+        self.previous_loss = previous_loss
     bt.logging.info(f"Previous Global Loss:    {self.previous_loss}")
     bt.logging.info(f"Current Global Loss:     {loss}")
 
@@ -117,10 +162,13 @@ def get_rewards(
     # Set previous loss to current loss
     self.previous_loss = loss
     
+    # Write loss to dht
+    self.dataset_common_state.set_dht("loss", loss)
+
     # Get all the reward results by iteratively calling your reward() function.
     scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 
                                 for _, response in zip(uids, responses[0])]).to(self.device)
-    bt.logging.info(f"Global Scores: {scores}")
+    bt.logging.info(f"Global Scores:        {scores}")
 
     # Adjust Global Score with Local Score
     test_uids_index = [uid_index for uid_index, uid in enumerate(uids) 
@@ -131,8 +179,8 @@ def get_rewards(
     scores = torch.FloatTensor([scores[uid_index] * get_local_score(self, responses[0][uid_index]) 
                                 if uid_index in test_uids_sample_index else scores[uid_index] 
                                 for uid_index,_ in enumerate(uids)]).to(self.device)
-    
-    bt.logging.info(f"Adjusted Global Scores: {scores}")
+
+    bt.logging.info(f"Adjusted Global Scores:   {scores}")
     
     return scores
 

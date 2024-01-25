@@ -30,13 +30,15 @@ import torch
 import wandb
 from datasets import load_dataset
 from hivemind.optim.state_averager import TrainingStateAverager
+from hivemind.optim.progress_tracker import ProgressTracker
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from template.base.validator import BaseValidatorNeuron
 from template.utils.misc import AsyncDendritePool, load_wandb
 from template.validator import forward
-from template.validator.validator_core import DatasetState, upload_checkpoint
+from template.validator.validator_core import DatasetState
+from bitarray import bitarray
 
 
 class Validator(BaseValidatorNeuron):
@@ -50,7 +52,7 @@ class Validator(BaseValidatorNeuron):
 
         # Init Wandb
         if not self.config.neuron.dont_wandb_log:
-            self.wandb = load_wandb(self.config, self.wallet)
+            self.wandb = load_wandb(self.config, self.wallet, "validator", str(self.dht.peer_id))
 
         # Init Dendrite Pool
         self.dendrite_pool = AsyncDendritePool(
@@ -58,22 +60,20 @@ class Validator(BaseValidatorNeuron):
         )
 
         # # Init Dataset
-        self.dataset = load_dataset(
-            self.config.neuron.dataset_name, "wikitext-2-v1", split="train"
-        )
-        self.dataset_indices = [i for i in range(0, len(self.dataset))]
-        self.dataset_dict = dict()  # Init a dict to use as placeholder DHT
-        self.dataset_common_state = DatasetState(
-            self.dataset_dict, self.dataset_indices, self.config.neuron.run_id
-        )
+        dataset_length = 968000015
+        self.dataset_indices = bitarray(dataset_length)
+        # self.dataset_dict = dict()  # Init a dict to use as placeholder DHT
 
+        self.dataset_common_state = DatasetState(
+            self.dht, self.dataset_indices, self.config.neuron.run_id
+        )
+        
         # self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_train")
         # if self.dataset_indices_list_test is None:
         #     self.dataset_indices_list_test = self.dataset_common_state.get_dht("dataset_indices_test")
-
         self.dataset_indices_list_test = (
             self.dataset_common_state.get_dataset_indices_test(
-                self.config.neuron.local_batch_size_test
+                self.config.neuron.local_batch_size_test * self.config.neuron.local_gradient_accumilation_steps_test
             )
         )
 
@@ -83,10 +83,11 @@ class Validator(BaseValidatorNeuron):
             # self.dataset_common_state.set_dht("step")
 
         # Init Loss
-        self.previous_loss = None
+        self.previous_loss = self.dataset_common_state.get_dht("loss")
         self.latest_upload = 0
         self.latest_weight_update = 0
         self.step = 0
+        self.global_step = self.dataset_common_state.get_dht("step")
 
         # Init device
         self.device = self.config.neuron.device
@@ -107,9 +108,13 @@ class Validator(BaseValidatorNeuron):
             allow_state_sharing=False,
             start=True,
             prefix=f"{self.config.neuron.run_id}_state_averager",
+            state_compression=hivemind.Float16Compression(),
             # **asdict(averager_args),
         )
-
+        
+        # Get Current Epoch
+        self.current_epoch = 1 # Dummy fix need to swithc to self.opt.tracker.global_progress.epoch
+        
         # Start Main Validation Loop
         bt.logging.info("Starting validator loop.")
 
@@ -164,6 +169,7 @@ class Validator(BaseValidatorNeuron):
                     initial_peers=[initial_peers_list[retries]],
                     announce_maddrs=announce_maddrs,
                     start=True,
+                    # client_mode = True,
                 )
                 bt.logging.info(
                     f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}"

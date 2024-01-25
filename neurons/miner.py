@@ -44,6 +44,7 @@ import template
 # import base miner class which takes care of most of the boilerplate
 from template.base.miner import BaseMinerNeuron
 from template.utils.misc import load_wandb
+from template.data.dataset import SubsetFalconLoader
 
 
 class Miner(BaseMinerNeuron):
@@ -122,14 +123,16 @@ class Miner(BaseMinerNeuron):
         self.opt = hivemind.Optimizer(
             dht=self.dht,  # use a DHT that is connected with other peers
             run_id=self.config.neuron.run_id,  # unique identifier of this collaborative run
-            scheduler=None,#partial(torch.optim.lr_scheduler.LambdaLR, lr_lambda=lambda t: 1.0 / max(1, t)),
-            batch_size_per_step=self.config.neuron.local_batch_size_train,  # each call to opt.step adds this many samples towards the next epoch
+            scheduler=None,
+            batch_size_per_step=self.config.neuron.local_batch_size_train*self.config.neuron.local_gradient_accumilation_steps_train,  # each call to opt.step adds this many samples towards the next epoch
             target_batch_size=self.config.neuron.global_batch_size_train,  # after peers collectively process this many samples, average weights and begin the next epoch
             optimizer=opt,  # wrap the SGD optimizer defined above
             use_local_updates=True,  # perform optimizer steps with local gradients, average parameters in background
             matchmaking_time=15.0,  # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=60.0,  # give up on averaging if not successful in this many seconds
+            averaging_timeout=600.0,  # give up on averaging if not successful in this many seconds
             verbose=False,  # print logs incessently
+            grad_compression=hivemind.Float16Compression(),
+            state_averaging_compression=hivemind.Float16Compression(),
         )
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
@@ -137,13 +140,14 @@ class Miner(BaseMinerNeuron):
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         # Load dataset
-        self.dataset = load_dataset(
-            self.config.neuron.dataset_name, "wikitext-2-v1", split="train"
-        )
+        # self.dataset = load_dataset(
+        #     self.config.neuron.dataset_name, "wikitext-2-v1", split="train"
+        # )
+        self.dataset_loader = ()
 
         # Init Wandb
         if not self.config.neuron.dont_wandb_log:
-            self.wandb = load_wandb(self.config, self.wallet)
+            self.wandb = load_wandb(self.config, self.wallet, "miner", str(self.dht.peer_id))
 
     # Define encoding function
     def encode(self, examples):
@@ -171,51 +175,75 @@ class Miner(BaseMinerNeuron):
             template.protocol.Train: The synapse object with the 'loss' field set to models loss.
         """
 
-        # Select dataset indices to use for optimization step
-        dataset = self.dataset.select(synapse.dataset_indices)
-        if not self.config.neuron.dont_wandb_log:
-            self.wandb.log({"received_indices": synapse.dataset_indices})
+        # # Select dataset indices to use for optimization step
+        # dataset = self.dataset.select(synapse.dataset_indices)
+        # if not self.config.neuron.dont_wandb_log:
+        #     self.wandb.log({"received_indices": synapse.dataset_indices})
 
-        # Encode the dataset
-        encoded_dataset = dataset.map(self.encode, batched=True)
+        # # Encode the dataset
+        # encoded_dataset = dataset.map(self.encode, batched=True)
 
-        # Create a PyTorch DataLoader
-        dataloader = DataLoader(
-            encoded_dataset,
-            batch_size=synapse.batch_size,
-            collate_fn=default_data_collator,
+        # # Create a PyTorch DataLoader
+        # dataloader = DataLoader(
+        #     encoded_dataset,
+        #     batch_size=synapse.batch_size,
+        #     collate_fn=default_data_collator,
+        # )
+
+        # Create Dataloader
+        dataloader = SubsetFalconLoader(
+            batch_size=synapse.batch_size, sequence_length=1024, rows=synapse.dataset_indices
         )
 
         total_loss = 0
+        n_acc_steps = 0
+        accumulation_steps = self.config.neuron.local_gradient_accumilation_steps_train
 
         # Train data for one epoch
         for step, batch in enumerate(dataloader):
-            input_ids = batch["input_ids"].to(self.device)
-            attention_mask = batch["attention_mask"].to(self.device)
-            labels = input_ids.clone()
-
-            self.opt.zero_grad()
+            inputs = batch.to(self.device)
 
             # Forward pass
-            outputs = self.model(
-                input_ids=input_ids, attention_mask=attention_mask, labels=labels
-            )
-            # Backward pass
-            loss = outputs.loss
-            if not self.config.neuron.dont_wandb_log:
-                self.wandb.log({"loss": loss, "opt_local_epoch": self.opt.local_epoch})
-            total_loss += loss.item()
+            outputs = self.model(input_ids=inputs, labels=inputs)
+            
+            # Zero gradients
+            self.opt.zero_grad()
 
+            # Normalize loss to account for batch accumulation
+            # loss = outputs.loss / accumulation_steps 
+            loss = outputs.loss
+            
+            # Accumulate Total Loss
+            total_loss += outputs.loss.detach().item() 
+            
+            # Backward Pass
             loss.backward()
+
             # Adjust gradient
             self.opt.step()
 
-            bt.logging.info(f"Step {step} Loss: {loss}")
+            # if (step + 1) % accumulation_steps == 0:
+            #     n_acc_steps += 1
+            #     self.opt.step()         # Adjust gradient
+            #     self.opt.zero_grad()    # Clear gradients
+                
+            #     bt.logging.info(f"Step {n_acc_steps} Loss: {outputs.loss.detach().item()}")
+                
+            #     if not self.config.neuron.dont_wandb_log:
+            #         self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
 
-        average_loss = total_loss / len(dataloader)
+            # torch.cuda.empty_cache()
+            bt.logging.info(f"Step {step} Loss: {outputs.loss.detach().item()}")
+        
+            if not self.config.neuron.dont_wandb_log:
+                self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
+
+        average_loss = total_loss / step
         synapse.loss = average_loss
+        synapse.epoch = self.opt.tracker.local_progress.epoch
 
-        bt.logging.info(f"Final Loss: {synapse.loss}")
+        bt.logging.info(f"Final Loss: {outputs.loss.detach().item()}")
+        bt.logging.info(f"Average Loss: {average_loss}")
 
         return synapse
 
