@@ -52,7 +52,7 @@ class Validator(BaseValidatorNeuron):
 
         # Init Wandb
         if not self.config.neuron.dont_wandb_log:
-            self.wandb = load_wandb(self.config, self.wallet)
+            self.wandb = load_wandb(self.config, self.wallet, "validator", str(self.dht.peer_id))
 
         # Init Dendrite Pool
         self.dendrite_pool = AsyncDendritePool(

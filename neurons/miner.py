@@ -147,7 +147,7 @@ class Miner(BaseMinerNeuron):
 
         # Init Wandb
         if not self.config.neuron.dont_wandb_log:
-            self.wandb = load_wandb(self.config, self.wallet)
+            self.wandb = load_wandb(self.config, self.wallet, "miner", str(self.dht.peer_id))
 
     # Define encoding function
     def encode(self, examples):
