@@ -73,7 +73,7 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
         bt.logging.info(f"Step {step} Loss: {outputs.loss.detach().item()}")
     
         if not self.config.neuron.dont_wandb_log:
-            self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
+            self.wandb.log({"loss": outputs.loss.detach().item()})
 
     average_loss = total_loss / step
 
