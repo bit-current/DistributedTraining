@@ -135,16 +135,6 @@ class Miner(BaseMinerNeuron):
             state_averaging_compression=hivemind.Float16Compression(),
         )
 
-        load_state_from_peers_status = False
-        retries = 0
-        while load_state_from_peers_status is False:
-            try:
-                load_state_from_peers_status = self.opt.state_averager.load_state_from_peers()
-            except Exception as e:
-                bt.logging.error(f"Attempt {retries + 1} to write to the load state from peers failed: {e}")
-                retries += 1
-                bt.logging.error(f"Retrying ...")
-
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
         self.tokenizer.pad_token = self.tokenizer.eos_token

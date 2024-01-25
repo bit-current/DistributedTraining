@@ -108,6 +108,7 @@ class Validator(BaseValidatorNeuron):
             allow_state_sharing=False,
             start=True,
             prefix=f"{self.config.neuron.run_id}_state_averager",
+            state_compression=hivemind.Float16Compression(),
             # **asdict(averager_args),
         )
         
