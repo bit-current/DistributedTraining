@@ -114,7 +114,8 @@ def add_args(cls, parser):
         nargs="+",
         help="The addresses for the DHT",
         default=[
-            "/ip4/69.30.85.69/tcp/22162/p2p/12D3KooWGc1irEf5N4Mz4Mxt59TVLDrfMaQffi3ELjTkd6N5rwv6",
+            "/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWNrfkQ8DX2RHW4c98c8As11wMNA425WTNohijyJQdA84Y",
+            "/ip4/54.205.54.19/tcp/8008/p2p/12D3KooWMY4YGYZ6JkWaCNKUeKQHAuxeQcMeoNfKHbbRXVoBaMiZ"
         ],
     )
 
@@ -164,7 +165,7 @@ def add_args(cls, parser):
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_run_v10",
+        default="s25_run_v2_1",
     )
 
     parser.add_argument(
@@ -178,7 +179,7 @@ def add_args(cls, parser):
         "--neuron.wandb_project",
         type=str,
         help="The wandb project to log to",
-        default="subnet25_test",
+        default="subnet25",
     )
 
     parser.add_argument(
