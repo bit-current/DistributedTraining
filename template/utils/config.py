@@ -164,7 +164,7 @@ def add_args(cls, parser):
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_run_v3",
+        default="s25_run_v5",
     )
 
     parser.add_argument(

@@ -113,7 +113,7 @@ class Validator(BaseValidatorNeuron):
             verbose=False,  # print logs incessently
             grad_compression=hivemind.Float16Compression(),
             state_averaging_compression=hivemind.Float16Compression(),
-            client_mode = True,
+            # client_mode = True,
         )
         
         # Get Current Epoch
@@ -173,7 +173,7 @@ class Validator(BaseValidatorNeuron):
                     initial_peers=[initial_peers_list[retries]],
                     announce_maddrs=announce_maddrs,
                     start=True,
-                    client_mode = True,
+                    # client_mode = True,
                 )
                 bt.logging.info(
                     f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}"
