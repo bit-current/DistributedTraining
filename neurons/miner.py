@@ -129,7 +129,7 @@ class Miner(BaseMinerNeuron):
             optimizer=opt,  # wrap the SGD optimizer defined above
             use_local_updates=True,  # perform optimizer steps with local gradients, average parameters in background
             matchmaking_time=15.0,  # when averaging parameters, gather peers in background for up to this many seconds
-            averaging_timeout=600.0,  # give up on averaging if not successful in this many seconds
+            averaging_timeout=60.0,  # give up on averaging if not successful in this many seconds
             verbose=False,  # print logs incessently
             grad_compression=hivemind.Float16Compression(),
             state_averaging_compression=hivemind.Float16Compression(),
@@ -192,7 +192,7 @@ class Miner(BaseMinerNeuron):
 
         # Create Dataloader
         dataloader = SubsetFalconLoader(
-            batch_size=synapse.batch_size, sequence_length=1024, rows=synapse.dataset_indices
+            batch_size=self.config.neuron.local_batch_size_train, sequence_length=1024, rows=synapse.dataset_indices
         )
 
         total_loss = 0
