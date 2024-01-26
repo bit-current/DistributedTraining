@@ -91,7 +91,7 @@ def add_args(cls, parser):
         "--neuron.epoch_length",
         type=int,
         help="The default epoch length (how often we set weights, measured in 12 second blocks).",
-        default=5,
+        default=200,
     )
 
     parser.add_argument(
@@ -165,8 +165,7 @@ def add_args(cls, parser):
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_run_v2_1",
-
+        default="s25_run_v2_2",
     )
 
     parser.add_argument(
@@ -236,7 +235,7 @@ def add_args(cls, parser):
             "--neuron.training_examples_per_miner",
             type=int,
             help="The number of rows to train on per miner",
-            default=500,
+            default=50,
         )
 
         parser.add_argument(
