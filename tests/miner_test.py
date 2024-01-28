@@ -2,7 +2,7 @@ import os
 import time
 from functools import partial
 from ipaddress import ip_address
-
+import random
 import hivemind
 import requests
 import torch
@@ -12,6 +12,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, default_data_collator
+from template.data.dataset import SubsetFalconLoader
 
 
 # Define encoding function
@@ -22,12 +23,12 @@ def encode(examples):
 
 
 # Create dataset and model, same as in the basic tutorial
-model = AutoModelForCausalLM.from_pretrained("kmfoda/tiny-random-gpt2")
+model = AutoModelForCausalLM.from_pretrained("kmfoda/gpt2-677m")
 device = "cuda"
-port = 40726
+port = 40317
 model = model.to(device=device)
 # model = model.to(device=device)
-opt = torch.optim.AdamW(model.parameters(), lr=0.0001)
+opt = torch.optim.AdamW(model.parameters(), lr=0.001)
 
 
 request = requests.get("https://api.ipify.org")
@@ -56,10 +57,10 @@ opt = hivemind.Optimizer(
     dht=dht,  # use a DHT that is connected with other peers
     run_id="use_local",  # unique identifier of this collaborative run
     scheduler=None,
-    batch_size_per_step=20,  # each call to opt.step adds this many samples towards the next epoch
-    target_batch_size=5000,  # after peers collectively process this many samples, average weights and begin the next epoch
+    batch_size_per_step=1,  # each call to opt.step adds this many samples towards the next epoch
+    target_batch_size=3200,  # after peers collectively process this many samples, average weights and begin the next epoch
     optimizer=opt,  # wrap the SGD optimizer defined above
-    use_local_updates=False,  # perform optimizer steps with local gradients, average parameters in background
+    use_local_updates=True,  # perform optimizer steps with local gradients, average parameters in background
     matchmaking_time=15.0,  # when averaging parameters, gather peers in background for up to this many seconds
     averaging_timeout=60.0,  # give up on averaging if not successful in this many seconds
     verbose=True,  # print logs incessently
@@ -67,13 +68,13 @@ opt = hivemind.Optimizer(
     state_averaging_compression=hivemind.Float16Compression(),
 )
 
-tokenizer = AutoTokenizer.from_pretrained("kmfoda/tiny-random-gpt2")
+tokenizer = AutoTokenizer.from_pretrained("kmfoda/gpt2-677m")
 # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
 tokenizer.pad_token = tokenizer.eos_token
 
 # Load dataset
-dataset = load_dataset("wikitext", "wikitext-2-v1", split="train")
-encoded_dataset = dataset.map(encode, batched=True)
+# dataset = load_dataset("wikitext", "wikitext-2-v1", split="train")
+# encoded_dataset = dataset.map(encode, batched=True)
 
 # chunk_size = 200
 # num_iterations = len(dataset) // chunk_size
@@ -89,47 +90,51 @@ encoded_dataset = dataset.map(encode, batched=True)
 
 # Create a PyTorch DataLoader
 # dataloader = DataLoader(encoded_dataset.select(dataset_indices), batch_size=10, collate_fn=default_data_collator)
-dataloader = DataLoader(
-    encoded_dataset, batch_size=10, collate_fn=default_data_collator
-)
-
-# pb_bar = tqdm(
-#     enumerate(dataloader), total=len(dataloader), dynamic_ncols=True, leave=False
+# dataloader = DataLoader(
+#     encoded_dataset, batch_size=10, collate_fn=default_data_collator
 # )
+num_rows = 9000000
 
-total_loss = 0
-
-time.sleep(10)
-
-# Train data for one epoch
-pb_bar = tqdm(enumerate(dataloader), total=len(dataloader), dynamic_ncols=True, leave=False)
-
-# Train data for one epoch
-for step, batch in pb_bar:
-    input_ids = batch['input_ids'].to(device)
-    attention_mask = batch['attention_mask'].to(device)
-    labels = input_ids.clone()
+for _ in range(100):
     
-    opt.zero_grad()
-
-    # Forward pass
-    outputs = model(
-        input_ids = input_ids, 
-        attention_mask = attention_mask,
-        labels = labels
-    )     
-    # Backward pass    
-    loss = outputs.loss
-    total_loss += loss.item()
+    random_indices = random.sample(range(num_rows), 50)
     
-    loss.backward()
-    # Adjust gradient
-    opt.step()
     
-    #print(f"Step {step} Loss: {loss}")
-    pb_bar.set_description("Train loop: loss {:.4f} ".format(loss.item()))
+    dataloader = SubsetFalconLoader(
+                batch_size=1, sequence_length=1024, rows=random_indices
+            )
 
-    #average_loss = total_loss / len(dataloader)
-    current_loss = loss / (step + 1)
-    #print(f"Current Loss: {current_loss}")
-    #print(f"Final Average Loss: {average_loss}")
+    total_loss = 0
+
+    time.sleep(10)
+
+    # Train data for one epoch
+    #pb_bar = tqdm(enumerate(dataloader), total=len(dataloader), dynamic_ncols=True, leave=False)
+
+    # Train data for one epoch
+    for step, batch in enumerate(dataloader):
+        inputs = batch.to(device)
+        
+        # Zero gradients
+        opt.zero_grad()
+
+        # Forward pass
+        outputs = model(input_ids=inputs, labels=inputs)
+
+        # Backward pass    
+        loss = outputs.loss
+        total_loss += loss.item()
+        
+        loss.backward()
+        # Adjust gradient
+        opt.step()
+        
+        #print(f"Step {step} Loss: {loss}")
+        #pb_bar.set_description("Train loop: loss {:.4f} ".format(loss.item()))
+
+        #average_loss = total_loss / len(dataloader)
+        current_loss = loss / (step + 1)
+        print(loss.item(), current_loss)
+        
+    average_loss = total_loss / step
+    print(f"Average Loss: {average_loss}")
