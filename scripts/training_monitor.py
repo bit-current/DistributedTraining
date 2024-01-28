@@ -9,7 +9,8 @@ parser.add_argument(
     nargs="+",
     help="The addresses for the DHT",
     default=[
-        "/ip4/127.0.0.1/tcp/22162/p2p/12D3KooWGjNpqMSQaWudtrBseypWVRMccRiQAWzV1QoPzbki8fRs",
+        "/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWNrfkQ8DX2RHW4c98c8As11wMNA425WTNohijyJQdA84Y",
+            "/ip4/54.205.54.19/tcp/8008/p2p/12D3KooWMY4YGYZ6JkWaCNKUeKQHAuxeQcMeoNfKHbbRXVoBaMiZ",
     ],
 )
 parser.add_argument(
@@ -22,7 +23,7 @@ parser.add_argument(
     "--run_id",
     type=str,
     help="The DHT run_id",
-    default="s25_run_v3",
+    default="s25_run_v1_1",
 )
 
 config = parser.parse_args()    

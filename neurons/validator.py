@@ -99,10 +99,12 @@ class Validator(BaseValidatorNeuron):
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
+        opt = torch.optim.AdamW(self.model.parameters(), lr=self.config.neuron.lr)
+
         # Init State Averager
         self.state_averager = TrainingStateAverager(
             dht=self.dht,
-            optimizer=partial(torch.optim.AdamW, lr=self.config.neuron.lr),
+            optimizer=opt,
             scheduler=None,
             params=self.model.parameters(),
             allow_state_sharing=False,
