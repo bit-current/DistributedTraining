@@ -13,6 +13,20 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, default_data_collator
 from template.data.dataset import SubsetFalconLoader
+import subprocess
+
+def get_latest_git_tag(repo_url):
+    try:
+        # Fetch tags from the remote
+        subprocess.run(["git", "fetch", "--tags", repo_url], check=True)
+        
+        # Get the latest tag name
+        latest_tag = subprocess.run(["git", "describe", "--tags", "`git rev-list --tags --max-count=1`"], check=True, stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
+        
+        return latest_tag
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while fetching tags from the Git repository: {e}")
+        return None
 
 
 # Define encoding function
@@ -52,17 +66,23 @@ dht = hivemind.DHT(
 )
 
 hivemind.utils.log_visible_maddrs(dht.get_visible_maddrs(), only_p2p=False)
+
+with open('visible_maddrs.txt', 'w') as file:
+    for addr in dht.get_visible_maddrs():
+        # Assuming each addr needs to be converted to string
+        file.write(str(addr) + '\n')  # Add a newline character to separate each address
+
 # Set up a decentralized optimizer that will average with peers in background
 opt = hivemind.Optimizer(
     dht=dht,  # use a DHT that is connected with other peers
     run_id="use_local",  # unique identifier of this collaborative run
     scheduler=None,
     batch_size_per_step=1,  # each call to opt.step adds this many samples towards the next epoch
-    target_batch_size=3200,  # after peers collectively process this many samples, average weights and begin the next epoch
+    target_batch_size=300,  # after peers collectively process this many samples, average weights and begin the next epoch
     optimizer=opt,  # wrap the SGD optimizer defined above
     use_local_updates=True,  # perform optimizer steps with local gradients, average parameters in background
     matchmaking_time=15.0,  # when averaging parameters, gather peers in background for up to this many seconds
-    averaging_timeout=60.0,  # give up on averaging if not successful in this many seconds
+    averaging_timeout=120.0,  # give up on averaging if not successful in this many seconds
     verbose=True,  # print logs incessently
     grad_compression=hivemind.Float16Compression(),
     state_averaging_compression=hivemind.Float16Compression(),
@@ -95,7 +115,7 @@ tokenizer.pad_token = tokenizer.eos_token
 # )
 num_rows = 9000000
 
-for _ in range(100):
+for _ in range(1000):
     
     random_indices = random.sample(range(num_rows), 50)
     
@@ -138,3 +158,8 @@ for _ in range(100):
         
     average_loss = total_loss / step
     print(f"Average Loss: {average_loss}")
+
+print("Shutting down..")
+opt.shutdown()
+dht.shutdown()
+exit()
