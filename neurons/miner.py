@@ -43,14 +43,25 @@ import template
 
 # import base miner class which takes care of most of the boilerplate
 from template.base.miner import BaseMinerNeuron
-from template.utils.misc import load_wandb
+from template.utils.misc import load_wandb, get_latest_git_tag
 from template.data.dataset import SubsetFalconLoader
 
 
 class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
-
+        
+         # Rudimentary check to see if running on newest update:
+        try:
+            latest_tag = get_latest_git_tag("https://github.com/KMFODA/DistributedTraining")
+            assert latest_tag == self.config.neuron.run_id, f"Running an outdated version. Latest tag is {latest_tag}, but running on {self.config.neuron.run_id}"
+        except AssertionError as error:
+            print(error)
+            exit()
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            exit()
+            
         # Init device
         self.device = self.config.neuron.device
 
@@ -368,6 +379,7 @@ class Miner(BaseMinerNeuron):
 
 # This is the main function, which runs the miner.
 if __name__ == "__main__":
+    
     with Miner() as miner:
         while True:
             bt.logging.info("Miner running...", time.time())

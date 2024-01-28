@@ -35,7 +35,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from template.base.validator import BaseValidatorNeuron
-from template.utils.misc import AsyncDendritePool, load_wandb
+from template.utils.misc import AsyncDendritePool, load_wandb, get_latest_git_tag
 from template.validator import forward
 from template.validator.validator_core import DatasetState
 from bitarray import bitarray
@@ -44,6 +44,17 @@ from bitarray import bitarray
 class Validator(BaseValidatorNeuron):
     def __init__(self, config=None):
         super(Validator, self).__init__(config=config)
+        
+        # Rudimentary check to see if running on newest update:
+        try:
+            latest_tag = get_latest_git_tag("https://github.com/KMFODA/DistributedTraining")
+            assert latest_tag == self.config.neuron.run_id, f"Running an outdated version. Latest tag is {latest_tag}, but running on {self.config.neuron.run_id}"
+        except AssertionError as error:
+            print(error)
+            exit()
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            exit()
 
         bt.logging.info("load_state()")
         self.load_state()

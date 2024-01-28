@@ -186,3 +186,44 @@ def load_wandb(config, wallet, neuron_type, peer_id):
 #     config.signature = signature
 #     wandb.config.update(config, allow_val_change=True)
 
+def get_latest_git_tag(repo_url):
+    try:
+        # Fetch tags from the remote
+        subprocess.run(["git", "fetch", "--tags", repo_url], check=True)
+        
+        # Get the latest tag name
+        latest_tag = subprocess.run(["git", "describe", "--tags", "`git rev-list --tags --max-count=1`"], check=True, stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
+        
+        return latest_tag
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while fetching tags from the Git repository: {e}")
+        return None
+    
+def get_latest_git_tag_branch(repo_url, branch_name):
+    try:
+        # Fetch tags and branches from the remote
+        subprocess.run(["git", "fetch", "--tags", repo_url], check=True)
+        subprocess.run(["git", "fetch", repo_url], check=True)
+        
+        # Checkout the specific branch
+        subprocess.run(["git", "checkout", branch_name], check=True)
+        
+        # Get the latest tag name on the branch
+        latest_tag = subprocess.run(["git", "describe", "--tags", "`git rev-list --tags --max-count=1`"], check=True, stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
+        
+        return latest_tag
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred: {e}")
+        return None
+    
+if name == main:
+    repo_url = 'https://github.com/KMFODA/DistributedTraining'
+    
+    # Tag from main branch:
+    latest_tag = get_latest_git_tag(repo_url)
+    print(f"The latest tag on main is {latest_tag}")'
+    
+    # Tag from specific branch:
+    branch_name = 'v0.0.1/train_fix'
+    latest_tag = get_latest_git_tag_branch(repo_url, branch_name)
+    print(f"The latest tag on branch {branch_name} is {latest_tag}")

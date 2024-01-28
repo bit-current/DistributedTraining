@@ -15,20 +15,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, default_data_colla
 from template.data.dataset import SubsetFalconLoader
 import subprocess
 
-def get_latest_git_tag(repo_url):
-    try:
-        # Fetch tags from the remote
-        subprocess.run(["git", "fetch", "--tags", repo_url], check=True)
-        
-        # Get the latest tag name
-        latest_tag = subprocess.run(["git", "describe", "--tags", "`git rev-list --tags --max-count=1`"], check=True, stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
-        
-        return latest_tag
-    except subprocess.CalledProcessError as e:
-        print(f"An error occurred while fetching tags from the Git repository: {e}")
-        return None
-
-
 # Define encoding function
 def encode(examples):
     return tokenizer(
