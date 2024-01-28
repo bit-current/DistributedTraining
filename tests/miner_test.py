@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, default_data_collator
 from template.data.dataset import SubsetFalconLoader
-import subprocess
+from torch_optimizer import Lamb
 
 # Define encoding function
 def encode(examples):
@@ -28,7 +28,33 @@ device = "cuda"
 port = 40317
 model = model.to(device=device)
 # model = model.to(device=device)
-opt = torch.optim.AdamW(model.parameters(), lr=0.001)
+# opt = torch.optim.AdamW(model.parameters(), lr=0.001)
+
+
+no_decay = ["bias", "LayerNorm.weight"]
+params = [
+    {
+        "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
+        "weight_decay": 0.01,
+    },
+    {
+        "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
+        "weight_decay": 0.0,
+    },
+]
+opt = Lamb(
+    params,
+    lr=0.00176,
+    weight_decay=0.01,
+    clamp_value=10000.0,
+    debias=True,
+)
+
+
+# scheduler = lambda opt: get_linear_schedule_with_warmup(
+#     opt, num_warmup_steps=training_args.warmup_steps, num_training_steps=training_args.max_steps
+# )
+
 
 
 request = requests.get("https://api.ipify.org")
@@ -63,6 +89,7 @@ opt = hivemind.Optimizer(
     dht=dht,  # use a DHT that is connected with other peers
     run_id="use_local",  # unique identifier of this collaborative run
     scheduler=None,
+    params=params,
     batch_size_per_step=1,  # each call to opt.step adds this many samples towards the next epoch
     target_batch_size=300,  # after peers collectively process this many samples, average weights and begin the next epoch
     optimizer=opt,  # wrap the SGD optimizer defined above
