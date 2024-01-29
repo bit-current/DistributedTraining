@@ -38,7 +38,7 @@ brew update && brew install jq && brew install npm && sudo npm install pm2 -g &&
 ```
 ---
 
-Once you have installed this repo you can run the miner and validator with the following commands.
+Once you have installed this repo you can run the miner and validator with **auto updates enabled** using the following commands.
 ```bash
 # To run the miner
 pm2 start run_miner.sh --name distributed_training_miner --
