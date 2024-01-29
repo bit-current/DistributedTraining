@@ -13,16 +13,31 @@
 
 # Installation
 This repository requires python3.8 or higher. To install, simply clone this repository and install the requirements.
+
+1. Install this repository
 ```bash
 git clone https://github.com/KMFODA/DistributedTraining
 cd DistributedTraining
 pip install -e . && python post_install.py
+```
+
+2. Log in to wandb:
+```bash
 wandb login <your_wandb_api_key>
 ```
 
+3. Install [PM2](https://pm2.io/docs/runtime/guide/installation/) and the [`jq` package](https://jqlang.github.io/jq/) on your system.
+**On Linux**:
+```bash
+sudo apt update && sudo apt install jq && sudo apt install npm && sudo npm install pm2 -g && pm2 update
+``` 
+**On Mac OS**
+```bash
+brew update && brew install jq && brew install npm && sudo npm install pm2 -g && pm2 update
+```
 ---
 
-Once you have installed this repo and attained your subnet via the instructions in the nested docs (staging, testing, or main) you can run the miner and validator with the following commands.
+Once you have installed this repo you can run the miner and validator with the following commands.
 ```bash
 # To run the miner
 pm2 start run_miner.sh --name distributed_training_miner --
