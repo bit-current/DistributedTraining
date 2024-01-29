@@ -41,6 +41,7 @@ brew update && brew install jq && brew install npm && sudo npm install pm2 -g &&
 Once you have installed this repo you can run the miner and validator with **auto updates enabled** using the following commands.
 ```bash
 # To run the miner
+chmod +x run_miner.sh
 pm2 start run_miner.sh --name distributed_training_miner --
     --netuid <your netuid>  # Must be attained by following the instructions in the docs/running_on_*.md files
     --subtensor.chain_endpoint <your chain url>  # Must be attained by following the instructions in the docs/running_on_*.md files
@@ -52,6 +53,7 @@ pm2 start run_miner.sh --name distributed_training_miner --
     --dht.announce_ip <your device ip address>
 
 # To run the validator
+chmod +x run_validator.sh
 pm2 start run_validator.sh --name distributed_training_validator --
     --netuid <your netuid> # Must be attained by following the instructions in the docs/running_on_*.md files
     --subtensor.chain_endpoint <your chain url> # Must be attained by following the instructions in the docs/running_on_*.md files
