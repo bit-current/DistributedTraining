@@ -1,4 +1,5 @@
 #!/bin/bash
+# Inspired by https://github.com/surcyf123/smart-scrape/blob/main/run.sh
 
 # Initialize variables
 script="neurons/miner.py"

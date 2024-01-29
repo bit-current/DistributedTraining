@@ -28,7 +28,7 @@ model_name = "distilgpt2"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer.pad_token = tokenizer.eos_token
 
-
+# Modified version of https://github.com/RaoFoundation/pretraining/blob/main/pretrain/dataset.py
 class SubsetFalconLoader(IterableDataset):
     max_pages: int = 968000015
 
