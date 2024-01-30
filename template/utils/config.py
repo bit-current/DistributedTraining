@@ -22,6 +22,7 @@ import os
 import bittensor as bt
 import torch
 from loguru import logger
+from template import __version__
 
 
 def check_config(cls, config: "bt.Config"):
@@ -165,7 +166,7 @@ def add_args(cls, parser):
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_run_v2_2",
+        default=f"s25_run_v{__version__.replace('.','_')}",
     )
 
     parser.add_argument(
