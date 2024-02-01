@@ -27,6 +27,10 @@ from typing import Any, List
 from template.protocol import Train
 import asyncio
 import wandb
+import logging
+from loguru import logger as bt_logger
+from hivemind.utils.logging import use_hivemind_log_handler
+
 
 
 # LRU Cache with TTL
@@ -186,3 +190,36 @@ def load_wandb(config, wallet, neuron_type, peer_id):
 #     config.signature = signature
 #     wandb.config.update(config, allow_val_change=True)
 
+class BittensorLogHandler(logging.Handler):
+    def emit(self, record):
+        log_entry = self.format(record)
+        
+        if record.levelno >= logging.CRITICAL:
+            bt_logger.critical(log_entry)
+        elif record.levelno >= logging.ERROR:
+            bt_logger.error(log_entry)
+        elif record.levelno >= logging.WARNING:
+            bt_logger.warning(log_entry)
+        elif record.levelno >= logging.INFO:
+            bt_logger.info(log_entry)
+        elif record.levelno >= logging.DEBUG:
+            bt_logger.debug(log_entry)
+        else:
+            bt_logger.trace(log_entry)
+
+def setup_logging():
+    # Function to force hivemind to log via bittensor
+    _ = bt.logging()
+
+    bt_logger_ = logging.getLogger('bittensor')
+    bt_logger_.propagate = False
+
+    use_hivemind_log_handler("nowhere")
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO) # Set this to DEBUG to check hivemind debug messages
+
+    bt_handler = BittensorLogHandler()
+    formatter = logging.Formatter('%(message)s')
+    bt_handler.setFormatter(formatter)
+    root_logger.addHandler(bt_handler)
