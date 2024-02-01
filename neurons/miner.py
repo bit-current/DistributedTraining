@@ -43,7 +43,7 @@ import template
 
 # import base miner class which takes care of most of the boilerplate
 from template.base.miner import BaseMinerNeuron
-from template.utils.misc import load_wandb
+from template.utils.misc import load_wandb, setup_logging
 from template.data.dataset import SubsetFalconLoader
 
 
@@ -368,6 +368,7 @@ class Miner(BaseMinerNeuron):
 
 # This is the main function, which runs the miner.
 if __name__ == "__main__":
+    setup_logging()
     with Miner() as miner:
         while True:
             bt.logging.info("Miner running...", time.time())

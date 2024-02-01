@@ -35,7 +35,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from template.base.validator import BaseValidatorNeuron
-from template.utils.misc import AsyncDendritePool, load_wandb
+from template.utils.misc import AsyncDendritePool, load_wandb, setup_logging
 from template.validator import forward
 from template.validator.validator_core import DatasetState
 from bitarray import bitarray
@@ -194,6 +194,7 @@ class Validator(BaseValidatorNeuron):
 
 # # The main function parses the configuration and runs the validator.
 if __name__ == "__main__":
+    setup_logging()
     with Validator() as validator:
         while True:
             time.sleep(5)
