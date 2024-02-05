@@ -131,10 +131,9 @@ class Miner(BaseMinerNeuron):
             matchmaking_time=15.0,  # when averaging parameters, gather peers in background for up to this many seconds
             averaging_timeout=60.0,  # give up on averaging if not successful in this many seconds
             verbose=False,  # print logs incessently
-            grad_compression=hivemind.Float16Compression(),
-            state_averaging_compression=hivemind.Float16Compression(),
+            grad_compression=hivemind.Uniform8BitQuantization(),
+            state_averaging_compression=hivemind.Uniform8BitQuantization(),
         )
-
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.neuron.model_name)
         # Add the EOS token as PAD token to ensure our dataloader doesn't throw an error for sequences of unequal length
         self.tokenizer.pad_token = self.tokenizer.eos_token
