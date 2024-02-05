@@ -152,7 +152,7 @@ def add_args(cls, parser):
         "--neuron.global_batch_size_train",
         type=int,
         help="The hivemind global target_batch_size",
-        default=3200,
+        default=250*20,
     )
 
     parser.add_argument(
@@ -236,7 +236,7 @@ def add_args(cls, parser):
             "--neuron.training_examples_per_miner",
             type=int,
             help="The number of rows to train on per miner",
-            default=50,
+            default=25,
         )
 
         parser.add_argument(
