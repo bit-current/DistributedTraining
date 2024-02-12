@@ -37,11 +37,11 @@ We are currently in our next project phase  (training a slightly larger GPT2 mod
 * Step-by-Step Guide to Mining on Hivemind (Dropping 16 Feb 2024)
 
 
-## Known Issues
+## Known Issues (fix in progress)
 * load_state_from_peers errors
 * ⁠All_reduce errors
 * Timeout errors
-⁠* suddenly diminishing miner incentive
+* suddenly diminishing miner incentive
 
 ## Frequently Asked Questions
 * What are the minimum requirements to run a validator? A GPU with a minimum of 16GB RAM e.g. RTX A4000
