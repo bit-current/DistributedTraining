@@ -49,7 +49,7 @@ from template.data.dataset import SubsetFalconLoader
 
 class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
-        super(Miner, self).__init__(config=config)
+        
 
         # Init device
         self.device = self.config.neuron.device
@@ -147,6 +147,12 @@ class Miner(BaseMinerNeuron):
         # Init Wandb
         if not self.config.neuron.dont_wandb_log:
             self.wandb = load_wandb(self.config, self.wallet, "miner", str(self.dht.peer_id))
+
+        super(Miner, self).__init__(config=config) #Placing this here ensures that the miner does not pass on to the DHT the 
+        # event_loop before running the DHT which triggers a fork. 
+        # This could have been the reason for crashing since the DHT runs 
+        # asyncio.get_event_loop().stop()  # if we're in jupyter, get rid of its built-in event loop
+        # which could be getting the forked event loop from the main thread and killing it.
 
     # Define encoding function
     def encode(self, examples):
