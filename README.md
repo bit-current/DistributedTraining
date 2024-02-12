@@ -34,6 +34,7 @@ We are currently in our next project phase  (training a slightly larger GPT2 mod
 * In Progress : GPT2 Training Run - 667m Params
 * Roadmap (Dropping 16 Feb 2024)
 * Office Hours (Timing TBC - Dropping 16 Feb 2024)
+* Step-by-Step Guide to Mining on Hivemind (Dropping 16 Feb 2024)
 
 
 ## Known Issues
