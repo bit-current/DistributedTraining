@@ -11,7 +11,7 @@
 
 ![Subnet25](assets/Subnet25.jpg)
 
-# Exploring New Frontiers with Bittensor: @hivemind・25
+# Exploring New Frontiers with Bittensor : א・hivemind・25
 
 ## Essential Guide for Bittensor Enthusiasts:
 Beginners to Bittensor are encouraged to start with the basics by visiting the [Bittensor official site](https://www.bittensor.com). This foundational step is crucial for understanding the innovative landscape Bittensor is shaping.
@@ -30,11 +30,21 @@ After a period of intense experimentation and evaluation, we have successfully t
 We are currently in our next project phase  (training a slightly larger GPT2 model - 677m params), and we invite you to join our mission by dedicating your computational resources towards this training run. All you have to do is run a miner, and it may just change the world.
 
 ## Live Status 
-
 * Done : Train TINYGPT  
 * In Progress : GPT2 Training Run - 667m Params
 * Roadmap (Dropping 16 Feb 2024)
 * Office Hours (Timing TBC - Dropping 16 Feb 2024)
+
+
+## Known Issues
+* load_state_from_peers errors
+* ⁠All_reduce errors
+* Timeout errors
+⁠* suddenly diminishing miner incentive
+
+## Frequently Asked Questions
+* What are the minimum requirements to run a validator? A GPU with a minimum of 16GB RAM e.g. RTX A4000
+* What are the minimum requirements to run a miner? A GPU with a minimum of 16GB RAM e.g. RTX A4000
 
 
 
