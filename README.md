@@ -49,33 +49,38 @@ We are currently in our next project phase  (training a slightly larger GPT2 mod
 * What are the minimum requirements to run a validator? A GPU with a minimum of 16GB RAM e.g. RTX A4000
 * What are the minimum requirements to run a miner? A GPU with a minimum of 16GB RAM e.g. RTX A4000
 
+# Running a Miner on HiveMind : A Step-by-Step Guide 
+
+## Running a Miner on Testnet
+For detailed instructions on how to run a miner on the testnet, please refer to the following documentation:
+[Running 25 on Testnet](https://github.com/bit-current/DistributedTraining/edit/main/docs/running_25_on_testnet.md
 
 
-# Getting Started - Installation
-This repository requires python3.8 or higher. To install, simply clone this repository and install the requirements.
+### Prerequisites
+Before you start, ensure your system meets the following requirements:
 
-1. Install this repository
-```bash
-git clone https://github.com/bit-current/DistributedTraining
-cd DistributedTraining
-pip install -e . && python post_install.py
-```
+* Your machine meets the minimum hardware requirements for mining on subnet 25: miner/validator GPU - 16GB RAM e.g. RTX A4000.
+* You have the requisite amount of tao in your wallet for registration fees (approx. 0.00001 Tao at the time of writing).
+* This repository requires python3.8 or higher.
 
-2. Log in to wandb:
-```bash
-wandb login <your_wandb_api_key>
-```
+### Setting Up
+* Clone the Repository: Start by cloning the Distributed Training repository.  
 
-3. Install [PM2](https://pm2.io/docs/runtime/guide/installation/) and the [`jq` package](https://jqlang.github.io/jq/) on your system.
+    ```git clone https://github.com/bit-current/DistributedTraining```  
+* Navigate to the Repository: Change your directory to the cloned repository.  
+    ```cd DistributedTraining```  
+* Install Dependencies: Install all necessary dependencies and run post-install scripts.        
+    ```pip install -e . && python post_install.py```    
+ * You also need to install pm2.  
+ On linux:  
+    ```sudo apt update && sudo apt install jq && sudo apt install npm && sudo npm install pm2 -g && pm2 update```  
+ On macOS:   
+    ```brew update && brew install jq && brew install npm && sudo npm install pm2 -g && pm2 update```
+* Wandb Login: You need a Weights & Biases account for tracking runs. If you don't have one, sign up at https://wandb.ai/site and use your API key to log in.  
+    ```wandb login <your_wandb_api_key>```
+* Register on Subnet 25: To register, execute the following command:    
+```btcli subnet register --netuid 25 --subtensor.network test --wallet.name miner --wallet.hotkey hotkey```
 
-**On Linux**:
-```bash
-sudo apt update && sudo apt install jq && sudo apt install npm && sudo npm install pm2 -g && pm2 update
-``` 
-**On Mac OS**
-```bash
-brew update && brew install jq && brew install npm && sudo npm install pm2 -g && pm2 update
-```
 ---
 
 Once you have installed this repo you can run the miner and validator with **auto updates enabled** using the following commands.
