@@ -53,7 +53,7 @@ We are currently in our next project phase  (training a slightly larger GPT2 mod
 
 ## Running a Miner on Testnet
 For detailed instructions on how to run a miner on the testnet, please refer to the following documentation:
-[Running 25 on Testnet](https://github.com/bit-current/DistributedTraining/edit/main/docs/running_25_on_testnet.md
+[Running 25 on Testnet](https://github.com/bit-current/DistributedTraining/edit/main/docs/running_25_on_testnet.md)
 
 
 ### Prerequisites
