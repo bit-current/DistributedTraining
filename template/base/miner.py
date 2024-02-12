@@ -24,6 +24,7 @@ import traceback
 import bittensor as bt
 from template.base.neuron import BaseNeuron
 
+import re
 import hivemind
 import requests
 import torch
