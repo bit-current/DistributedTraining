@@ -42,26 +42,26 @@ Once you have installed this repo you can run the miner and validator with **aut
 ```bash
 # To run the miner
 chmod +x run_miner.sh
-pm2 start run_miner.sh --name distributed_training_miner_auto_update --
-    --netuid <your netuid>  # Must be attained by following the instructions in the docs/running_on_*.md files
-    --subtensor.chain_endpoint <your chain url>  # Must be attained by following the instructions in the docs/running_on_*.md files
-    --wallet.name <your miner wallet> # Must be created using the bittensor-cli
-    --wallet.hotkey <your validator hotkey> # Must be created using the bittensor-cli
-    --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
-    --axon.port <an open port to serve the bt axon on>
-    --dht.port <another open port to serve the dht axon on>
+pm2 start run_miner.sh --name distributed_training_miner_auto_update -- \
+    --netuid 25 \
+    --subtensor.chain_endpoint <your chain url> \  # Must be attained by following the instructions in the docs/running_on_*.md files
+    --wallet.name <your miner wallet> \ # Must be created using the bittensor-cli
+    --wallet.hotkey <your validator hotkey> \ # Must be created using the bittensor-cli
+    --logging.debug \ # Run in debug mode, alternatively --logging.trace for trace mode
+    --axon.port <an open port to serve the bt axon on> \
+    --dht.port <another open port to serve the dht axon on> \
     --dht.announce_ip <your device ip address>
 
 # To run the validator
 chmod +x run_validator.sh
-pm2 start run_validator.sh --name distributed_training_auto_update --
-    --netuid <your netuid> # Must be attained by following the instructions in the docs/running_on_*.md files
-    --subtensor.chain_endpoint <your chain url> # Must be attained by following the instructions in the docs/running_on_*.md files
-    --wallet.name <your validator wallet>  # Must be created using the bittensor-cli
-    --wallet.hotkey <your validator hotkey> # Must be created using the bittensor-cli
-    --logging.debug # Run in debug mode, alternatively --logging.trace for trace mode
-    --axon.port <an open port to serve the bt axon on>
-    --dht.port <another open port to serve the dht axon on>
+pm2 start run_validator.sh --name distributed_training_auto_update -- \
+    --netuid 25 \
+    --subtensor.chain_endpoint <your chain url> \ # Must be attained by following the instructions in the docs/running_on_*.md files
+    --wallet.name <your validator wallet> \  # Must be created using the bittensor-cli
+    --wallet.hotkey <your validator hotkey> \ # Must be created using the bittensor-cli
+    --logging.debug \ # Run in debug mode, alternatively --logging.trace for trace mode
+    --axon.port <an open port to serve the bt axon on> \
+    --dht.port <another open port to serve the dht axon on> \
     --dht.announce_ip <your device ip address>
 ```
 
