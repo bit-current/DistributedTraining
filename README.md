@@ -11,7 +11,7 @@
 
 ![Subnet25](assets/Subnet25.jpg)
 
-# Exploring New Frontiers with Bittensor : א・hivemind・25
+# Exploring New Frontiers : א・hivemind・25
 
 ## Essential Guide for Bittensor Enthusiasts:
 Beginners to Bittensor are encouraged to start with the basics by visiting the [Bittensor official site](https://www.bittensor.com). This foundational step is crucial for understanding the innovative landscape Bittensor is shaping.
