@@ -36,12 +36,14 @@ We are currently in our next project phase  (training a slightly larger GPT2 mod
 * Office Hours (Timing TBC - Dropping 16 Feb 2024)
 * Step-by-Step Guide to Mining on Hivemind (Dropping 16 Feb 2024)
 
-
 ## Known Issues (fix in progress)
 * load_state_from_peers errors
 * ⁠All_reduce errors
 * Timeout errors
 * suddenly diminishing miner incentive
+
+## New Bounties
+* Improving our validation mechanism is key, take a look at it and make a propposal (@bitcurrent on discord) - if accepted you can execute. 5t reward upon exection. Please propose before execution!
 
 ## Frequently Asked Questions
 * What are the minimum requirements to run a validator? A GPU with a minimum of 16GB RAM e.g. RTX A4000
