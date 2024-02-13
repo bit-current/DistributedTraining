@@ -115,7 +115,12 @@ def add_args(cls, parser):
         nargs="+",
         help="The addresses for the DHT",
         default=[
-            "/ip4/213.173.105.83/tcp/15790/p2p/12D3KooWMSr5jH2Pczne5XHxQQGgP7YW86stNfriPTZjN7MFAYh3"
+            "/ip4/213.173.105.83/tcp/11791/p2p/12D3KooWKS314H4NfNaN5VJsZgGhwojnNqQmc3m5oYVBD9Es662g",
+            "/ip4/213.173.105.83/tcp/11790/p2p/12D3KooWE8Kp2i5CxvxGEKJGocA8JnJwKKBsv5qEKRMsuQnmjFKC",
+            "/ip4/213.173.105.83/tcp/11789/p2p/12D3KooWDn9hfQjP9pcmp7hh72okL8tQBAsCCVi8Uw7xhhFPj3Qy",
+            "/ip4/213.173.105.83/tcp/10368/p2p/12D3KooWKvmrnf2p3L9UWFcBcpp1bRRMJ2xD8UPFJkiucpNgMbzo",
+            "/ip4/213.173.105.83/tcp/10367/p2p/12D3KooWSRJJ7amqaJy5DZ7BmLrMQsFqQMgvnzQYUi4Dynupy2VW",
+            "/ip4/213.173.105.83/tcp/10366/p2p/12D3KooWRoQ4rN5xo6vp4Xr9UZzGP9zoeRSe4zRJPaKfdmBTH3cs"
         ],
     )
 
