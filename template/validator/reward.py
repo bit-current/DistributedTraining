@@ -197,6 +197,7 @@ def get_rewards(
 
     # Assign a score of 0 to non-responders.
     scores[~responded] = 0.1
+    scores = torch.FloatTensor([score for score in scores])
 
     bt.logging.info(f"Global Scores:        {scores}")
 
