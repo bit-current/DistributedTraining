@@ -42,9 +42,6 @@ We are currently in our next project phase  (training a slightly larger GPT2 mod
 * Timeout errors
 * suddenly diminishing miner incentive
 
-## New Bounties
-* Improving our validation mechanism is key, take a look at it and make a propposal (@bitcurrent on discord) - if accepted you can execute. 5t reward upon exection. Please propose before execution!
-
 ## Frequently Asked Questions
 * What are the minimum requirements to run a validator? A GPU with a minimum of 16GB RAM e.g. RTX A4000
 * What are the minimum requirements to run a miner? A GPU with a minimum of 16GB RAM e.g. RTX A4000
