@@ -22,6 +22,7 @@ from typing import List
 
 import bittensor as bt
 import torch
+import numpy as np
 from template.data.dataset import SubsetFalconLoader
 from hivemind.utils.timed_storage import get_dht_time
 
@@ -82,21 +83,22 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
     return average_loss
 
-def get_local_score(self, synapse):
-
-    if False: # Dummy fix need to switch to if self.tracker.global_progress.epoch != self.current_epoch:
-        score = 1
-    else:
-        loss = get_loss(self, synapse.dataset_indices, synapse.batch_size, synapse.gradient_accumilation_steps)
-        bt.logging.info(f"Calculated Loss:  {loss}")
-        bt.logging.info(f"Synapse Loss:     {synapse.loss}")
-        # The miner's local score is the variance between the loss it returns and the 
-        # loss the validator calculates for the last batch of data sent to that miner
-        score = 1-(abs(loss-synapse.loss)/loss)
-        bt.logging.info(f"Local Score:      {score}")
-
-    return score
+# def get_local_score(self, synapse):
     
+#     if False: # Dummy fix need to switch to if self.tracker.global_progress.epoch != self.current_epoch:
+#         score = 1
+#     else:
+#         loss = get_loss(self, synapse.dataset_indices, synapse.batch_size, synapse.gradient_accumilation_steps)
+#         bt.logging.info(f"Calculated Loss:  {loss}")
+#         bt.logging.info(f"Synapse Loss:     {synapse.loss}")
+#         # The miner's local score is the variance between the loss it returns and the 
+#         # loss the validator calculates for the last batch of data sent to that miner
+#         score = 1
+#         #score = 1-(abs(loss-synapse.loss)/loss)
+#         bt.logging.info(f"Local Score:      {score}")
+
+#     return score
+
 
 def get_rewards(
     self,
@@ -154,7 +156,7 @@ def get_rewards(
         # self.dataset_common_state.set_dht("loss", float(loss))
         self.dataset_common_state.set_dht("loss", loss)
     else:
-        score = 0
+        score = 1
 
     # Log score, previous and current loss
     bt.logging.info(f"Global Score:            {score}")
@@ -166,21 +168,50 @@ def get_rewards(
     self.dataset_common_state.set_dht("loss", loss)
 
     # Get all the reward results by iteratively calling your reward() function.
-    scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 
-                                for _, response in zip(uids, responses[0])]).to(self.device)
+    #scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 
+    #                            for _, response in zip(uids, responses[0])]).to(self.device)
+    losses = []  # To store losses of responders.
+    responded = np.zeros(len(uids), dtype=bool)  # To track whether each uid responded, initialized to False.
+
+    for i, response in enumerate(responses[0]):
+        if response.dendrite.status_code == 200 and response.loss != []:
+            losses.append(response.loss)
+            responded[i] = True  # Mark as responded.
+
+    OUTLIER_THRESHOLD = 2 #FIXME
+
+    # Calculate mean and standard deviation of the losses for responders.
+    if losses:  # Ensure there are any losses to calculate stats on.
+        mean_loss = np.mean(losses)
+        std_loss = np.std(losses)
+        # Calculate z-scores based on these stats.
+        z_scores = np.abs((losses - mean_loss) / std_loss) if std_loss > 0 else np.zeros_like(losses)
+    else:
+        mean_loss, std_loss, z_scores = 0, 0, np.array([])
+
+    # Initialize scores with a default value (e.g., 1) for all.
+    scores = np.ones(len(uids))
+    # Apply a penalty based on the z-score for outliers among responders.
+    outliers = np.array([z > OUTLIER_THRESHOLD for z in z_scores])
+    scores[responded] = np.where(outliers, 0.3, 1)  # Update scores for responders based on outlier status.
+
+    # Assign a score of 0 to non-responders.
+    scores[~responded] = 0.1
+    scores = torch.FloatTensor([score for score in scores]).to(self.device)
+
     bt.logging.info(f"Global Scores:        {scores}")
 
     # Adjust Global Score with Local Score
-    test_uids_index = [uid_index for uid_index, uid in enumerate(uids) 
-                       if responses[0][uid_index].dendrite.status_code == 200]
+    # test_uids_index = [uid_index for uid_index, uid in enumerate(uids) 
+    #                    if responses[0][uid_index].dendrite.status_code == 200]
     
-    test_uids_sample_index = random.sample(test_uids_index, k = min(4, len(test_uids_index)))
+    # test_uids_sample_index = random.sample(test_uids_index, k = min(4, len(test_uids_index)))
     
-    scores = torch.FloatTensor([scores[uid_index] * get_local_score(self, responses[0][uid_index]) 
-                                if uid_index in test_uids_sample_index else scores[uid_index] 
-                                for uid_index,_ in enumerate(uids)]).to(self.device)
+    # scores = torch.FloatTensor([scores[uid_index] * get_local_score(self, responses[0][uid_index]) 
+    #                             if uid_index in test_uids_sample_index else scores[uid_index] 
+    #                             for uid_index,_ in enumerate(uids)]).to(self.device)
 
-    bt.logging.info(f"Adjusted Global Scores:   {scores}")
+    #bt.logging.info(f"Adjusted Global Scores:   {scores}")
     
     return scores
 

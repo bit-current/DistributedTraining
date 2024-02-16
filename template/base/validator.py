@@ -285,7 +285,6 @@ class BaseValidatorNeuron(BaseNeuron):
 
     def update_scores(self, rewards: torch.FloatTensor, uids: List[int]):
         """Performs exponential moving average on the scores based on the rewards received from the miners."""
-
         # Check if rewards contains NaN values.
         if torch.isnan(rewards).any():
             bt.logging.warning(f"NaN values detected in rewards: {rewards}")
@@ -297,6 +296,7 @@ class BaseValidatorNeuron(BaseNeuron):
         scattered_rewards: torch.FloatTensor = self.scores.scatter(
             0, torch.tensor(uids).to(self.device), rewards
         ).to(self.device)
+
         bt.logging.debug(f"Scattered rewards: {rewards}")
 
         # Update scores with rewards produced by this step.

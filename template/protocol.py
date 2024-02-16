@@ -88,7 +88,7 @@ class Train( bt.Synapse ):
     gradient_accumilation_steps: int = 16
 
     # # Optional score
-    loss: float = 0.0
+    loss: float = 6.0
     
     # Epoch
     epoch: int | None
