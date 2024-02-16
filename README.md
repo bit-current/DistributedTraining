@@ -76,7 +76,7 @@ Before you start, ensure your system meets the following requirements:
 * Wandb Login: You need a Weights & Biases account for tracking runs. If you don't have one, sign up at https://wandb.ai/site and use your API key to log in.  
     ```wandb login <your_wandb_api_key>```
 * Register on Subnet 25: To register, execute the following command:    
-```btcli subnet register --netuid 25 --subtensor.network test --wallet.name miner --wallet.hotkey hotkey```
+```btcli subnet register --netuid 25 --wallet.name miner --wallet.hotkey hotkey```
 
 ---
 
