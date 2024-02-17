@@ -29,18 +29,25 @@ After a period of intense experimentation and evaluation, we have successfully t
 
 We are currently in our next project phase  (training a slightly larger GPT2 model - 677m params), and we invite you to join our mission by dedicating your computational resources towards this training run. All you have to do is run a miner, and it may just change the world.
 
-## Live Status 
-* Done : Train TINYGPT  
+## Live Status (Friday 16th Feb, 2024)
+Done : Train TINYGPT  
 * In Progress : GPT2 Training Run - 667m Params
-* Roadmap (Dropping 16 Feb 2024)
-* Office Hours (Timing TBC - Dropping 16 Feb 2024)
-* Step-by-Step Guide to Mining on Hivemind (Dropping 16 Feb 2024)
+* Roadmap (Dropping 16 Feb 2024) - **see below**
+    * **Roadmap.Now** : Upgrade/stabilise subnet architecture (Due 02/24/24)
+        * Outcomes : Improves all aspects of subnet operations, validaton, mining experience and stability. Much more details to come.  
+    * **Roadmap.Next** : Train even larger model (still deciding which one)
+    * **Roadmap.Later** : Fintune and Serve LLM on bittensor
+* Office Hours (Timing TBC - Dropping 16 Feb 2024) - **see below**
+    * **Live Guided Mining from Scratch on Hivemind (S25) - Fri 23 Feb, time TBC - Beginner Friendly**
+* Step-by-Step Guide to Mining on Hivemind (Dropping 16 Feb 2024) - **See below**
+    * : See [Running a Miner on Testnet](https://github.com/bit-current/DistributedTraining/edit/main/docs/running_25_on_testnet.md).
+
 
 ## Known Issues (fix in progress)
-* load_state_from_peers errors
-* ⁠All_reduce errors
-* Timeout errors
-* suddenly diminishing miner incentive
+* suddenly diminishing miner incentive - (fixed pushed Thursday 15th Feb - 7:30EST - We need your feedback on this one)
+* load_state_from_peers errors (Should be fixed - let us know if you still see it, we're not 100% sure on this one)
+* Timeout errors - on the list (not occurred recently, but let us know if it shows up again!)
+* All_reduce errors - on the list
 
 ## Frequently Asked Questions
 * What are the minimum requirements to run a validator? A GPU with a minimum of 16GB RAM e.g. RTX A4000
@@ -52,7 +59,7 @@ We are currently in our next project phase  (training a slightly larger GPT2 mod
 For detailed instructions on how to run a miner on the testnet, please refer to the following documentation:
 [Running a Miner on Testnet](https://github.com/bit-current/DistributedTraining/edit/main/docs/running_25_on_testnet.md)
 
-
+## Running a Miner on Hivemind
 ### Prerequisites
 Before you start, ensure your system meets the following requirements:
 
