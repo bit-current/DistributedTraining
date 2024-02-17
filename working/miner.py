@@ -9,21 +9,47 @@ from torch.utils.data import DataLoader
 import requests
 import torch.distributed as dist
 
+import json
+import requests
+import os
+from substrateinterface import Keypair
+
+# Assuming the Keypair for the miner is generated or loaded here
+miner_keypair = Keypair.create_from_mnemonic(Keypair.generate_mnemonic())
+
+
+
+def sign_message(message):
+    message_bytes = json.dumps(message, sort_keys=True).encode()
+    signature = miner_keypair.sign(message_bytes)
+    return signature.hex()
+
+def send_signed_request(url, method='post', data=None):
+    signature = sign_message(data)
+    headers = {
+        'Public-Key-Id': miner_keypair.ss58_address,
+        'Signature': signature
+    }
+    if method.lower() == 'post':
+        response = requests.post(url, json=data, headers=headers)
+    else:
+        response = requests.get(url, headers=headers)
+    return response.json()
+
 def join_orchestrator(orchestrator_url):
-    response = requests.post(f"{orchestrator_url}/join").json()
+    # Check if it's okay to start training
+    status_response = requests.get(f"{orchestrator_url}/check_status").json()
+    if status_response['status'] == 'wait':
+        print(f"Please wait {status_response['wait_time']} seconds before joining the training session.")
+        return -1, -1  # Indicate that joining is currently not  #TODO link to metascript/meta-trainer thread
+    # Proceed with registration if training can start
+    response = send_signed_request(f"{orchestrator_url}/register", data={})
     os.environ['RANK'] = str(response['rank'])
     os.environ['WORLD_SIZE'] = str(response['world_size'])
-    os.environ['MASTER_ADDR'] = response['master_addr']
-    os.environ['MASTER_PORT'] = response['master_port']
     return response['rank'], response['world_size']
-
-def update_world_size(orchestrator_url):
-    response = requests.get(f"{orchestrator_url}/update").json()
-    new_world_size = response['world_size']
-    if new_world_size != dist.get_world_size():
-        dist.destroy_process_group()
-        torch.distributed.init_process_group("nccl", rank=dist.get_rank(), world_size=new_world_size)
-    return new_world_size
+def update_world_size(orchestrator_url, rank):
+    response = send_signed_request(f"{orchestrator_url}/update", data={"rank": rank})
+    return response['world_size']
 
 def setup(rank, world_size):
     torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
