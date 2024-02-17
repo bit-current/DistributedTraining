@@ -1,118 +1,95 @@
-# validator.py
 import argparse
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import numpy as np
 import time
 
 app = Flask(__name__)
 
-# Define variables to track time
+model_checksums = {}
+metrics_data = {}
+
 last_evaluation_time = time.time()
-evaluation_interval = 5  # Evaluate every 60 seconds
+evaluation_interval = 60
 
-# Store metrics data
-metrics_data = []
+def verify_model_checksum(rank, checksum):
+    global model_checksums
+    model_checksums[rank] = checksum
 
-def clear_or_log_data():
- # Clear or log the stored metrics data here
-    print("Clearing or logging data...")
-    print(metrics_data)
-    # Clear the metrics data for the next timestep
-    metrics_data.clear()
-
-def detect_anomaly():
-    losses = metrics_data
-    OUTLIER_THRESHOLD = 2 #FIXME
-
-    # Calculate mean and standard deviation of the losses for responders.
-    if losses:  # Ensure there are any losses to calculate stats on.
-        mean_loss = np.mean(losses)
-        std_loss = np.std(losses)
-        # Calculate z-scores based on these stats.
-        z_scores = np.abs((losses - mean_loss) / std_loss) if std_loss > 0 else np.zeros_like(losses)
-    else:
-        mean_loss, std_loss, z_scores = 0, 0, np.array([])
-
-    # Initialize scores with a default value (e.g., 1) for all.
-    scores = np.ones(len(losses))
-    # Apply a penalty based on the z-score for outliers among responders.
-    outliers = np.array([z > OUTLIER_THRESHOLD for z in z_scores])
-    scores = np.where(outliers, 0.3, 1)  # Update scores for responders based on outlier status.
-
-    # Assign a score of 0 to non-responders.
-    
-    print(f"Scores of losses anomaly detection {scores}")
-
-def verify_model_checksum():
+def detect_metric_anomaly(metric="loss", OUTLIER_THRESHOLD=2):
     global metrics_data
-    # Check if more than 70% of the model checksums are in consensus
-    consensus_threshold = len(metrics_data) * 0.7
-    unique_checksums = set(metrics_data)
-    if len(unique_checksums) >= consensus_threshold:
-        print("Model checksum consensus reached.")
-    else:
-        print("Model checksum consensus not reached. Penalizing non-conforming models.")
-        # Penalize any models that do not conform
-        non_conforming_models = [checksum for checksum in unique_checksums if metrics_data.count(checksum) < consensus_threshold]
-        print(f"Non-conforming models: {non_conforming_models}")
+    if not metrics_data:
+        return []
 
+    aggregated_metrics = {}
+    for rank, data in metrics_data.items():
+        for metric_recorded in data:
+            if metric in metric_recorded.keys():
+                #rank = data['rank']
+                if rank in aggregated_metrics:
+                    aggregated_metrics[rank].append(metric_recorded[metric])
+                else:
+                    aggregated_metrics[rank] = [metric_recorded[metric]]
 
-def verify_model_checksum():
-    # Perform model checksum consensus here
-    pass
+    average_losses = {rank: np.mean(losses) for rank, losses in aggregated_metrics.items()}
+    
+    losses = np.array(list(average_losses.values()))
+    mean_loss = np.mean(losses)
+    std_loss = np.std(losses)
+    z_scores = np.abs((losses - mean_loss) / std_loss) if std_loss > 0 else np.zeros_like(losses)
+    outliers = np.array([z > OUTLIER_THRESHOLD for z in z_scores])
+    
+    scores = []
+    for i, (rank, _) in enumerate(average_losses.items()):
+        score = 0 if outliers[i] else 1
+        scores.append({'rank': rank, 'score': score})
+    
+    for score_data in scores:
+        print(f"Rank: {score_data['rank']}, Score: {score_data['score']}")
+    
+    return scores
+
 
 def run_evaluation():
-    # Define your evaluation function
-    print("Running evaluation...")
-    # Example: Loss anomaly detection
-    detect_anomaly()
-    # Example: Model checksum consensus
-    verify_model_checksum()
-    # Clear or log the data for the next timestep
-    clear_or_log_data()
+    global model_checksums, metrics_data
+    checksum_frequencies = {}
+    for rank, checksum in model_checksums.items():
+        checksum_frequencies[checksum] = checksum_frequencies.get(checksum, 0) + 1
 
-# Use the before_request decorator to check if it's time to run the evaluation function
+    most_common_checksum = max(checksum_frequencies, key=checksum_frequencies.get)
+    model_scores = {rank: (1 if checksum == most_common_checksum else 0) for rank, checksum in model_checksums.items()}
+    print("Model scores based on checksum consensus:", model_scores)
+
+    detect_metric_anomaly()
+
+    model_checksums.clear()
+    metrics_data.clear()
+
 @app.before_request
-def check_evaluation():
+def before_request():
     global last_evaluation_time
-
-    # Get the current time
     current_time = time.time()
-
-    # Check if the evaluation interval has passed since the last evaluation
-    if current_time - last_evaluation_time >= evaluation_interval:
-        # Run the evaluation function
+    if current_time - last_evaluation_time > evaluation_interval:
         run_evaluation()
-
-        # Update the last evaluation time
         last_evaluation_time = current_time
 
-
-@app.route('/validate_gradient', methods=['POST'])
-def validate_gradient():
-    data = request.get_json()
-    #print(f"Received gradient checksum: {data['checksum']}")
-    return "OK"
-
 @app.route('/validate_model', methods=['POST'])
-def verify_model():
+def validate_model():
     data = request.get_json()
-    #print(f"Received model checksum from rank {data['rank']}: {data['checksum']}")
-    return "OK"
+    verify_model_checksum(data['rank'], data['checksum'])
+    return jsonify({"message": "Model checksum received and verified"})
 
 @app.route('/validate_metrics', methods=['POST'])
-def verify_metrics():
+def validate_metrics():
     data = request.get_json()
-    for metric, value in data.items():
-        pass
-        #print(f"Received metric {metric} with values {value} from rank {data['rank']}: {data['checksum']}")
-    return "OK"
+    data['rank'] = int(data['rank'])
+    if data['rank'] not in metrics_data:
+        metrics_data[data['rank']] = []
+    metrics_data[data['rank']].append({'rank': data['rank'], 'loss': data['metrics']['loss']})
+    return jsonify({"message": "Metrics received"})
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='PyTorch FSDP Validator')
-    parser.add_argument('--host', type=str, default="0.0.0.0")
+    parser = argparse.ArgumentParser(description='Validator Server')
     parser.add_argument('--port', type=int, default=5000)
-    
     args = parser.parse_args()
 
-    app.run(host=args.host, port=args.port)
+    app.run(host="0.0.0.0", port=args.port)
