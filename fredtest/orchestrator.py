@@ -1,77 +1,112 @@
-from transitions.extensions import GraphMachine as Machine
+import argparse
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data.distributed import DistributedSampler
+from torchvision import datasets, transforms
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.utils.data import DataLoader
+import json
+import os
+from substrateinterface import Keypair
+import requests
 
-class Orchestrator(object):
+# Assuming the Keypair for the miner is generated or loaded here
+miner_keypair = Keypair.create_from_mnemonic(Keypair.generate_mnemonic())
+
+def sign_message(message):
+    message_bytes = json.dumps(message, sort_keys=True).encode()
+    signature = miner_keypair.sign(message_bytes)
+    return signature.hex()
+
+def send_signed_request(url, method='post', data=None):
+    signature = sign_message(data if data else {})
+    headers = {
+        'Public-Key-Id': miner_keypair.ss58_address,
+        'Signature': signature
+    }
+    if method.lower() == 'post':
+        response = requests.post(url, json=data, headers=headers)
+    else:
+        response = requests.get(url, json=data, headers=headers)  # Adjusted to support GET with JSON body if necessary
+    if response.ok:
+        return response.json()
+    else:
+        print(f"Request failed: {response.text}")
+        return None
+
+def join_orchestrator(orchestrator_url):
+    response = send_signed_request(f"{orchestrator_url}/register_miner", data={"miner_address": miner_keypair.ss58_address})
+    if response and 'rank' in response and 'world_size' in response:
+        os.environ['RANK'] = str(response['rank'])
+        os.environ['WORLD_SIZE'] = str(response['world_size'])
+        return response['rank'], response['world_size']
+    else:
+        print("Failed to join orchestrator.")
+        return None, None
+
+def update_world_size(orchestrator_url, rank):
+    response = send_signed_request(f"{orchestrator_url}/update_world_size", data={"rank": rank})
+    if response and 'world_size' in response:
+        return response['world_size']
+    else:
+        print("Failed to update world size.")
+        return None
+
+def setup(rank, world_size):
+    if rank is not None and world_size is not None:
+        torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
+        torch.cuda.set_device(rank)
+
+def cleanup():
+    torch.distributed.destroy_process_group()
+
+class Net(nn.Module):
     def __init__(self):
-        self.miners = []  # List to keep track of registered miners
+        super(Net, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, stride=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1)
+        self.dropout1 = nn.Dropout(0.25)
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc1 = nn.Linear(9216, 128)
+        self.fc2 = nn.Linear(128, 10)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = torch.relu(x)
+        x = self.conv2(x)
+        x = torch.relu(x)
+        x = torch.max_pool2d(x, 2)
+        x = self.dropout1(x)
+        x = torch.flatten(x, 1)
+        x = self.fc1(x)
+        x = torch.relu(x)
+        x = self.dropout2(x)
+        x = self.fc2(x)
+        output = torch.log_softmax(x, dim=1)
+        return output
+
+def train(rank, world_size, epochs, batch_size, orchestrator_url):
+    if rank is None or world_size is None:
+        return  # Early exit if registration failed
+
+    setup(rank, world_size)
     
-    def register_miner(self, miner_address):
-        if miner_address not in self.miners:
-            self.miners.append(miner_address)
-            print(f"Miner {miner_address} registered.")
-        else:
-            print(f"Miner {miner_address} is already registered.")
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
     
-    def deregister_miner(self, miner_address):
-        if miner_address in self.miners:
-            self.miners.remove(miner_address)
-            print(f"Miner {miner_address} deregistered.")
-        else:
-            print(f"Miner {miner_address} is not registered.")
+    dataset = datasets.MNIST('../data', train=True, download=True, transform=transform)
+    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=True)
+    train_loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler)
     
-    def select_miner(self):
-        # Simple round-robin selection for demonstration
-        # In a real scenario, you could implement more complex logic here
-        if self.miners:
-            return self.miners.pop(0)  # This removes the first miner and returns it
-        else:
-            print("No miners registered.")
-            return None
+    model = Net().to(rank)
+    model = FSDP(model)
+    optimizer = optim.Adam(model.parameters())
 
-    def on_enter_waiting(self):
-        print("Waiting for workers to join.")
-        if not self.miners:
-            print("No miners available, staying in waiting.")
-
-    def on_enter_running(self):
-        print("Running task with joined workers.")
-        selected_miner = self.select_miner()
-        if selected_miner:
-            print(f"Task assigned to miner: {selected_miner}")
-            # Here you would send the task to the selected miner
-        else:
-            self.to_error_handling()
-
-    def on_enter_error_handling(self):
-        print("Handling error, attempting to reset task.")
-
-    def on_enter_updating(self):
-        print("Updating reference checkpoint.")
-
-    def on_enter_idle(self):
-        print("Orchestrator is idle, awaiting manual intervention or new tasks.")
-
-# Define the states and transitions as before
-
-states = ['waiting', 'running', 'error_handling', 'updating', 'idle']
-
-transitions = [
-    {'trigger': 'start_task', 'source': 'waiting', 'dest': 'running'},
-    {'trigger': 'complete_task', 'source': 'running', 'dest': 'updating'},
-    {'trigger': 'task_error', 'source': 'running', 'dest': 'error_handling'},
-    {'trigger': 'reset_task', 'source': 'error_handling', 'dest': 'waiting'},
-    {'trigger': 'update_checkpoint', 'source': 'updating', 'dest': 'waiting'},
-    {'trigger': 'error_unresolved', 'source': 'error_handling', 'dest': 'idle'},
-    {'trigger': 'resolve_error', 'source': 'idle', 'dest': 'waiting'}
-]
-
-# Initialize the orchestrator with its state machine
-orchestrator = Orchestrator()
-
-# Initialize state machine
-machine = Machine(model=orchestrator, states=states, transitions=transitions, initial='waiting', auto_transitions=False, ignore_invalid_triggers=True)
-
-# Now you can register and deregister miners dynamically
-orchestrator.register_miner("http://miner1.example.com")
-orchestrator.register_miner("http://miner2.example.com")
-
-# Proceed with task workflow as before
+    for epoch in range(epochs):
+        world_size = update_world_size(orchestrator_url, rank)  # Update world size at the beginning of each epoch
+        sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=True)
+        train_loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler)
+       
