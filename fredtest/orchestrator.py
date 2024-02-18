@@ -109,4 +109,36 @@ def train(rank, world_size, epochs, batch_size, orchestrator_url):
         world_size = update_world_size(orchestrator_url, rank)  # Update world size at the beginning of each epoch
         sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=True)
         train_loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler)
-       
+        model.train()
+        sampler.set_epoch(epoch)
+        for batch_idx, (data, target) in enumerate(train_loader):
+            data, target = data.to(rank), target.to(rank)
+            optimizer.zero_grad()
+            output = model(data)
+            loss = nn.functional.nll_loss(output, target)
+            loss.backward()
+            optimizer.step()
+            if batch_idx % 10 == 0:
+                print(f"Rank {rank}, Epoch {epoch}, Batch {batch_idx}, Loss {loss.item()}")
+
+    if rank == 0:
+        torch.save(model.state_dict(), "mnist_model.pt")
+    
+    cleanup()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='PyTorch FSDP Example')
+    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--batch-size', type=int, default=64)
+    # Set a default URL for the orchestrator
+    parser.add_argument('--orchestrator-url', type=str, default='http://localhost:5000', help='URL of the orchestrator server')
+
+    args = parser.parse_args()
+
+    # Automatically attempt to join the orchestrator upon launch
+    rank, world_size = join_orchestrator(args.orchestrator_url)
+    if rank is not None and world_size is not None:
+        # Proceed with training if registration was successful
+        train(rank, world_size, args.epochs, args.batch_size, args.orchestrator_url)
+    else:
+        print("Registration with the orchestrator failed. Exiting.")
