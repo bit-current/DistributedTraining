@@ -4,61 +4,15 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data.distributed import DistributedSampler
 from torchvision import datasets, transforms
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 import requests
 import torch.distributed as dist
 import json
 import os
 from substrateinterface import Keypair
-import hashlib
 
-# Assuming the Keypair for the miner is generated or loaded here
-miner_keypair = Keypair.create_from_mnemonic(Keypair.generate_mnemonic())
-
-def sign_message(message):
-    message_bytes = json.dumps(message, sort_keys=True).encode()
-    signature = miner_keypair.sign(message_bytes)
-    return signature.hex()
-
-def send_signed_request(url, method='post', data=None):
-    signature = sign_message(data if data else {})
-    headers = {
-        'Public-Key-Id': miner_keypair.ss58_address,
-        'Signature': signature
-    }
-    if method.lower() == 'post':
-        response = requests.post(url, json=data, headers=headers)
-    else:
-        response = requests.get(url, json=data, headers=headers)  # Adjusted to support GET with JSON body if necessary
-    return response.json()
-
-def join_orchestrator(orchestrator_url):
-    response = send_signed_request(f"{orchestrator_url}/register_miner", data={"miner_address": miner_keypair.ss58_address})
-    if 'rank' in response and 'world_size' in response:
-        os.environ['RANK'] = str(response['rank'])
-        os.environ['WORLD_SIZE'] = str(response['world_size'])
-        return response['rank'], response['world_size']
-    else:
-        print("Failed to join orchestrator.")
-        return None, None
-
-def update_world_size(orchestrator_url, rank):
-    response = send_signed_request(f"{orchestrator_url}/update_world_size", data={"rank": rank})
-    if 'world_size' in response:
-        return response['world_size']
-    else:
-        print("Failed to update world size.")
-        return None
-
-def setup(rank, world_size):
-    if rank is not None and world_size is not None:
-        torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
-        torch.cuda.set_device(rank)
-
-def cleanup():
-    torch.distributed.destroy_process_group()
-
+# Define your neural network architecture
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -81,56 +35,77 @@ class Net(nn.Module):
         x = torch.relu(x)
         x = self.dropout2(x)
         x = self.fc2(x)
-        output = torch.log_softmax(x, dim=1)
-        return output
+        return torch.log_softmax(x, dim=1)
 
-def train(rank, world_size, epochs, batch_size, orchestrator_url):
+# Functions for digital signing and communication with orchestrator
+def sign_message(message, keypair):
+    message_bytes = json.dumps(message, sort_keys=True).encode()
+    signature = keypair.sign(message_bytes)
+    return signature.hex()
+
+def send_signed_request(url, data, keypair):
+    signature = sign_message(data if data else {}, keypair)
+    headers = {'Public-Key-Id': keypair.ss58_address, 'Signature': signature}
+    response = requests.post(url, json=data, headers=headers)
+    return response.json() if response.ok else None
+
+def join_orchestrator(orchestrator_url, keypair):
+    data = {"miner_address": keypair.ss58_address}
+    response = send_signed_request(f"{orchestrator_url}/register_miner", data, keypair)
+    if response and 'rank' in response and 'world_size' in response:
+        return response['rank'], response['world_size']
+    print("Failed to join orchestrator.")
+    return None, None
+
+def update_world_size(orchestrator_url, rank, keypair):
+    data = {"rank": rank}
+    response = send_signed_request(f"{orchestrator_url}/update_world_size", data, keypair)
+    return response['world_size'] if response else None
+
+def main(args):
+    keypair = Keypair.create_from_mnemonic(Keypair.generate_mnemonic())
+    
+    rank, world_size = join_orchestrator(args.orchestrator_url, keypair)
     if rank is None or world_size is None:
-        return  # Early exit if registration failed
+        print("Registration with the orchestrator failed. Exiting.")
+        return
 
-    setup(rank, world_size)
-    
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-    ])
-    
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
+
+    model = Net().cuda(rank)
+    ddp_model = DDP(model, device_ids=[rank])
+
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
     dataset = datasets.MNIST('../data', train=True, download=True, transform=transform)
-    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=True)
-    train_loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler)
-    
-    model = Net().to(rank)
-    model = FSDP(model)
-    optimizer = optim.Adam(model.parameters())
+    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
+    train_loader = DataLoader(dataset, batch_size=args.batch_size, sampler=sampler)
 
-    for epoch in range(epochs):
-        world_size = update_world_size(orchestrator_url, rank)  # Update world size at the beginning of each epoch
-        sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=True)
-        train_loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler)
-        model.train()
+    optimizer = optim.Adam(ddp_model.parameters(), lr=0.001)
+
+    for epoch in range(args.epochs):
+        ddp_model.train()
         sampler.set_epoch(epoch)
-        for batch_idx, (data, target) in enumerate(train_loader):
-            data, target = data.to(rank), target.to(rank)
+        for _, (data, target) in enumerate(train_loader):
+            data, target = data.cuda(rank), target.cuda(rank)
             optimizer.zero_grad()
-            output = model(data)
+            output = ddp_model(data)
             loss = nn.functional.nll_loss(output, target)
             loss.backward()
             optimizer.step()
-            if batch_idx % 10 == 0:
-                print(f"Rank {rank}, Epoch {epoch}, Batch {batch_idx}, Loss {loss.item()}")
 
     if rank == 0:
-        torch.save(model.state_dict(), "mnist_model.pt")
+        torch.save(ddp_model.module.state_dict(), "mnist_model.pt")
     
-    cleanup()
+    dist.destroy_process_group()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='PyTorch FSDP Example')
-    parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--batch-size', type=int, default=64)
-    parser.add_argument('--orchestrator-url', type=str, required=True, help='URL of the orchestrator server')
-
+    parser = argparse.ArgumentParser(description="Distributed PyTorch Training")
+    parser.add_argument("--epochs", type=int, default=10, help="Number of epochs to train")
+    parser.add_argument("--batch-size", type=int, default=64, help="Input batch size for training")
+    parser.add_argument("--orchestrator-url", type=str, required=True, help="URL of the orchestrator server")
     args = parser.parse_args()
 
-    rank, world_size = join_orchestrator(args.orchestrator_url)
-    train(rank, world_size, args.epochs, args.batch_size, args.orchestrator_url)
+    main(args)
