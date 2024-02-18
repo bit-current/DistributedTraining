@@ -2,17 +2,14 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader
 import requests
-import torch.distributed as dist
-import json
 import os
+import json
 from substrateinterface import Keypair
 
-# Define your neural network architecture
+# Assuming the use of a simple CNN for MNIST dataset
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -37,75 +34,77 @@ class Net(nn.Module):
         x = self.fc2(x)
         return torch.log_softmax(x, dim=1)
 
-# Functions for digital signing and communication with orchestrator
-def sign_message(message, keypair):
-    message_bytes = json.dumps(message, sort_keys=True).encode()
-    signature = keypair.sign(message_bytes)
-    return signature.hex()
+def receive_task(orchestrator_url):
+    """Simulate receiving a dynamic task from the orchestrator."""
+    response = requests.get(f"{orchestrator_url}/get_task")
+    if response.status_code == 200:
+        task = response.json()
+        return task
+    else:
+        print("Failed to receive task.")
+        return None
 
-def send_signed_request(url, data, keypair):
-    signature = sign_message(data if data else {}, keypair)
-    headers = {'Public-Key-Id': keypair.ss58_address, 'Signature': signature}
-    response = requests.post(url, json=data, headers=headers)
-    return response.json() if response.ok else None
+def submit_update(update, orchestrator_url):
+    """Submit model updates to the orchestrator."""
+    response = requests.post(f"{orchestrator_url}/submit_update", json=update)
+    if response.status_code == 200:
+        print("Update submitted successfully.")
+    else:
+        print("Failed to submit update.")
 
-def join_orchestrator(orchestrator_url, keypair):
-    data = {"miner_address": keypair.ss58_address}
-    response = send_signed_request(f"{orchestrator_url}/register_miner", data, keypair)
-    if response and 'rank' in response and 'world_size' in response:
-        return response['rank'], response['world_size']
-    print("Failed to join orchestrator.")
-    return None, None
+def partial_aggregate(update, orchestrator_url):
+    """Participate in partial aggregation."""
+    response = requests.post(f"{orchestrator_url}/partial_aggregate", json=update)
+    if response.status_code == 200:
+        aggregated_update = response.json()
+        return aggregated_update
+    else:
+        print("Failed to participate in partial aggregation.")
+        return None
 
-def update_world_size(orchestrator_url, rank, keypair):
-    data = {"rank": rank}
-    response = send_signed_request(f"{orchestrator_url}/update_world_size", data, keypair)
-    return response['world_size'] if response else None
+def train(model, device, train_loader, optimizer):
+    model.train()
+    for data, target in train_loader:
+        data, target = data.to(device), target.to(device)
+        optimizer.zero_grad()
+        output = model(data)
+        loss = nn.functional.nll_loss(output, target)
+        loss.backward()
+        optimizer.step()
 
-def main(args):
-    keypair = Keypair.create_from_mnemonic(Keypair.generate_mnemonic())
-    
-    rank, world_size = join_orchestrator(args.orchestrator_url, keypair)
-    if rank is None or world_size is None:
-        print("Registration with the orchestrator failed. Exiting.")
-        return
-
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-    torch.cuda.set_device(rank)
-
-    model = Net().cuda(rank)
-    ddp_model = DDP(model, device_ids=[rank])
-
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
-    dataset = datasets.MNIST('../data', train=True, download=True, transform=transform)
-    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
-    train_loader = DataLoader(dataset, batch_size=args.batch_size, sampler=sampler)
-
-    optimizer = optim.Adam(ddp_model.parameters(), lr=0.001)
-
-    for epoch in range(args.epochs):
-        ddp_model.train()
-        sampler.set_epoch(epoch)
-        for _, (data, target) in enumerate(train_loader):
-            data, target = data.cuda(rank), target.cuda(rank)
-            optimizer.zero_grad()
-            output = ddp_model(data)
-            loss = nn.functional.nll_loss(output, target)
-            loss.backward()
-            optimizer.step()
-
-    if rank == 0:
-        torch.save(ddp_model.module.state_dict(), "mnist_model.pt")
-    
-    dist.destroy_process_group()
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Distributed PyTorch Training")
-    parser.add_argument("--epochs", type=int, default=10, help="Number of epochs to train")
-    parser.add_argument("--batch-size", type=int, default=64, help="Input batch size for training")
-    parser.add_argument("--orchestrator-url", type=str, required=True, help="URL of the orchestrator server")
+def main():
+    parser = argparse.ArgumentParser(description="Distributed PyTorch Training Miner")
+    parser.add_argument("--orchestrator-url", type=str, required=True, help="URL of the orchestrator")
     args = parser.parse_args()
 
-    main(args)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = Net().to(device)
+    optimizer = optim.Adam(model.parameters())
+    
+    while True:
+        task = receive_task(args.orchestrator_url)
+        if task is None:
+            continue
+
+        dataset = datasets.MNIST('../data', train=True, download=True, 
+                                 transform=transforms.Compose([transforms.ToTensor(), 
+                                                               transforms.Normalize((0.1307,), (0.3081,))]))
+        # Assuming task contains indices for the data subset
+        train_subset = Subset(dataset, indices=task['indices'])
+        train_loader = DataLoader(train_subset, batch_size=64, shuffle=True)
+
+        train(model, device, train_loader, optimizer)
+
+        # Assuming the task requires submitting model updates
+        if task.get('submit_update', False):
+            model_update = {"weights": model.state_dict()}  # Simplification for demonstration
+            submit_update(model_update, args.orchestrator_url)
+
+        # Assuming the task may require participation in partial aggregation
+        if task.get('participate_in_aggregation', False):
+            aggregated_update = partial_aggregate(model_update, args.orchestrator_url)
+            if aggregated_update:
+                model.load_state_dict(aggregated_update['weights'])
+
+if __name__ == "__main__":
+    main()
