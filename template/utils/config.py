@@ -115,12 +115,12 @@ def add_args(cls, parser):
         nargs="+",
         help="The addresses for the DHT",
         default=[
-            "/ip4/213.173.105.83/tcp/11791/p2p/12D3KooWKS314H4NfNaN5VJsZgGhwojnNqQmc3m5oYVBD9Es662g",
-            "/ip4/213.173.105.83/tcp/11790/p2p/12D3KooWE8Kp2i5CxvxGEKJGocA8JnJwKKBsv5qEKRMsuQnmjFKC",
-            "/ip4/213.173.105.83/tcp/11789/p2p/12D3KooWDn9hfQjP9pcmp7hh72okL8tQBAsCCVi8Uw7xhhFPj3Qy",
-            "/ip4/213.173.105.83/tcp/10368/p2p/12D3KooWKvmrnf2p3L9UWFcBcpp1bRRMJ2xD8UPFJkiucpNgMbzo",
-            "/ip4/213.173.105.83/tcp/10367/p2p/12D3KooWSRJJ7amqaJy5DZ7BmLrMQsFqQMgvnzQYUi4Dynupy2VW",
-            "/ip4/213.173.105.83/tcp/10366/p2p/12D3KooWRoQ4rN5xo6vp4Xr9UZzGP9zoeRSe4zRJPaKfdmBTH3cs"
+            "/ip4/213.173.105.85/tcp/18159/p2p/12D3KooWPgc7rwVmrbidRbZ69HwGcVMoNFv6wrAMYATpnA5rqtdW",
+            "/ip4/213.173.105.85/tcp/18160/p2p/12D3KooWLUNSfCatD5GGi2KofLdVp6XiBm1sjmJJuN7R69hj9AUr",
+            "/ip4/213.173.105.85/tcp/18161/p2p/12D3KooWDFbknTvPDk2yZfrHnLuQiDchQ7UVcyaupviXAJtHrXaw",
+            "/ip4/213.173.105.85/tcp/12845/p2p/12D3KooWSmfQUqbfgHav95LCVJQ93pnu1ZZXXyztMwAAfruB6WKP",
+            "/ip4/213.173.105.85/tcp/12846/p2p/12D3KooWG3asUyjWkL2SbN83aF6dJGE1NV2hoCfY7kQF2mjkXR3J",
+            "/ip4/213.173.105.85/tcp/12847/p2p/12D3KooWQm7EtkXrAjfXMiLS74zaFkWScoiEM1VdAxPmrovfdCrE"
         ],
     )
 
