@@ -17,8 +17,6 @@ from substrateinterface import Keypair
 # Assuming the Keypair for the miner is generated or loaded here
 miner_keypair = Keypair.create_from_mnemonic(Keypair.generate_mnemonic())
 
-
-
 def sign_message(message):
     message_bytes = json.dumps(message, sort_keys=True).encode()
     signature = miner_keypair.sign(message_bytes)
@@ -47,6 +45,7 @@ def join_orchestrator(orchestrator_url):
     os.environ['RANK'] = str(response['rank'])
     os.environ['WORLD_SIZE'] = str(response['world_size'])
     return response['rank'], response['world_size']
+
 def update_world_size(orchestrator_url, rank):
     response = send_signed_request(f"{orchestrator_url}/update", data={"rank": rank})
     return response['world_size']
@@ -67,6 +66,7 @@ def update_world_size(orchestrator_url, rank):
     return response['world_size']
 
 def setup(rank, world_size):
+    torch.distributed.destroy_process_group()
     torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
     torch.cuda.set_device(rank)
 

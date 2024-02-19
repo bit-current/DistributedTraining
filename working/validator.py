@@ -9,7 +9,7 @@ model_checksums = {}
 metrics_data = {}
 
 last_evaluation_time = time.time()
-evaluation_interval = 60
+evaluation_interval = 120
 
 def verify_model_checksum(rank, checksum):
     global model_checksums
@@ -54,15 +54,20 @@ def run_evaluation():
     checksum_frequencies = {}
     for rank, checksum in model_checksums.items():
         checksum_frequencies[checksum] = checksum_frequencies.get(checksum, 0) + 1
+    model_scores = {}
+    try:
+        most_common_checksum = max(checksum_frequencies, key=checksum_frequencies.get)
+        model_scores = {rank: (1 if checksum == most_common_checksum else 0) for rank, checksum in model_checksums.items()}
+        print("Model scores based on checksum consensus:", model_scores)
 
-    most_common_checksum = max(checksum_frequencies, key=checksum_frequencies.get)
-    model_scores = {rank: (1 if checksum == most_common_checksum else 0) for rank, checksum in model_checksums.items()}
-    print("Model scores based on checksum consensus:", model_scores)
+    except ValueError:
+        pass
 
     detect_metric_anomaly()
 
     model_checksums.clear()
     metrics_data.clear()
+
 
 @app.before_request
 def before_request():
