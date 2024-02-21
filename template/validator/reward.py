@@ -197,7 +197,6 @@ def get_rewards(
 
     # Assign a score of 0 to non-responders.
     scores[~responded] = 0.1
-    scores = scores * 65535
     scores = torch.FloatTensor([score for score in scores]).to(self.device)
 
     bt.logging.info(f"Global Scores:        {scores}")
