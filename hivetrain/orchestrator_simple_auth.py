@@ -5,40 +5,18 @@ import subprocess
 import os
 import signal
 import logging
-#from .auth import authenticate_request
+from hivetrain.auth import authenticate_request_with_bittensor
+from hivetrain.config import Configurator
+from hivetrain.btt_connector import initialize_bittensor_objects, BittensorNetwork
 
 app = Flask(__name__)
 
 # Configure logging for the orchestrator
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def authenticate_request_with_bittensor(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        data = request.json
-        message = data.get('message') if data else None
-        signature = data.get('signature') if data else None
-        public_address = data.get('public_address') if data else None
-
-        if not (message and signature and public_address):
-            return make_response(jsonify({'error': 'Missing message, signature, or public_address'}), 400)
-
-        # Check if public_address is in the metagraph's list of registered public keys
-        global metagraph
-        if public_address not in metagraph.hotkeys:
-            return make_response(jsonify({'error': 'Public address not recognized or not registered in the metagraph'}), 403)
-
-        # Use Bittensor's wallet for verification
-        wallet = bittensor.wallet(ss58_address=public_address)
-        is_valid = wallet.verify(message.encode('utf-8'), signature, public_address)
-
-        if is_valid:
-            return f(*args, **kwargs)
-        else:
-            return make_response(jsonify({'error': 'Signature verification failed'}), 403)
-    
-    return decorated_function
-
+# wallet = btt.wallet
+# subtensor = btt.subtensor
+# metagraph = btt.metagraph
 
 def setupTCPStore(store_address, store_port):
     try:
@@ -61,15 +39,13 @@ def check_subprocess(process):
         else:
             logging.error(f"TCPStore subprocess exited with errors: {stderr.decode()}")
 
-
-
 class Orchestrator:
     def __init__(self, store_address = "127.0.0.1", store_port=4999, training_threshold = 3):
         self.lock = threading.Lock()
         self.meta_miners = {}
         self.state = "onboarding"
         self.rank_counter = 0
-        self.training_state_threshold = 3
+        self.training_state_threshold = 1
         self.max_inactive_time = 600  # seconds
         self.onboarding_time_limit = 20  # seconds for onboarding timeout
         self.onboarding_start_time = time.time()
@@ -111,7 +87,7 @@ class Orchestrator:
                 self.onboarding_start_time = time.time()  # Update onboarding start time for new registrations
             
             # Check for state transition to training
-            if self.state == "onboarding" and (len(self.meta_miners) >= self.training_state_threshold or current_time - self.onboarding_start_time >= self.onboarding_time_limit):
+            if self.state == "onboarding" and (len(self.meta_miners) >= self.training_state_threshold and current_time - self.onboarding_start_time >= self.onboarding_time_limit):
                 if self.tcp_store_subprocess:
                     self.tcp_store_subprocess.terminate()
                     self.tcp_store_subprocess.wait()
@@ -144,7 +120,7 @@ def cleanup():
 orchestrator = Orchestrator()
 
 @app.route('/register', methods=['POST'])
-@authenticate_request
+@authenticate_request_with_bittensor
 def register_miner():
     if orchestrator.state == "training":
         return jsonify({"error": "Registration closed during training"}), 403
@@ -157,7 +133,7 @@ def register_miner():
         return jsonify({"error": "Failed to register or update miner"}), 404
 
 @app.route('/update', methods=['POST'])
-@authenticate_request
+@authenticate_request_with_bittensor
 def update():
     data = request.json
     miner_id = data.get('miner_id')
@@ -167,12 +143,12 @@ def update():
         return jsonify({"message": "Miner updated", "miner_id": updated_miner_id, "state": orchestrator.state}), 200
     return jsonify({"error": "Update not processed"}), 400
 
-@app.route('/training_params', methods=['GET'])
-@authenticate_request
+@app.route('/training_params', methods=['POST'])
+@authenticate_request_with_bittensor
 def training_params():
     if orchestrator.state != "training":
         return jsonify({"error": "Not in training state"}), 400
-    data = request.args
+    data = request.json
     miner_id = int(data.get('miner_id'))
     if miner_id in orchestrator.meta_miners:
         return jsonify({"world_size": len(orchestrator.meta_miners), "rank": miner_id, "state": orchestrator.state}), 200
@@ -180,4 +156,14 @@ def training_params():
         return jsonify({"error": "Miner not found"}), 404
 
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    config = Configurator.combine_configs()
+
+    BittensorNetwork.initialize(config)
+
+    # Now you can access wallet, subtensor, and metagraph like this:
+    wallet = BittensorNetwork.wallet
+    subtensor = BittensorNetwork.subtensor
+    metagraph = BittensorNetwork.metagraph
+
+    app.run(debug=True, host='0.0.0.0', port=config.port)
+

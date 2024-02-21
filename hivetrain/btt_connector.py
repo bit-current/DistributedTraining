@@ -1,0 +1,179 @@
+import bittensor as bt
+import copy
+import math
+import time
+from typing import List, Tuple
+
+
+def initialize_bittensor_objects():
+    global wallet, subtensor, metagraph, config
+    base_config = copy.deepcopy(config)
+    check_config(base_config)
+
+    if base_config.mock:
+        wallet = bt.MockWallet(config=base_config)
+        subtensor = MockSubtensor(base_config.netuid, wallet=wallet)
+        metagraph = MockMetagraph(base_config.netuid, subtensor=subtensor)
+    else:
+        wallet = bt.wallet(config=base_config)
+        subtensor = bt.subtensor(config=base_config)
+        metagraph = subtensor.metagraph(base_config.netuid)
+
+    # Ensure the miner's hotkey is registered on the network
+    # FIXME add check for miners and valis
+    # 
+
+def check_registered(netuid):
+    
+    if not BittensorNetwork.subtensor.is_hotkey_registered(netuid=netuid, hotkey_ss58=BittensorNetwork.wallet.hotkey.ss58_address):
+        print(f"Wallet: {wallet} is not registered on netuid {netuid}. Please register the hotkey before trying again")
+        exit()
+
+def resync_metagraph():
+    global metagraph, config, subtensor
+    # Fetch the latest state of the metagraph from the Bittensor network
+    print("Resynchronizing metagraph...")
+    if not config.mock:
+        # Update the metagraph with the latest information from the network
+        metagraph = BittensorNetwork.subtensor.metagraph(config.netuid)
+    else:
+        # In a mock environment, simply log the action without actual network interaction
+        print("Mock environment detected, skipping actual metagraph resynchronization.")
+    print("Metagraph resynchronization complete.")
+
+def should_sync_metagraph(last_sync_time):
+    current_time = time.time()
+    return current_time - last_sync_time > sync_interval
+
+def sync(last_sync_time, sync_interval):
+    if should_sync_metagraph(last_sync_time,sync_interval):
+        # Assuming resync_metagraph is a method to update the metagraph with the latest state from the network.
+        # This method would need to be defined or adapted from the BaseNeuron implementation.
+        resync_metagraph()
+        last_sync_time = time.time()
+        return last_sync_time
+
+def get_validator_uids_and_addresses(
+    metagraph: "bt.metagraph.Metagraph", vpermit_tao_limit: int
+) -> Tuple[List[dict], List[str]]:
+    """
+    Check availability of all UIDs in a given subnet, returning their IP, port numbers, and hotkeys 
+    if they are serving and have at least vpermit_tao_limit stake, along with a list of strings 
+    formatted as 'ip:port' for each validator.
+
+    Args:
+        metagraph (bt.metagraph.Metagraph): Metagraph object.
+        vpermit_tao_limit (int): Validator permit tao limit.
+
+    Returns:
+        Tuple[List[dict], List[str]]: A tuple where the first element is a list of dicts with details 
+                                      of available UIDs, including their IP, port, and hotkeys, and the 
+                                      second element is a list of strings formatted as 'ip:port'.
+    """
+    available_uid_details = []
+    validator_addresses = []  # List to hold 'ip:port' strings
+    for uid in range(len(metagraph.S)):
+        if metagraph.S[uid] >= vpermit_tao_limit:
+            ip = metagraph.axons[uid].ip
+            port = metagraph.axons[uid].port
+            details = {
+                "uid": uid,
+                "ip": ip,
+                "port": port,
+                "hotkey": metagraph.hotkeys[uid]
+            }
+            available_uid_details.append(details)
+            validator_addresses.append(f"{ip}:{port}")  # Format and add 'ip:port' to the list
+
+    return available_uid_details, validator_addresses
+
+# def serve_on_subtensor(external_ip, external_port, netuid, max_retries=5, wait_for_inclusion=True, wait_for_finalization=False):
+#     retry_count = 0
+#     check_registered(netuid)
+#     while retry_count < max_retries:
+#         try:
+#             breakpoint()
+#             serve_success = BittensorNetwork.subtensor.serve(
+#                 wallet=BittensorNetwork.wallet,
+#                 ip=external_ip,
+#                 port=external_port,
+#                 netuid=netuid,
+#                 protocol=4,
+#                 wait_for_inclusion=wait_for_inclusion,
+#                 wait_for_finalization=wait_for_finalization,
+#                 prompt=False,
+#             )
+#             if serve_success:
+#                 print(f"Serving on IP: {external_ip}, Port: {external_port}")
+#                 break
+#             else:
+#                 print("Failed to serve on Subtensor network. Retrying...")
+#         except Exception as e:
+#             print(f"Error serving on Subtensor network: {e}")
+        
+#         retry_count += 1
+#         sleep_time = math.pow(2, retry_count)  # Exponential backoff
+#         print(f"Retry {retry_count}/{max_retries}. Retrying in {sleep_time} seconds.")
+#         time.sleep(sleep_time)
+
+#     if retry_count == max_retries:
+#         print("Max retries reached. Failed to serve on Subtensor network.")
+
+def serve_axon(netuid,host_address,external_address, host_port, external_port):
+    """Serve axon to enable external connections."""
+
+    bt.logging.info("serving ip to chain...")
+    try:
+        axon = bt.axon(
+            config=BittensorNetwork.config,
+            wallet=BittensorNetwork.wallet,
+            # port=host_port,
+            # ip=host_address,
+            # external_ip=external_address,
+            # external_port=external_port
+        )
+        try:
+            BittensorNetwork.subtensor.serve_axon(
+                netuid=netuid,
+                axon=axon,
+            )
+            bt.logging.info(
+                f"Served Axon {axon} on network: {BittensorNetwork.config.subtensor.chain_endpoint} with netuid: {BittensorNetwork.config.netuid}"
+            )
+        except Exception as e:
+            bt.logging.error(f"Failed to serve Axon with exception: {e}")
+            pass
+
+    except Exception as e:
+        bt.logging.error(
+            f"Failed to create Axon initialize with exception: {e}"
+        )
+        pass
+    return axon
+
+
+class BittensorNetwork:
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(BittensorNetwork, cls).__new__(cls)
+            cls.wallet = None
+            cls.subtensor = None
+            cls.metagraph = None
+        return cls._instance
+
+    @classmethod
+    def initialize(cls, config):
+        if config.mock:
+            cls.wallet = bt.MockWallet(config=config)
+            cls.subtensor = bt.subtensor.mock(config=config)
+            cls.metagraph = cls.subtensor.metagraph()
+            cls.config = config
+        else:
+            cls.wallet = bt.wallet(config=config)
+            cls.subtensor = bt.subtensor(config=config)
+            cls.metagraph = cls.subtensor.metagraph(config.netuid)
+            cls.config = config
+
+        # Additional initialization logic here

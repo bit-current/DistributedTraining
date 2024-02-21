@@ -23,7 +23,7 @@ import bittensor as bt
 from loguru import logger
 
 
-def check_config(cls, config: "bt.Config"):
+def check_config(config: "bt.Config"):
     r"""Checks/validates the config namespace object."""
     bt.logging.check_config(config)
 
@@ -56,7 +56,7 @@ def check_config(cls, config: "bt.Config"):
         )
 
 
-def add_args(cls, parser):
+def add_neuron_args(parser):
     """
     Adds relevant arguments to the parser for operation.
     """
@@ -98,37 +98,11 @@ def add_args(cls, parser):
         default=False,
     )
 
-    parser.add_argument(
-        "--wandb.off",
-        action="store_true",
-        help="Turn off wandb.",
-        default=False,
-    )
-
-    parser.add_argument(
-        "--wandb.offline",
-        action="store_true",
-        help="Runs wandb in offline mode.",
-        default=False,
-    )
-
-    parser.add_argument(
-        "--wandb.notes",
-        type=str,
-        help="Notes to add to the wandb run.",
-        default="",
-    )
+    
 
 
-def add_miner_args(cls, parser):
+def add_miner_args(parser):
     """Add miner specific arguments to the parser."""
-
-    parser.add_argument(
-        "--neuron.name",
-        type=str,
-        help="Trials for this neuron go in neuron.root / (wallet_cold - wallet_hot) / neuron.name. ",
-        default="miner",
-    )
 
     parser.add_argument(
         "--blacklist.force_validator_permit",
@@ -144,30 +118,12 @@ def add_miner_args(cls, parser):
         default=False,
     )
 
-    parser.add_argument(
-        "--wandb.project_name",
-        type=str,
-        default="template-miners",
-        help="Wandb project to log to.",
-    )
-
-    parser.add_argument(
-        "--wandb.entity",
-        type=str,
-        default="opentensor-dev",
-        help="Wandb entity to log to.",
-    )
+    
 
 
-def add_validator_args(cls, parser):
+def add_validator_args(parser):
     """Add validator specific arguments to the parser."""
 
-    parser.add_argument(
-        "--neuron.name",
-        type=str,
-        help="Trials for this neuron go in neuron.root / (wallet_cold - wallet_hot) / neuron.name. ",
-        default="validator",
-    )
 
     parser.add_argument(
         "--neuron.timeout",
@@ -221,29 +177,17 @@ def add_validator_args(cls, parser):
         default=4096,
     )
 
-    parser.add_argument(
-        "--wandb.project_name",
-        type=str,
-        help="The name of the project where you are sending the new run.",
-        default="template-validators",
-    )
-
-    parser.add_argument(
-        "--wandb.entity",
-        type=str,
-        help="The name of the project where you are sending the new run.",
-        default="opentensor-dev",
-    )
+    
 
 
-def config(cls):
-    """
-    Returns the configuration object specific to this miner or validator after adding relevant arguments.
-    """
-    parser = argparse.ArgumentParser()
-    bt.wallet.add_args(parser)
-    bt.subtensor.add_args(parser)
-    bt.logging.add_args(parser)
-    bt.axon.add_args(parser)
-    cls.add_args(parser)
-    return bt.config(parser)
+# def config(cls):
+#     """
+#     Returns the configuration object specific to this miner or validator after adding relevant arguments.
+#     """
+#     parser = argparse.ArgumentParser()
+#     bt.wallet.add_args(parser)
+#     bt.subtensor.add_args(parser)
+#     bt.logging.add_args(parser)
+#     bt.axon.add_args(parser)
+#     cls.add_args(parser)
+#     return bt.config(parser)
