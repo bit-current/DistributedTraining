@@ -1,7 +1,5 @@
 > There is no passion to be found playing small - in settling for a life that is less than the one you are capable of living. Nelson Mandela.
 
-# Alone, we may be small. Together - we can do great things.
-
 # Distributed PyTorch Mining Framework
 
 ## Vision
