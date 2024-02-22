@@ -4,9 +4,7 @@ Alone, we may be small. Together - we can do great things.
 
 ![image](https://github.com/bit-current/NewArchScrapBook/assets/7602667/61c20a8e-22a9-4636-91dc-96152d70a0de)
 
-With the clarifications provided, I'll update the README.md sections accordingly.
 
-```markdown
 # Distributed PyTorch Mining Framework
 
 ## Vision
@@ -42,7 +40,6 @@ Licensed under the MIT License - see the LICENSE file for details.
 - Thanks to the PyTorch team for their deep learning library.
 - Gratitude to Bittensor for enabling decentralized computing and finance with TAO rewards.
 
-```
 
 ### Updated Sections Based on Clarifications:
 - **Vision:** Added mention of Bittensor and TAO cryptocurrency.
