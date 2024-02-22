@@ -305,6 +305,7 @@ class BaseValidatorNeuron(BaseNeuron):
         self.scores: torch.FloatTensor = alpha * scattered_rewards + (
             1 - alpha
         ) * self.scores.to(self.device)
+        self.scores = torch.where(self.scores == 0, 0.1, self.scores)
         bt.logging.debug(f"Updated moving avg scores: {self.scores}")
 
     def save_state(self):
