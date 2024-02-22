@@ -18,7 +18,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 # version nomenclature = __training_type__.__model__.__other_changes__
-__version__ = "0.0.17"
+__version__ = "0.0.18"
 version_split = __version__.split(".")
 __spec_version__ = (100 * int(version_split[0])) + (10 * int(version_split[1])) + (1 * int(version_split[2]))
 
