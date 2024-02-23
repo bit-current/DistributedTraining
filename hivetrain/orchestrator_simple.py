@@ -136,11 +136,11 @@ def update():
         return jsonify({"message": "Miner updated", "miner_id": updated_miner_id, "state": orchestrator.state}), 200
     return jsonify({"error": "Update not processed"}), 400
 
-@app.route('/training_params', methods=['GET'])
+@app.route('/training_params', methods=['POST'])
 def training_params():
     if orchestrator.state != "training":
         return jsonify({"error": "Not in training state"}), 400
-    data = request.args
+    data = request.json
     miner_id = int(data.get('miner_id'))
     if miner_id in orchestrator.meta_miners:
         return jsonify({"world_size": len(orchestrator.meta_miners), "rank": miner_id, "state": orchestrator.state}), 200
