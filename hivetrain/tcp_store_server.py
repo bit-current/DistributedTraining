@@ -14,7 +14,6 @@ def main(store_address, store_port, timeout=30):
     timeout = int(timeout)
     try:
         # Initialize the TCPStore
-        breakpoint()
         store = TCPStore(store_address, store_port, None, True,timedelta(seconds=timeout))
         logging.info(f"TCPStore running at {store_address}:{store_port}")
 

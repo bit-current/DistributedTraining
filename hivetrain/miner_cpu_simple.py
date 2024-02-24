@@ -17,9 +17,11 @@ import json
 import requests
 import os
 from substrateinterface import Keypair
+from hivetrain.config import Configurator
+from hivetrain.btt_connector import BittensorNetwork
+
 
 # Assuming the Keypair for the miner is generated or loaded here
-miner_keypair = Keypair.create_from_mnemonic(Keypair.generate_mnemonic())
 
 # def sign_message(message):
 #     message_bytes = json.dumps(message, sort_keys=True).encode()
@@ -94,7 +96,7 @@ def create_signed_message(message):
 def send_metrics(metrics, rank, validator_urls):
     timestamp = time.time()
     message, signature, public_address = create_signed_message(timestamp)
-    data = {'message': message, 'signature': signature, 'public_address': public_address, "metrics", metrics, "rank": rank}
+    data = {'message': message, 'signature': signature, 'public_address': public_address, "metrics": metrics, "rank": rank}
     # Ensure metrics is a dictionary
     if not isinstance(metrics, dict):
         raise ValueError("Metrics must be provided as a dictionary.")

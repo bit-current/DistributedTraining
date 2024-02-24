@@ -5,8 +5,8 @@ import bittensor as bt
 from loguru import logger
 from argparse import ArgumentParser
 import bittensor as bt
-from .hivetrain_config import add_meta_miner_args, add_orchestrator_args#s, add_validator_args
-from .base_subnet_config import add_neuron_args, add_miner_args, add_validator_args
+from .hivetrain_config import add_meta_miner_args, add_orchestrator_args, add_torch_miner_args #s, add_validator_args
+from .base_subnet_config import add_neuron_args, add_validator_args, add_miner_args
 
 
 def check_config(cls, config: "bt.Config"):
@@ -50,6 +50,7 @@ class Configurator:
         bt.logging.add_args(parser)
         bt.axon.add_args(parser)
 
+        add_torch_miner_args(parser)
         add_meta_miner_args(parser)
         add_orchestrator_args(parser)
         add_neuron_args(parser)

@@ -52,6 +52,7 @@ def get_training_params(orchestrator_url, miner_id):
 
 def start_training(rank, world_size, miner_script, batch_size, epochs, validator_urls, store_address, store_port):
     # Ensure all command line arguments are strings
+    
     cmd = [
         "python", miner_script,
         f"--rank={str(rank)}",
@@ -77,6 +78,10 @@ def cleanup_child_processes(parent_pid, sig=signal.SIGTERM):
     for alive in still_alive:
         alive.kill()
 
+def sketchy_hack_for_local_runs(validator_ips, known_ip):
+    """Replaces known IPs with 127.0.0.1 for local runs."""
+    return [ip.replace(known_ip, "127.0.0.1") for ip in validator_ips]
+
 def main(orchestrator_url, miner_script, batch_size, epochs, tcp_store_address, tcp_store_port):
     miner_id = None
     torchrun_process = None
@@ -96,7 +101,10 @@ def main(orchestrator_url, miner_script, batch_size, epochs, tcp_store_address, 
                     print(f"Starting training with params: {training_params}")
                     # Extract and use training parameters
                     # TODO ensure the sn has slow tempo to fit this slow rate.
+                    
                     _, validator_ips = get_validator_uids_and_addresses(metagraph, config.neuron.vpermit_tao_limit)
+                    #validator_ips = sketchy_hack_for_local_runs(validator_ips, "213.173.105.85")
+                    validator_ips = ["127.0.0.1:3000"]
                     torchrun_process = start_training(training_params['rank'], training_params['world_size'], miner_script, batch_size, epochs, validator_ips, tcp_store_address, tcp_store_port)
             elif state == "onboarding" and torchrun_process:
                 # If the state has reverted to onboarding, terminate any running training process
