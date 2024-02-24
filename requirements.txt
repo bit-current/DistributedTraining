@@ -1,6 +1,5 @@
 bittensor
 flask
 requests
-signal
-substrateinterface
+substrate-interface
 torch
