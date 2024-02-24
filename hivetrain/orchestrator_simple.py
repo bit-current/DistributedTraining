@@ -14,8 +14,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def setupTCPStore(store_address, store_port, timeout = 30):
     try:
+        breakpoint()
         # Define the command to launch the TCPStore server script
-        command = ['python', 'tcp_store_server.py', store_address, str(store_port), timeout]
+        command = ['python', 'tcp_store_server.py', store_address, str(store_port), str(timeout)]
         # Launch the TCPStore server as a subprocess
         process = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         logging.info(f"Launched TCPStore subprocess at {store_address}:{store_port}")
