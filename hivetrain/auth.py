@@ -5,6 +5,7 @@ from hivetrain.btt_connector import BittensorNetwork
 from substrateinterface import Keypair, KeypairType
 #metagraph = bittensor.metagraph()  # Ensure this metagraph is synced before using it in the decorator.
 
+
 def authenticate_request_with_bittensor(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):

@@ -18,6 +18,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # subtensor = btt.subtensor
 # metagraph = btt.metagraph
 
+
+
 def setupTCPStore(store_address, store_port):
     try:
         # Define the command to launch the TCPStore server script
@@ -40,18 +42,18 @@ def check_subprocess(process):
             logging.error(f"TCPStore subprocess exited with errors: {stderr.decode()}")
 
 class Orchestrator:
-    def __init__(self, store_address = "127.0.0.1", store_port=4999, training_threshold = 3):
+    def __init__(self, training_threshold = 3):
         self.lock = threading.Lock()
         self.meta_miners = {}
         self.state = "onboarding"
         self.rank_counter = 0
         self.training_state_threshold = 1
-        self.max_inactive_time = 600  # seconds
+        self.max_inactive_time = 45  # seconds
         self.onboarding_time_limit = 20  # seconds for onboarding timeout
         self.onboarding_start_time = time.time()
         self.tcp_store_subprocess = None  # Track the TCPStore subprocess
-        self.store_address = store_address
-        self.store_port = store_port
+        self.store_address = os.environ.get("STORE_ADDRESS", "127.0.0.1")
+        self.store_port = int(os.environ.get("STORE_PORT", 4999))
 
     def register_or_update_miner(self, miner_id=None, trigger_error=False):
         with self.lock:

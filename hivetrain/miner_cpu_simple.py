@@ -12,7 +12,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 import requests
 import torch.distributed as dist
-
+import time
 import json
 import requests
 import os
@@ -81,9 +81,20 @@ def send_model_checksum(model, rank, validator_urls):
     checksum = hashlib.md5(model_bytes).hexdigest()
     # Send to each validator URL
     for url in validator_urls:
-        requests.post(f"{url}/validate_model", json={"rank": rank, "checksum": checksum})
+        requests.post(f"http://{url}/validate_model", json={"rank": rank, "checksum": checksum})
+
+# Existing meta_miner.py code with modifications to use Bittensor wallet for signing and authentication
+def create_signed_message(message):
+    """Sign a message and return the signature."""
+    global wallet
+    signature = wallet.hotkey.sign(message).hex()  # Convert bytes to hex string for easy transmission
+    public_address = wallet.hotkey.ss58_address
+    return message, signature, public_address
 
 def send_metrics(metrics, rank, validator_urls):
+    timestamp = time.time()
+    message, signature, public_address = create_signed_message(timestamp)
+    data = {'message': message, 'signature': signature, 'public_address': public_address, "metrics", metrics, "rank": rank}
     # Ensure metrics is a dictionary
     if not isinstance(metrics, dict):
         raise ValueError("Metrics must be provided as a dictionary.")
@@ -91,11 +102,12 @@ def send_metrics(metrics, rank, validator_urls):
     if not isinstance(validator_urls, list):
         raise ValueError("validator_urls must be provided as a list.")
     
-    metrics_data = json.dumps(metrics, sort_keys=True, ensure_ascii=True)
-    checksum = hashlib.md5(metrics_data.encode()).hexdigest()
     # Send to each validator URL
     for url in validator_urls:
-        requests.post(f"{url}/validate_metrics", json={"rank": rank, "checksum": checksum, "metrics": metrics})
+        try:
+            requests.post(f"http://{url}/validate_metrics", json={"rank": rank, "checksum": checksum, "metrics": metrics})
+        except:
+            pass#FIXME log sth
 
 class Net(nn.Module):
     def __init__(self):
@@ -178,17 +190,12 @@ def train(rank, world_size, epochs, batch_size, validator_urls, store_address, s
     cleanup()
 
 if __name__ == "__main__":
-    import os
-    parser = argparse.ArgumentParser(description='PyTorch DDP Example')
-    parser.add_argument('--epochs', type=int, default=1)
-    parser.add_argument('--batch-size', type=int, default=1)
-    parser.add_argument('--rank', type=int, required=True, help='Rank of process/node in training run')
-    parser.add_argument('--world-size', type=int, required=True, help='Number of processes/nodes in training run')
-    parser.add_argument('--validator-urls', type=str,nargs="+", help='URLs of the test validators')#FIXME add the main from btt
-    parser.add_argument('--store-address', type=str,default="127.0.0.1", help='IP/URL of the TCPStore')#FIXME add the main from btt
-    parser.add_argument('--store-port', type=int,default=4999, help='Port of the test TCPStore')#FIXME add the main from btt
+    config = Configurator.combine_configs()
+    #FIXME add wallet, etc
+    BittensorNetwork.initialize(config)
+    wallet = BittensorNetwork.wallet
+    subtensor = BittensorNetwork.subtensor
+    metagraph = BittensorNetwork.metagraph
 
-    args = parser.parse_args()
-
-    train(rank=args.rank, world_size=args.world_size, epochs=args.epochs, batch_size=args.batch_size, validator_urls=args.validator_urls,
-        store_address=args.store_address, store_port=args.store_port)
+    train(rank=config.rank, world_size=config.world_size, epochs=config.epochs, batch_size=config.batch_size, validator_urls=config.validator_urls,
+        store_address=config.store_address, store_port=config.store_port)

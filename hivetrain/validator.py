@@ -6,6 +6,7 @@ from hivetrain.auth import authenticate_request_with_bittensor
 from hivetrain.config import Configurator
 from hivetrain.btt_connector import sync, BittensorNetwork, serve_axon
 from hivetrain import __spec_version__
+import torch
 
 app = Flask(__name__)
 
@@ -126,9 +127,10 @@ def before_request():
         run_evaluation()
         last_evaluation_time = current_time
 
-    global last_sync_time
+    global last_sync_time, sync_interval
     # Existing before_request code...
-    last_sync_time = sync(last_sync_time)  # Ensure the validator is synchronized with the network state before processing any request.
+    last_sync_time = sync(last_sync_time,sync_interval)  # Ensure the validator is synchronized with the network state before processing any request.
+
 
 @app.route('/validate_model', methods=['POST'])
 @authenticate_request_with_bittensor
@@ -151,5 +153,5 @@ if __name__ == "__main__":
     config = Configurator.combine_configs()
 
     BittensorNetwork.initialize(config)
-    serve_axon(config.netuid,config.host_address,config.host_address, config.port, config.port)
+    serve_axon(config.netuid,config.axon.ip,config.axon.external_ip, config.axon.port, config.axon.external_port)
     app.run(host="0.0.0.0", port=config.port)
