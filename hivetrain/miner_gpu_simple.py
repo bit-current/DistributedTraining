@@ -50,7 +50,8 @@ def setup(rank, world_size, store_address, store_port, timeout=30):
     #torch.distributed.destroy_process_group()
     print(f"World Size in miner process: {world_size} @ rank {rank}")
     store = TCPStore(store_address, store_port, None,False,timedelta(seconds=timeout) )
-    torch.distributed.init_process_group("gloo", rank=rank, world_size=world_size, store=store)
+    torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size, store=store)
+    torch.cuda.set_device(int(os.environ.get("LOCAL_RANK", "0")))
     #torch.cuda.set_device(rank)
 
 def cleanup():
@@ -146,11 +147,13 @@ def train(rank, world_size, epochs, batch_size, validator_urls, store_address, s
     ])
     print("loading dataset")
     dataset = datasets.MNIST('../data', train=True, download=True, transform=transform)
-    sampler = DistributedSampler(dataset, num_replicas=2, rank=rank, shuffle=True)
+    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=True)
     train_loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler)
     print("loading model")
+    LOCAL_RANK = int(os.environ.get("LOCAL_RANK", "0"))
     model = Net()
-    model = DDP(model)
+    model = model.to(LOCAL_RANK)
+    model = DDP(model, device_ids=[int(os.environ.get("LOCAL_RANK", "0"))])
     optimizer = optim.Adam(model.parameters())
 
     #validate_gradient_hook = ValidateGradientHook(validator_urls)
@@ -161,13 +164,14 @@ def train(rank, world_size, epochs, batch_size, validator_urls, store_address, s
     for epoch in range(epochs):
         print("begin training")
         #world_size = update_world_size(orchestrator_url)
-        sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=True)
+        sampler = DistributedSampler(dataset, num_replicas=2, rank=rank, shuffle=True)
         print("Loading data")
         train_loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler)
         model.train()
         sampler.set_epoch(epoch)
+        
         for batch_idx, (data, target) in enumerate(train_loader):
-            data, target = data, target
+            data, target = data.to(LOCAL_RANK), target.to(LOCAL_RANK)
             optimizer.zero_grad()
             output = model(data)
             loss = nn.functional.nll_loss(output, target)
