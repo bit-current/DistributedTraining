@@ -1,3 +1,5 @@
+import functools
+
 import argparse
 import hashlib
 import torch
