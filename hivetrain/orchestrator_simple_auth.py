@@ -46,9 +46,9 @@ class Orchestrator:
         self.meta_miners = {}
         self.state = "onboarding"
         self.rank_counter = 0
-        self.training_state_threshold = 1
+        self.training_state_threshold = 3
         self.max_inactive_time = 45  # seconds
-        self.onboarding_time_limit = 1  # seconds for onboarding timeout
+        self.onboarding_time_limit = 300  # seconds for onboarding timeout
         self.onboarding_start_time = time.time()
         self.tcp_store_subprocess = None  # Track the TCPStore subprocess
         self.store_address = os.environ.get("STORE_ADDRESS", "127.0.0.1")
