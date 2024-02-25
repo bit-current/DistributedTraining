@@ -169,7 +169,7 @@ def train(rank, world_size, epochs, batch_size, validator_urls, store_address, s
     my_auto_wrap_policy = functools.partial(
         size_based_auto_wrap_policy, min_num_params=100
     )
-    torch.cuda.set_device(rank)
+    torch.cuda.set_device(LOCAL_RANK)
     model = Net().to(LOCAL_RANK)
     model = FSDP(model, auto_wrap_policy=my_auto_wrap_policy, cpu_offload=CPUOffload(offload_params=True))
     optimizer = optim.Adam(model.parameters())
