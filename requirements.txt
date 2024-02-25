@@ -3,3 +3,4 @@ flask
 requests
 substrate-interface
 torch
+torchvision
