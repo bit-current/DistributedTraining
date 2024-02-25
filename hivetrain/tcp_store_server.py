@@ -28,7 +28,7 @@ def main(store_address, store_port, timeout=30):
         sys.exit(1)
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         logging.error("Usage: python tcp_store_server.py <store_address> <store_port> <timeout_interval>")
         sys.exit(1)
     main(sys.argv[1], sys.argv[2], sys.argv[3])

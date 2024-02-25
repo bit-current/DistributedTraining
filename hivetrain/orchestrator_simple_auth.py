@@ -25,8 +25,7 @@ def setupTCPStore(store_address, store_port, timeout = 30):
         # Define the command to launch the TCPStore server script
         command = ['python', 'tcp_store_server.py', store_address, str(store_port), str(timeout)]
         # Launch the TCPStore server as a subprocess
-        process = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        logging.info(f"Launched TCPStore subprocess at {store_address}:{store_port}")
+        process = subprocess.Popen(command, shell=False)
         return process
     except Exception as e:
         logging.error(f"Failed to launch TCPStore subprocess: {e}")
@@ -49,7 +48,7 @@ class Orchestrator:
         self.rank_counter = 0
         self.training_state_threshold = 1
         self.max_inactive_time = 45  # seconds
-        self.onboarding_time_limit = 20  # seconds for onboarding timeout
+        self.onboarding_time_limit = 1  # seconds for onboarding timeout
         self.onboarding_start_time = time.time()
         self.tcp_store_subprocess = None  # Track the TCPStore subprocess
         self.store_address = os.environ.get("STORE_ADDRESS", "127.0.0.1")

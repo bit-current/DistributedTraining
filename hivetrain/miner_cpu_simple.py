@@ -10,7 +10,6 @@ from torch.distributed import TCPStore
 from torch.nn.parallel import DistributedDataParallel as DDP
 #from torch.distributed.ddp import DistributedDataParallel as FSDP
 from torch.utils.data import DataLoader
-import requests
 import torch.distributed as dist
 import time
 import json
@@ -19,7 +18,7 @@ import os
 from substrateinterface import Keypair
 from hivetrain.config import Configurator
 from hivetrain.btt_connector import BittensorNetwork
-
+from datetime import timedelta
 
 # Assuming the Keypair for the miner is generated or loaded here
 
@@ -47,10 +46,10 @@ from hivetrain.btt_connector import BittensorNetwork
 
 
 
-def setup(rank, world_size, store_address, store_port):
+def setup(rank, world_size, store_address, store_port, timeout=30):
     #torch.distributed.destroy_process_group()
     print(f"World Size in miner process: {world_size} @ rank {rank}")
-    store = TCPStore(store_address, store_port, None,False )
+    store = TCPStore(store_address, store_port, None,False,timedelta(seconds=timeout) )
     torch.distributed.init_process_group("gloo", rank=rank, world_size=world_size, store=store)
     #torch.cuda.set_device(rank)
 
