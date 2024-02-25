@@ -223,4 +223,4 @@ if __name__ == "__main__":
     metagraph = BittensorNetwork.metagraph
 
     train(rank=config.rank, world_size=config.world_size, epochs=config.epochs, batch_size=config.batch_size, validator_urls=config.validator_urls,
-        store_address=config.store_address, store_port=config.store_port)
+        store_address=config.tcp_store_address, store_port=config.tcp_store_port)
