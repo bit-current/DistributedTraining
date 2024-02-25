@@ -171,7 +171,7 @@ def train(rank, world_size, epochs, batch_size, validator_urls, store_address, s
     )
     torch.cuda.set_device(rank)
     model = Net().to(LOCAL_RANK)
-    model = FSDP(model, fsdp_auto_wrap_policy=my_auto_wrap_policy, cpu_offload=CPUOffload(offload_params=True))
+    model = FSDP(model, auto_wrap_policy=my_auto_wrap_policy, cpu_offload=CPUOffload(offload_params=True))
     optimizer = optim.Adam(model.parameters())
 
     #validate_gradient_hook = ValidateGradientHook(validator_urls)
