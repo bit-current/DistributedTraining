@@ -77,7 +77,7 @@ def start_training(rank, world_size, miner_script, batch_size, epochs, validator
         f"--batch-size={str(batch_size)}",
         f"--store-address={store_address}",
         f"--store-port={str(store_port)}",
-        f"--subtensor.chain_endpoint=ws://127.0.0.1:9946"
+        f"--subtensor.network=train" #FIXME local only pass all args automatically from parent
     ]
     if len(validator_urls) > 0:
         cmd += ["--validator-urls"] + validator_urls
