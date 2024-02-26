@@ -1,6 +1,7 @@
 > There is no passion to be found playing small - in settling for a life that is less than the one you are capable of living. Nelson Mandela.
 
-# Distributed PyTorch Mining Framework
+# Distributed PyTorch Mining Framework 
+(WARNING : IN ACTIVE DEVELOPMENT)
 
 ## Vision
 This project aims to revolutionize distributed computing and mining by leveraging PyTorch and the Bittensor blockchain. It introduces a scalable, efficient, and secure system for training deep learning models across distributed nodes. Participants are rewarded in TAO cryptocurrency for their computational contributions, fostering a decentralized ecosystem of computational resources.
