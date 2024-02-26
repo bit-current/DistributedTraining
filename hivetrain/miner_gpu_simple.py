@@ -46,15 +46,16 @@ from datetime import timedelta
 
 
 
-def setup(rank, world_size, store_address, store_port, timeout=30):
+def setup():
     #torch.distributed.destroy_process_group()
     try:
         torch.distributed.destroy_process_group()
     except:
         pass
-    print(f"World Size in miner process: {world_size} @ rank {rank}")
-    store = TCPStore(store_address, store_port, None,False,timedelta(seconds=timeout) )
-    torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size, store=store)
+    #store = TCPStore(store_address, store_port, None,False,timedelta(seconds=timeout) )
+    torch.distributed.init_process_group("nccl")#, rank=rank, world_size=world_size, store=store)
+    print(f"World Size in miner process: {os.environ["WORLD_SIZE"]} @ rank {os.environ["GLOBAL_RANK"]}")
+
     torch.cuda.set_device(int(os.environ.get("LOCAL_RANK", "0")))
     #torch.cuda.set_device(rank)
 
@@ -140,10 +141,10 @@ class Net(nn.Module):
         output = torch.log_softmax(x, dim=1)
         return output
 
-def train(rank, world_size, epochs, batch_size, validator_urls, store_address, store_port):
+def train(epochs, batch_size, validator_urls):
     print("setting up")
-    print(rank)
-    setup(rank, world_size, store_address, store_port)
+    
+    setup()
     
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -155,6 +156,7 @@ def train(rank, world_size, epochs, batch_size, validator_urls, store_address, s
     train_loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler)
     print("loading model")
     LOCAL_RANK = int(os.environ.get("LOCAL_RANK", "0"))
+    rank = os.environ["GLOBAL_RANK"]
     model = Net()
     model = model.to(LOCAL_RANK)
     model = DDP(model, device_ids=[int(os.environ.get("LOCAL_RANK", "0"))])
@@ -206,5 +208,4 @@ if __name__ == "__main__":
     subtensor = BittensorNetwork.subtensor
     metagraph = BittensorNetwork.metagraph
 
-    train(rank=config.rank, world_size=config.world_size, epochs=config.epochs, batch_size=config.batch_size, validator_urls=config.validator_urls,
-        store_address=config.tcp_store_address, store_port=config.tcp_store_port)
+    train(epochs=config.epochs, batch_size=config.batch_size, validator_urls=config.validator_urls)
