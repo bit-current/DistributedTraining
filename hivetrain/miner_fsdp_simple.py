@@ -221,9 +221,9 @@ def train(rank, world_size, epochs, batch_size, validator_urls, store_address, s
 if __name__ == "__main__":
     config = Configurator.combine_configs()
     #FIXME add wallet, etc
-    BittensorNetwork.initialize(config)
-    wallet = BittensorNetwork.wallet
-    subtensor = BittensorNetwork.subtensor
-    metagraph = BittensorNetwork.metagraph
+    # BittensorNetwork.initialize(config)
+    # wallet = BittensorNetwork.wallet
+    # subtensor = BittensorNetwork.subtensor
+    # metagraph = BittensorNetwork.metagraph
 
     train(epochs=config.epochs, batch_size=config.batch_size, validator_urls=config.validator_urls)
