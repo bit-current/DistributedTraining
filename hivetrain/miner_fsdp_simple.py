@@ -59,13 +59,14 @@ from datetime import timedelta
 
 
 def setup():
-    #torch.distributed.destroy_process_group()
+    os.environ['MASTER_ADDR'] = '192.168.88.181'
+    os.environ['MASTER_PORT'] = '58575'
+    rank = int(os.environ['RANK'])
+    world_size = int(os.environ['WORLD_SIZE'])
+    local_rank = int(os.environ['LOCAL_RANK'])
     
-    #store = TCPStore(store_address, store_port, None,False,timedelta(seconds=timeout) )
-    torch.distributed.init_process_group("nccl")#, rank=rank, world_size=world_size, store=store)
-    print(f"World Size in miner process: {os.environ["WORLD_SIZE"]} @ rank {os.environ["GLOBAL_RANK"]}")
-    torch.cuda.set_device(int(os.environ.get("LOCAL_RANK", "0")))
-    #torch.cuda.set_device(rank)
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
 
 def cleanup():
     torch.distributed.destroy_process_group()
