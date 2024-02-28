@@ -11,7 +11,7 @@ import argparse
 import os
 import random
 import numpy as np
-from time import timedelta
+from datetime import timedelta
 
 def set_random_seeds(random_seed=0):
 
