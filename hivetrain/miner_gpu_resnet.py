@@ -49,6 +49,7 @@ def main():
 
     # Each process runs on 1 GPU device specified by the local_rank argument.
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--local_rank", type=int, help="Rank.")
     parser.add_argument("--local_rank", type=int, help="Local rank. Necessary for using the torch.distributed.launch utility.")
     parser.add_argument("--num_epochs", type=int, help="Number of training epochs.", default=num_epochs_default)
     parser.add_argument("--batch_size", type=int, help="Training batch size for one process.", default=batch_size_default)
@@ -57,6 +58,9 @@ def main():
     parser.add_argument("--model_dir", type=str, help="Directory for saving models.", default=model_dir_default)
     parser.add_argument("--model_filename", type=str, help="Model filename.", default=model_filename_default)
     parser.add_argument("--resume", action="store_true", help="Resume training from saved checkpoint.")
+    parser.add_argument("--master_addr", required=True, type=str, help="Model filename.")
+    parser.add_argument("--master_port", required=True, type=int, help="Resume training from saved checkpoint.")
+    
     argv = parser.parse_args()
 
     local_rank = argv.local_rank
@@ -81,7 +85,9 @@ def main():
     set_random_seeds(random_seed=random_seed)
 
     # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
-    torch.distributed.init_process_group(backend="nccl")
+    torch.distributed.init_process_group(backend="nccl", 
+        init_method=f"tcp://{argv.master_addr}:{argv.master_port}",
+    )
     # torch.distributed.init_process_group(backend="gloo")
 
     # Encapsulate the model on the GPU assigned to the current process
