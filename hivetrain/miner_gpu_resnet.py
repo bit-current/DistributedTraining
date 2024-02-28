@@ -88,12 +88,12 @@ def main():
 
     # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
 
-    store = TCPStore(argv.master_addr, argv.master_port, None, False, timedelta(seconds=30))
+    #store = TCPStore(argv.master_addr, argv.master_port, None, False, timedelta(seconds=30))
 
         
     torch.distributed.init_process_group(backend="gloo", 
-        #init_method=f"tcp://{argv.master_addr}:{argv.master_port}",
-        store=store,
+        init_method=f"tcp://{argv.master_addr}:{argv.master_port}",
+        #store=store,
         rank=argv.rank,
         world_size=2
     )
