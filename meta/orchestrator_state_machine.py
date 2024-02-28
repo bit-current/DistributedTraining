@@ -2,19 +2,19 @@ from transitions.extensions import GraphMachine as Machine
 
 class Orchestrator(object):
     def on_enter_waiting(self):
-        print("Waiting for workers to join.")
+        print("🕒 Waiting for workers to join. Please stand by...")
 
     def on_enter_running(self):
-        print("Running task with joined workers.")
+        print("🚀 Running task with joined workers. Let's do this!")
 
     def on_enter_error_handling(self):
-        print("Handling error, attempting to reset task.")
+        print("🛠️ Handling error, attempting to reset task. Hang tight!")
 
     def on_enter_updating(self):
-        print("Updating reference checkpoint.")
+        print("🔄 Updating reference checkpoint. Almost there!")
 
     def on_enter_idle(self):
-        print("Orchestrator is idle, awaiting manual intervention or new tasks.")
+        print("💤 Orchestrator is idle, awaiting manual intervention or new tasks.")
 
 # Define the states
 states = ['waiting', 'running', 'error_handling', 'updating', 'idle']
