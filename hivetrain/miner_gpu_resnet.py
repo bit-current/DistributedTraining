@@ -11,6 +11,7 @@ import argparse
 import os
 import random
 import numpy as np
+from time import timedelta
 
 def set_random_seeds(random_seed=0):
 
@@ -85,8 +86,13 @@ def main():
     set_random_seeds(random_seed=random_seed)
 
     # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
+
+    store = TCPStore(master_addr, master_port, None, False, timedelta(seconds=30))
+
+        
     torch.distributed.init_process_group(backend="nccl", 
-        init_method=f"tcp://{argv.master_addr}:{argv.master_port}",
+        #init_method=f"tcp://{argv.master_addr}:{argv.master_port}",
+        store=store,
         rank=argv.rank,
         world_size=2
     )
