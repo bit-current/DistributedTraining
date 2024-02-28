@@ -50,8 +50,14 @@ Done : Train TINYGPT
 * All_reduce errors - on the list
 
 ## Frequently Asked Questions
-* What are the minimum requirements to run a validator? A GPU with a minimum of 16GB RAM e.g. RTX A4000
-* What are the minimum requirements to run a miner? A GPU with a minimum of 16GB RAM e.g. RTX A4000
+* **Q**:What are the minimum requirements to run a validator?
+   * **A** GPU with a minimum of 16GB RAM e.g. RTX A4000
+* **Q**: What are the minimum requirements to run a miner?
+   * **A**: GPU with a minimum of 16GB RAM e.g. RTX A4000
+* **Q**: I am running a miner and I see this: ERROR: Could not retrieve update: caught TypeError("StringParseError.init() missing 1 required positional argument: 'string'"), What am I doing wrong?
+   * **A**: Check your port and IP configuration. If you are using runpod, refer to this: https://docs.runpod.io/pods/configuration/expose-ports
+* **Q**: I am running a miner and I see this: ERROR: Attempt 2 to init DHT using initial_peer as /ip4/XX.XXX.XXX.XX, What am I doing wrong?
+   * **A**: Make sure you pull the latest changes from the remote repository. ```git pull``` Sometimes it can take several hundred attemps before connecting with peers. Eventually you should see in the logs "INFO: Step 1 Loss: 6.2343.."
 
 # Running a Miner on HiveMind : A Step-by-Step Guide 
 
