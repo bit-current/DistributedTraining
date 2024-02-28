@@ -87,6 +87,7 @@ def main():
     # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
     torch.distributed.init_process_group(backend="nccl", 
         init_method=f"tcp://{argv.master_addr}:{argv.master_port}",
+        rank=argv.rank,
         world_size=2
     )
     # torch.distributed.init_process_group(backend="gloo")
