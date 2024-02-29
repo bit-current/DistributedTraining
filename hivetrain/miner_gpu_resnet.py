@@ -95,7 +95,7 @@ def main():
 
     os.environ["MASTER_ADDR"] = argv.master_addr
     os.environ["MASTER_PORT"] = str(argv.master_port)
-    torch.distributed.init_process_group(backend="nccl", 
+    torch.distributed.init_process_group(backend="gloo", 
         init_method=f"tcp://{argv.master_addr}:{argv.master_port}",
         #store=store,
         rank=int(argv.rank),
