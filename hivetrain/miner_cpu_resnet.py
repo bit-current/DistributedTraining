@@ -101,7 +101,7 @@ def main():
         #store=store,
         rank=int(argv.rank),
         world_size=argv.world_size,
-        timeout=timedelta(seconds=5)
+        timeout=timedelta(seconds=30)
     )
     # torch.distributed.init_process_group(backend="gloo")
 
