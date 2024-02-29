@@ -94,7 +94,7 @@ def main():
     #     store = TCPStore(argv.master_addr, argv.master_port, None, False, timedelta(seconds=30))
 
         
-    torch.distributed.init_process_group(backend="gloo", 
+    torch.distributed.init_process_group(backend="nccl", 
         init_method=f"tcp://{argv.master_addr}:{argv.master_port}",
         #store=store,
         rank=argv.rank,
