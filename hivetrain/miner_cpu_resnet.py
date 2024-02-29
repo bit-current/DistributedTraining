@@ -22,7 +22,7 @@ def set_random_seeds(random_seed=0):
     np.random.seed(random_seed)
     random.seed(random_seed)
 
-def evaluate(model, device, test_loader):
+def evaluate(model, test_loader):
 
     model.eval()
 
@@ -140,7 +140,7 @@ def main():
         
         # Save and evaluate model routinely
         if epoch % 10 == 0:
-                accuracy = evaluate(model=ddp_model, device=device, test_loader=test_loader)
+                accuracy = evaluate(model=ddp_model, test_loader=test_loader)
                 torch.save(ddp_model.state_dict(), model_filepath)
                 print("-" * 75)
                 print("Epoch: {}, Accuracy: {}".format(epoch, accuracy))
