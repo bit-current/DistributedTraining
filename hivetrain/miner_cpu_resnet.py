@@ -62,6 +62,7 @@ def main():
     parser.add_argument("--resume", action="store_true", help="Resume training from saved checkpoint.")
     parser.add_argument("--master_addr", required=True, type=str, help="Model filename.")
     parser.add_argument("--master_port", required=True, type=int, help="Resume training from saved checkpoint.")
+    parser.add_argument("--world_size", type=int, help="Resume training from saved checkpoint.",default=2)
     
     argv = parser.parse_args()
 
@@ -99,7 +100,7 @@ def main():
         init_method=f"tcp://{argv.master_addr}:{argv.master_port}",
         #store=store,
         rank=int(argv.rank),
-        world_size=2,
+        world_size=argv.world_size,
         timeout=timedelta(seconds=5)
     )
     # torch.distributed.init_process_group(backend="gloo")
