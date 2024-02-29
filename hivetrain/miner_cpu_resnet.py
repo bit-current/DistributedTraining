@@ -13,6 +13,7 @@ import random
 import numpy as np
 from datetime import timedelta
 from torch.distributed import TCPStore
+from tqdm import tqdm
 
 def set_random_seeds(random_seed=0):
 
@@ -148,7 +149,7 @@ def main():
 
         ddp_model.train()
 
-        for data in train_loader:
+        for data in tqdm(train_loader):
             inputs, labels = data[0], data[1]
             optimizer.zero_grad()
             outputs = ddp_model(inputs)
