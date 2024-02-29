@@ -94,7 +94,7 @@ def main():
     #     store = TCPStore(argv.master_addr, argv.master_port, None, False, timedelta(seconds=30))
 
     os.environ["MASTER_ADDR"] = argv.master_addr
-    os.environ["MASTER_PORT"] = argv.master_port
+    os.environ["MASTER_PORT"] = str(argv.master_port)
     torch.distributed.init_process_group(backend="nccl", 
         init_method=f"tcp://{argv.master_addr}:{argv.master_port}",
         #store=store,
