@@ -97,7 +97,7 @@ def main():
     os.environ["MASTER_PORT"] = str(argv.master_port)
     torch.distributed.init_process_group(backend="nccl", 
         init_method=f"tcp://{argv.master_addr}:{argv.master_port}",
-        store=store,
+        #store=store,
         rank=int(argv.rank),
         world_size=2,
         timeout=timedelta(seconds=5)
