@@ -145,4 +145,4 @@ def train_fashion_mnist(num_workers=2, use_gpu=False):
 
 
 if __name__ == "__main__":
-    train_fashion_mnist(num_workers=4, use_gpu=True)
+    train_fashion_mnist(num_workers=2, use_gpu=True)
