@@ -75,16 +75,14 @@ class BaseMinerNeuron(BaseNeuron):
 
         # Init list of available DHT addresses from wandb
         api = wandb.Api()
-        initial_peers_list = self.config.neuron.initial_peers
+        initial_peers_list = set(self.config.neuron.initial_peers)
         runs = api.runs(
             f"{self.config.neuron.wandb_entity}/{self.config.neuron.wandb_project}"
         )
         for ru in runs:
             if ru.state == "running":
-                for peer in ru.config["neuron"]["initial_peers"]:
-                    if peer not in initial_peers_list:
-                        initial_peers_list.append(peer)
-
+                initial_peers_list.update(ru.config["neuron"]["initial_peers"])
+        initial_peers_list = list(initial_peers_list)
         # Init DHT
         retries = 0
         while retries <= len(initial_peers_list):
