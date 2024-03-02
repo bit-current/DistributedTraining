@@ -32,13 +32,13 @@ We are currently in our next project phase  (training a slightly larger GPT2 mod
 ## Live Status (Friday 16th Feb, 2024)
 Done : Train TINYGPT  
 * In Progress : GPT2 Training Run - 667m Params
-* Roadmap (Dropping 16 Feb 2024) - **see below**
-    * **Roadmap.Now** : Upgrade/stabilise subnet architecture (Due 02/24/24)
+* Roadmap
+    * **Roadmap.Now** : Upgrade/stabilise subnet architecture
         * Outcomes : Improves all aspects of subnet operations, validaton, mining experience and stability. Much more details to come.  
     * **Roadmap.Next** : Train even larger model (still deciding which one)
     * **Roadmap.Later** : Fintune and Serve LLM on bittensor
-* Office Hours (Timing TBC - Dropping 16 Feb 2024) - **see below**
-    * **Live Guided Mining from Scratch on Hivemind (S25) - Fri 23 Feb, time TBC - Beginner Friendly**
+* Office Hours (Timing TBC - Pending Architecture Upgrade)
+    * **Live Guided Mining from Scratch on Hivemind (S25)** 
 * Step-by-Step Guide to Mining on Hivemind (Dropping 16 Feb 2024) - **See below**
     * : See [Running a Miner on Testnet](https://github.com/bit-current/DistributedTraining/edit/main/docs/running_25_on_testnet.md).
 
@@ -58,6 +58,41 @@ Done : Train TINYGPT
    * **A**: Check your port and IP configuration. If you are using runpod, refer to this: https://docs.runpod.io/pods/configuration/expose-ports
 * **Q**: I am running a miner and I see this: ERROR: Attempt 2 to init DHT using initial_peer as /ip4/XX.XXX.XXX.XX, What am I doing wrong?
    * **A**: Make sure you pull the latest changes from the remote repository. ```git pull``` Sometimes it can take several hundred attemps before connecting with peers. Eventually you should see in the logs "INFO: Step 1 Loss: 6.2343.."
+
+## How Miners are Rewarded
+
+Hivetrain uses a simmple score assignment system designed to reward users for their participation and adherence to network guidelines. The system evaluates two critical aspects of user behavior: responsiveness and loss values. By applying a set of predefined rules, we aim to foster a healthy and productive network environment where all participants are incentivized to contribute positively. Whilst maintaining network integrity with few gameable variables.
+
+### 1.0 
+Users who actively respond to network activities and maintain their losses within an acceptable threshold are awarded a score of 1.0. This top score reflects exemplary user behavior and strict adherence to network standards, highlighting the user as a model participant.
+Responsive Users with Unacceptable Loss:
+
+### 0.3 
+Active users whose losses exceed the acceptable limits receive a reduced score of 0.3. While these users are engaged, the score signifies the need for improvement in managing their network activities to align with expected performance metrics.
+Non-responsive Users:
+
+### 0.1 
+Users who fail to respond to network prompts or activities are assigned a baseline score of 0.1. This score acts as a safety mechanism, ensuring that users are not severely penalized for inactivity during periods of network-wide disruptions. It is a minimal support to maintain user engagement, even when external factors affect their ability to participate.
+
+### Pseudocode 
+```
+for uid in uids:
+
+  responded = has_uid_responded(uid)
+  loss_acceptable = is_uid_within_acceptable_loss_value(uid, loss_responses)
+
+  if responded:
+    if loss_acceptable:
+      score = 1.0
+    else:
+      score = 0.3
+    else:
+    score = 0.1
+# baseline reward to keep miners afloat if there is a network wide issue.
+# leeches planning on sticking to this should be deregged by honest miners when network is up.
+
+scores[uid] = score
+```
 
 # Running a Miner on HiveMind : A Step-by-Step Guide 
 
