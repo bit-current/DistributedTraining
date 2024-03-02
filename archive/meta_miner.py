@@ -10,50 +10,6 @@ from hivetrain.config import Configurator
 from hivetrain.btt_connector import get_validator_uids_and_addresses, BittensorNetwork, serve_axon
 
 
-import requests
-
-class OrchestratorInterface:
-    def __init__(self, network_enabled=True):
-        self.network_enabled = network_enabled
-
-    def _send_request(self, url, method='post', data=None, params=None):
-        try:
-            if self.network_enabled:
-                if method == 'post':
-                    response = requests.post(url, json=data)
-                elif method == 'get':
-                    response = requests.get(url, params=params)
-                response.raise_for_status()  # Raises a HTTPError for bad responses
-                return response
-            else:
-                return self._mock_response(url, data, params)
-        except requests.exceptions.RequestException as e:
-            # Handle all request exceptions, including connection errors, timeouts, and HTTP errors
-            print(f"Request to {url} failed: {e}")
-            return None
-
-    def _mock_response(self, url, data, params):
-        mock_responses = {
-            '/register': {'status_code': 200, 'json': lambda: {'miner_id': 'mock_miner_id', 'state': 'registered'}},
-            '/update': {'status_code': 200, 'json': lambda: {'state': 'updated'}},
-            '/training_params': {'status_code': 200, 'json': lambda: {'params': 'mock_params'}}
-        }
-        response_path = url.split('/')[-1]
-        if response_path in mock_responses:
-            mock = mock_responses[response_path]
-            return type('MockResponse', (object,), {'status_code': mock['status_code'], 'json': mock['json'], 'raise_for_status': lambda: None})
-        else:
-            return type('MockResponse', (object,), {'status_code': 404, 'json': lambda: {'error': 'Not found'}, 'raise_for_status': lambda: None})
-
-    def register_with_orchestrator(self, orchestrator_url, data):
-        return self._send_request(f"{orchestrator_url}/register", method='post', data=data)
-
-    def update_orchestrator(self, orchestrator_url, data):
-        return self._send_request(f"{orchestrator_url}/update", method='post', data=data)
-
-    def get_training_params(self, orchestrator_url, data):
-        return self._send_request(f"{orchestrator_url}/training_params", method='post', data=data)
-
 # Existing meta_miner.py code with modifications to use Bittensor wallet for signing and authentication
 def create_signed_message(message):
     """Sign a message and return the signature."""
@@ -62,8 +18,36 @@ def create_signed_message(message):
     public_address = wallet.hotkey.ss58_address
     return message, signature, public_address
 
+def register_with_orchestrator(orchestrator_url):
+    """Attempt to register the miner with the orchestrator, using PublicKey authentication."""
+    timestamp = str(int(time.time()))
+    message, signature, public_address = create_signed_message(timestamp)
+    data = {'message': message, 'signature': signature, 'public_address': public_address}
+    response = requests.post(f"{orchestrator_url}/register", json=data)
+    if response.status_code == 200:
+        data = response.json()
+        return data.get('miner_id'), data.get('state')
+    else:
+        return None, response.json().get('error', 'Failed to register')
 
-orchestrator_interface = OrchestratorInterface(network_enabled=True)  # Assuming network is enabled, adjust as necessary
+def update_orchestrator(orchestrator_url, miner_id, trigger_error=False):
+    """Send an update to the orchestrator, optionally with an error trigger, using PublicKey authentication."""
+    timestamp = str(int(time.time()))
+    message, signature, public_address = create_signed_message(f"{timestamp}:{miner_id}:{trigger_error}")
+    data = {'miner_id': miner_id, 'trigger_error': trigger_error, 'message': message, 'signature': signature, 'public_address': public_address}
+    response = requests.post(f"{orchestrator_url}/update", json=data)
+    return response.json() if response.ok else None
+
+def get_training_params(orchestrator_url, miner_id):
+    """Retrieve training parameters from the orchestrator, using PublicKey authentication."""
+    timestamp = str(int(time.time()))
+    message, signature, public_address = create_signed_message(f"{timestamp}:{miner_id}")
+    data = {'miner_id': miner_id, 'message': message, 'signature': signature, 'public_address': public_address}
+    response = requests.post(f"{orchestrator_url}/training_params", json=data)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return None
 
 
 def start_training(rank, world_size, miner_script, batch_size, epochs, validator_urls, store_address, store_port):
@@ -77,7 +61,6 @@ def start_training(rank, world_size, miner_script, batch_size, epochs, validator
         f"--batch-size={str(batch_size)}",
         f"--store-address={store_address}",
         f"--store-port={str(store_port)}",
-        f"--subtensor.network=train" #FIXME local only pass all args automatically from parent
     ]
     if len(validator_urls) > 0:
         cmd += ["--validator-urls"] + validator_urls
@@ -108,22 +91,20 @@ def main(orchestrator_url, miner_script, batch_size, epochs, tcp_store_address, 
         message, signature, public_address = create_signed_message(timestamp)
         
         if miner_id is not None:
-            # Non-blocking check of the subprocess status
             if torchrun_process and torchrun_process.poll() is not None:
-                # Process has completed, check for errors
                 if torchrun_process.returncode != 0:
-                    # Process ended with an error, notify the orchestrator
                     print(f"Training process ended with error, return code {torchrun_process.returncode}. Notifying orchestrator.")
                     update_response = orchestrator_interface.update_orchestrator(orchestrator_url, {'miner_id': miner_id, 'trigger_error': True})
                     if update_response and update_response.status_code == 200:
                         print("Orchestrator notified about the error.")
                     else:
                         print("Failed to notify orchestrator about the error.")
-                    torchrun_process = None  # Reset process to allow for restart if needed
+                    torchrun_process = None
                     time.sleep(10)
-                    continue 
+                    continue
 
-        if miner_id is None:
+        # Add check for miner_id existence in Orchestrator response
+        if miner_id is None or (update_response and update_response.status_code == 404):
             registration_data = {'message': message, 'signature': signature, 'public_address': public_address}
             registration_response = orchestrator_interface.register_with_orchestrator(orchestrator_url, registration_data)
             if registration_response and registration_response.status_code == 200:
@@ -132,7 +113,7 @@ def main(orchestrator_url, miner_script, batch_size, epochs, tcp_store_address, 
                 print(f"Registered with miner ID: {miner_id}")
             else:
                 print("Failed to register with orchestrator. Retrying...")
-                time.sleep(10)  # Wait before retrying registration
+                time.sleep(10)
                 continue
 
         data = {'miner_id': miner_id, 'trigger_error': False, 'message': message, 'signature': signature, 'public_address': public_address}
@@ -161,7 +142,7 @@ def main(orchestrator_url, miner_script, batch_size, epochs, tcp_store_address, 
         else:
             print("Failed to update orchestrator. Retrying...")
         
-        time.sleep(10)  # Polling interval for loop
+        time.sleep(10)
 
 if __name__ == "__main__":
     config = Configurator.combine_configs() #argparse.ArgumentParser(description="Meta Miner Configuration")
