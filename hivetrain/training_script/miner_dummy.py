@@ -6,19 +6,21 @@ import torch.optim as optim
 from torch.utils.data.distributed import DistributedSampler
 from torchvision import datasets, transforms
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed import TCPStore
 from torch.nn.parallel import DistributedDataParallel as DDP
 #from torch.distributed.ddp import DistributedDataParallel as FSDP
 from torch.utils.data import DataLoader
-import requests
 import torch.distributed as dist
-
+import time
 import json
 import requests
 import os
 from substrateinterface import Keypair
+from hivetrain.config import Configurator
+from hivetrain.btt_connector import BittensorNetwork
+from datetime import timedelta
 
 # Assuming the Keypair for the miner is generated or loaded here
-miner_keypair = Keypair.create_from_mnemonic(Keypair.generate_mnemonic())
 
 # def sign_message(message):
 #     message_bytes = json.dumps(message, sort_keys=True).encode()
@@ -41,21 +43,14 @@ miner_keypair = Keypair.create_from_mnemonic(Keypair.generate_mnemonic())
 #         # Handle cases where the response is not in JSON format
 #         return {"error": "Failed to decode JSON response."}
 
-def join_orchestrator(orchestrator_url):
-    #response = send_signed_request(f"{orchestrator_url}/register", data={})
-    response = requests.post(f"{orchestrator_url}/register", data={}).json()
 
-    os.environ['RANK'] = str(response['rank'])
-    os.environ['WORLD_SIZE'] = str(response['world_size'])
-    return response['rank'], response['world_size']
 
-def update_world_size(orchestrator_url, rank):
-    #response = send_signed_request(f"{orchestrator_url}/update", data={"rank": rank})
-    response = requests.post(f"{orchestrator_url}/update", data={"rank": rank})
-    return response['world_size']
 
-def setup(rank, world_size):
-    torch.distributed.init_process_group("gloo", rank=rank, world_size=world_size)
+def setup(rank, world_size, store_address, store_port, timeout=30):
+    #torch.distributed.destroy_process_group()
+    print(f"World Size in miner process: {world_size} @ rank {rank}")
+    store = TCPStore(store_address, store_port, None,False,timedelta(seconds=timeout) )
+    torch.distributed.init_process_group("gloo", rank=rank, world_size=world_size, store=store)
     #torch.cuda.set_device(rank)
 
 def cleanup():
@@ -87,9 +82,20 @@ def send_model_checksum(model, rank, validator_urls):
     checksum = hashlib.md5(model_bytes).hexdigest()
     # Send to each validator URL
     for url in validator_urls:
-        requests.post(f"{url}/validate_model", json={"rank": rank, "checksum": checksum})
+        requests.post(f"http://{url}/validate_model", json={"rank": rank, "checksum": checksum})
+
+# Existing meta_miner.py code with modifications to use Bittensor wallet for signing and authentication
+def create_signed_message(message):
+    """Sign a message and return the signature."""
+    global wallet
+    signature = wallet.hotkey.sign(message).hex()  # Convert bytes to hex string for easy transmission
+    public_address = wallet.hotkey.ss58_address
+    return message, signature, public_address
 
 def send_metrics(metrics, rank, validator_urls):
+    timestamp = time.time()
+    message, signature, public_address = create_signed_message(timestamp)
+    data = {'message': message, 'signature': signature, 'public_address': public_address, "metrics": metrics, "rank": rank}
     # Ensure metrics is a dictionary
     if not isinstance(metrics, dict):
         raise ValueError("Metrics must be provided as a dictionary.")
@@ -97,11 +103,12 @@ def send_metrics(metrics, rank, validator_urls):
     if not isinstance(validator_urls, list):
         raise ValueError("validator_urls must be provided as a list.")
     
-    metrics_data = json.dumps(metrics, sort_keys=True, ensure_ascii=True)
-    checksum = hashlib.md5(metrics_data.encode()).hexdigest()
     # Send to each validator URL
     for url in validator_urls:
-        requests.post(f"{url}/validate_metrics", json={"rank": rank, "checksum": checksum, "metrics": metrics})
+        try:
+            requests.post(f"http://{url}/validate_metrics", json={"rank": rank, "checksum": checksum, "metrics": metrics})
+        except:
+            pass#FIXME log sth
 
 class Net(nn.Module):
     def __init__(self):
@@ -128,10 +135,10 @@ class Net(nn.Module):
         output = torch.log_softmax(x, dim=1)
         return output
 
-def train(rank, world_size, epochs, batch_size, orchestrator_url, validator_urls):
+def train(rank, world_size, epochs, batch_size, validator_urls, store_address, store_port):
     print("setting up")
     print(rank)
-    setup(rank, world_size)
+    setup(rank, world_size, store_address, store_port)
     
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -139,7 +146,7 @@ def train(rank, world_size, epochs, batch_size, orchestrator_url, validator_urls
     ])
     print("loading dataset")
     dataset = datasets.MNIST('../data', train=True, download=True, transform=transform)
-    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=True)
+    sampler = DistributedSampler(dataset, num_replicas=2, rank=rank, shuffle=True)
     train_loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler)
     print("loading model")
     model = Net()
@@ -168,9 +175,15 @@ def train(rank, world_size, epochs, batch_size, orchestrator_url, validator_urls
             optimizer.step()
             if batch_idx % 10 == 0:
                 print(f"Rank {rank}, Epoch {epoch}, Batch {batch_idx}, Loss {loss.item()}")
-                send_metrics({"loss": loss.item()}, rank, validator_urls)
+                try:
+                    send_metrics({"loss": loss.item()}, rank, validator_urls)
+                except Exception as e:
+                    print(e)
 
-        send_model_checksum(model, rank, validator_urls)
+        try:
+            send_model_checksum(model, rank, validator_urls)
+        except Exception as e:
+            print(e)
 
     if rank == 0:
         torch.save(model.state_dict(), "mnist_model.pt")
@@ -178,15 +191,12 @@ def train(rank, world_size, epochs, batch_size, orchestrator_url, validator_urls
     cleanup()
 
 if __name__ == "__main__":
-    import os
-    parser = argparse.ArgumentParser(description='PyTorch FSDP Example')
-    parser.add_argument('--epochs', type=int, default=1)
-    parser.add_argument('--batch-size', type=int, default=1)
-    parser.add_argument('--orchestrator-url', type=str, required=True, help='URL of the orchestrator server')
-    parser.add_argument('--world-size', type=int, required=True, help='URL of the orchestrator server')
-    parser.add_argument('--validator-urls', type=str,nargs="+", help='URLs of the test validators')
+    config = Configurator.combine_configs()
+    #FIXME add wallet, etc
+    BittensorNetwork.initialize(config)
+    wallet = BittensorNetwork.wallet
+    subtensor = BittensorNetwork.subtensor
+    metagraph = BittensorNetwork.metagraph
 
-    args = parser.parse_args()
-
-    rank, _ = join_orchestrator(args.orchestrator_url)
-    train(rank, args.world_size, args.epochs, args.batch_size, args.orchestrator_url, args.validator_urls)
+    train(rank=config.rank, world_size=config.world_size, epochs=config.epochs, batch_size=config.batch_size, validator_urls=config.validator_urls,
+        store_address=config.store_address, store_port=config.store_port)

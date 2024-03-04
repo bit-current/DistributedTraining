@@ -5,13 +5,14 @@ import bittensor as bt
 from loguru import logger
 
 def add_meta_miner_args(parser):
-    parser.add_argument("--orchestrator-url", type=str, help="URL of the orchestrator")
-    parser.add_argument("--miner-script", type=str, default="miner_cpu.py", help="The miner script to execute for training")
-    parser.add_argument("--batch-size", type=int, default=64, help="Batch size per forward/backward pass")
-    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs to train")
-    parser.add_argument('--validator-urls', type=str, nargs="+", help='URLs of the validators for local testing only')
-    parser.add_argument('--tcp-store-address', type=str, help='URLs of the validators for local testing only')
-    parser.add_argument('--tcp-store-port', type=int, help='URLs of the validators for local testing only')
+    #parser.add_argument("--meta-miner.log-activity", type=bool, help="Display logging message every request")
+    parser.add_argument("--meta-miner.orchestrator-url", type=str, help="URL of the orchestrator")
+    parser.add_argument("--meta-miner.miner-script", type=str, default="miner_cpu.py", help="The miner script to execute for training")
+    parser.add_argument("--miner.batch-size", type=int, default=64, help="Batch size per forward/backward pass")
+    parser.add_argument("--miner.epochs", type=int, default=100, help="Number of epochs to train")
+    parser.add_argument('--miner.validator-urls', type=str, nargs="+", help='URLs of the validators for local testing only')
+    parser.add_argument('--miner.tcp-store-address', type=str, help='URLs of the validators for local testing only')
+    parser.add_argument('--miner.tcp-store-port', type=int, help='URLs of the validators for local testing only')
 
 def add_torch_miner_args(parser):
     parser.add_argument('--rank', type=int, help='Rank of process/node in training run')

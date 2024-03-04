@@ -19,9 +19,6 @@ def initialize_bittensor_objects():
         subtensor = bt.subtensor(config=base_config)
         metagraph = subtensor.metagraph(base_config.netuid)
 
-    # Ensure the miner's hotkey is registered on the network
-    # FIXME add check for miners and valis
-    # 
 
 def check_registered(netuid):
     

@@ -1,16 +1,15 @@
 import argparse
 import atexit
 import bittensor
-import requests
-import time
-import subprocess
 import json
+import os
+import requests
 import signal
+import subprocess
+import time
+
 from hivetrain.config import Configurator
 from hivetrain.btt_connector import get_validator_uids_and_addresses, BittensorNetwork, serve_axon
-
-
-import requests
 
 class OrchestratorInterface:
     def __init__(self, network_enabled=True):
@@ -77,7 +76,7 @@ def start_training(rank, world_size, miner_script, batch_size, epochs, validator
         f"--batch-size={str(batch_size)}",
         f"--store-address={store_address}",
         f"--store-port={str(store_port)}",
-        f"--subtensor.network=train" #FIXME local only pass all args automatically from parent
+        #f"--subtensor.network=train" #FIXME local only pass all args automatically from parent
     ]
     if len(validator_urls) > 0:
         cmd += ["--validator-urls"] + validator_urls
@@ -159,6 +158,7 @@ def main(orchestrator_url, miner_script, batch_size, epochs, tcp_store_address, 
                 torchrun_process = None
                 print("Training process terminated, ready for next run.")
         else:
+            miner_id = None
             print("Failed to update orchestrator. Retrying...")
         
         time.sleep(10)  # Polling interval for loop
@@ -179,7 +179,7 @@ if __name__ == "__main__":
     metagraph = BittensorNetwork.metagraph
 
     #serve_on_subtensor(config.host_address, config.port, config.netuid, max_retries=5, wait_for_inclusion=True, wait_for_finalization=True) #FIXME hardcoded to localhost
-    serve_axon(config.netuid,config.host_address,config.host_address, config.port, config.port)
+    serve_axon(config.netuid,config.axon.ip,config.axon.external_ip, config.axon.port, config.axon.external_port)
 
-    main(config.orchestrator_url, config.miner_script, config.batch_size, config.epochs, 
-        config.tcp_store_address, config.tcp_store_port)
+    main(config.meta_miner.orchestrator_url, config.meta_miner.miner_script, config.miner.batch_size, config.miner.epochs, 
+        os.environ.get("STORE_ADDRESS", "127.0.0.1"), os.environ.get("STORE_PORT", 4999))

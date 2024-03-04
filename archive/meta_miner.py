@@ -159,7 +159,6 @@ if __name__ == "__main__":
     subtensor = BittensorNetwork.subtensor
     metagraph = BittensorNetwork.metagraph
 
-    #serve_on_subtensor(config.host_address, config.port, config.netuid, max_retries=5, wait_for_inclusion=True, wait_for_finalization=True) #FIXME hardcoded to localhost
     serve_axon(config.netuid,config.host_address,config.host_address, config.port, config.port)
 
     main(config.orchestrator_url, config.miner_script, config.batch_size, config.epochs, 

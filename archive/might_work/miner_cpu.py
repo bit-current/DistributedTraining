@@ -154,7 +154,7 @@ if __name__ == '__main__':
     parser.add_argument("--world-size", type=int, default=3, help="World size for the distributed training")
     parser.add_argument("--batch-size", type=int, default=1, help="Size of batch per forward/backward pass")
     parser.add_argument("--epochs", type=int, default=100, help="Number of epochs to train")
-    parser.add_argument('--validator-urls', type=str,nargs="+", help='URLs of the test validators')#FIXME add the main from btt
+    parser.add_argument('--validator-urls', type=str,nargs="+", help='URLs of the test validators')
 
     args = parser.parse_args()
 
