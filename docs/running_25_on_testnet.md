@@ -1,5 +1,5 @@
 # Running a Miner on Testnet: A Step-by-Step Guide
-Welcome to the step-by-step guide for running a miner/validator on the testnet. This guide is designed to help you set up and test on subnet 25.
+Welcome to the step-by-step guide for running a miner/validator on the testnet. This guide is designed to help you set up and test on subnet 25 on the mainnet. Which is subnet 100 on the testnet.
 
 ### Prerequisites
 Before you start, ensure your system meets the following requirements:
@@ -26,9 +26,9 @@ Before you start, ensure your system meets the following requirements:
 ### Registration
 Check Registration Cost: In order to 'mine' you need to register on the subnet (testnet). Remember registration may cost you Tao but this is just test tao which can be created. Ask on the bittensor discord
 
-Register on Subnet 25: To register, execute the following command:    
+Register on Subnet 100: To register, execute the following command:    
 
-```btcli subnet register --netuid 25 --subtensor.network test --wallet.name miner --wallet.hotkey hotkey```
+```btcli subnet register --netuid 100 --subtensor.network test --wallet.name miner --wallet.hotkey hotkey```
 
 ### Running a Miner
 To start mining on the testnet, follow these steps:
@@ -38,7 +38,7 @@ Use the following command to start the miner. Replace placeholders with your act
 ```
 chmod +x run_miner.sh \
 pm2 start run_miner.sh --name distributed_training_miner_auto_update --
-    --netuid <your netuid>  # Must be attained by following the instructions in the docs/running_on_*.md files
+    --netuid 100  
     --subtensor.network test
     --wallet.name <your miner wallet> # Must be created using the bittensor-cli
     --wallet.hotkey <your validator hotkey> # Must be created using the bittensor-cli
@@ -53,7 +53,7 @@ Use the following command to start the validator. Replace placeholders with your
 ```
 chmod +x run_validator.sh
 pm2 start run_validator.sh --name distributed_training_auto_update --
-    --netuid 25 # Must be attained by following the instructions in the docs/running_on_*.md files
+    --netuid 100
     --subtensor.network test
     --wallet.name <your validator wallet>  # Must be created using the bittensor-cli
     --wallet.hotkey <your validator hotkey> # Must be created using the bittensor-cli
