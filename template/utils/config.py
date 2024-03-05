@@ -172,7 +172,7 @@ def add_args(cls, parser):
         "--neuron.wandb_project",
         type=str,
         help="The wandb project to log to",
-        default="subnet25",
+        default="subnet25_pii",
     )
 
     parser.add_argument(
