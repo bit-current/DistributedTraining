@@ -1,5 +1,7 @@
 bittensor
+bitarray==2.9.2
 datasets
 transformers
 hivemind
 wandb
+bitarray
