@@ -22,6 +22,7 @@ import os
 import bittensor as bt
 import torch
 from loguru import logger
+from template import __version__
 
 
 def check_config(cls, config: "bt.Config"):
@@ -91,7 +92,7 @@ def add_args(cls, parser):
         "--neuron.epoch_length",
         type=int,
         help="The default epoch length (how often we set weights, measured in 12 second blocks).",
-        default=100,
+        default=200,
     )
 
     parser.add_argument(
@@ -114,8 +115,12 @@ def add_args(cls, parser):
         nargs="+",
         help="The addresses for the DHT",
         default=[
-            "/ip4/161.97.156.125/tcp/8001/p2p/12D3KooWNrfkQ8DX2RHW4c98c8As11wMNA425WTNohijyJQdA84Y",
-            "/ip4/54.205.54.19/tcp/8008/p2p/12D3KooWMY4YGYZ6JkWaCNKUeKQHAuxeQcMeoNfKHbbRXVoBaMiZ",
+            "/ip4/213.173.105.85/tcp/18159/p2p/12D3KooWPgc7rwVmrbidRbZ69HwGcVMoNFv6wrAMYATpnA5rqtdW",
+            "/ip4/213.173.105.85/tcp/18160/p2p/12D3KooWLUNSfCatD5GGi2KofLdVp6XiBm1sjmJJuN7R69hj9AUr",
+            "/ip4/213.173.105.85/tcp/18161/p2p/12D3KooWDFbknTvPDk2yZfrHnLuQiDchQ7UVcyaupviXAJtHrXaw",
+            "/ip4/213.173.105.85/tcp/12845/p2p/12D3KooWSmfQUqbfgHav95LCVJQ93pnu1ZZXXyztMwAAfruB6WKP",
+            "/ip4/213.173.105.85/tcp/12846/p2p/12D3KooWG3asUyjWkL2SbN83aF6dJGE1NV2hoCfY7kQF2mjkXR3J",
+            "/ip4/213.173.105.85/tcp/12847/p2p/12D3KooWQm7EtkXrAjfXMiLS74zaFkWScoiEM1VdAxPmrovfdCrE"
         ],
     )
 
@@ -123,42 +128,49 @@ def add_args(cls, parser):
         "--neuron.model_name",
         type=str,
         help="The model to be trained",
-        default="sshleifer/tiny-gpt2",
+        default="mekaneeky/gpt2-677m",
     )
 
     parser.add_argument(
         "--neuron.lr",
         type=float,
         help="The learning rate",
-        default=0.0001,
+        default=0.001
     )
 
     parser.add_argument(
         "--neuron.dataset_name",
         type=str,
         help="The datasets the model will be trained on",
-        default="wikitext",
+        default="tiiuae/falcon-refinedweb",
     )
 
     parser.add_argument(
         "--neuron.local_batch_size_train",
         type=int,
         help="The default batch size",
-        default=20,
+        default=1,
     )
 
     parser.add_argument(
         "--neuron.global_batch_size_train",
         type=int,
         help="The hivemind global target_batch_size",
-        default=3200,
+        default=250*20,
+    )
+
+    parser.add_argument(
+        "--neuron.local_gradient_accumilation_steps_train",
+        type=int,
+        help="The default batch size",
+        default=4,
     )
 
     parser.add_argument(
         "--neuron.run_id",
         type=str,
         help="The DHT run_id",
-        default="s25_run_v1_1",
+        default=f"s25_run_v{__version__.replace('.','_')}",
     )
 
     parser.add_argument(
@@ -200,7 +212,14 @@ def add_args(cls, parser):
             "--neuron.local_batch_size_test",
             type=int,
             help="The default batch size",
-            default=20,
+            default=1,
+        )
+
+        parser.add_argument(
+            "--neuron.local_gradient_accumilation_steps_test",
+            type=int,
+            help="The default batch size",
+            default=4,
         )
 
         parser.add_argument(
@@ -221,7 +240,7 @@ def add_args(cls, parser):
             "--neuron.training_examples_per_miner",
             type=int,
             help="The number of rows to train on per miner",
-            default=200,
+            default=25,
         )
 
         parser.add_argument(

@@ -82,10 +82,13 @@ class Train( bt.Synapse ):
     # optimizer_name: str = "adam"
 
     # # Required batch size
-    batch_size: int = 1
+    batch_size: int = 2
+
+    # # Required gradient_accumilation_steps
+    gradient_accumilation_steps: int = 16
 
     # # Optional score
-    loss: float = 0.0
+    loss: float = 6.0
     
-    # # Training Steps
-    # steps: int = 10
+    # Epoch
+    epoch: int | None

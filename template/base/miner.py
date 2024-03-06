@@ -117,6 +117,7 @@ class BaseMinerNeuron(BaseNeuron):
                     )
                     retries += 1
                     bt.logging.error(f"Retrying...")
+
         utils.log_visible_maddrs(self.dht.get_visible_maddrs(), only_p2p=True)
 
         # Add DHT address to wandb config

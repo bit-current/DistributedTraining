@@ -26,6 +26,7 @@ from template.utils.uids import get_random_uids
 
 import template
 import asyncio
+import torch
 
 
 async def forward(self):
@@ -39,17 +40,15 @@ async def forward(self):
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
 
     """
-    
     self.miner_uids = await get_random_uids(
         self, dendrite=self.dendrite, k=self.config.neuron.sample_size
     )
+    bt.logging.info(f"UIDs:  {self.miner_uids}")
     datapoints_per_group = self.config.neuron.training_examples_per_miner
-    
     self.dataset_indices_list = self.dataset_common_state.get_dataset_indices(
             groups_count=len(self.miner_uids),
             items_per_group=datapoints_per_group,
     )
-
     if not self.config.neuron.dont_wandb_log:
         self.wandb.log({"uids":self.miner_uids,
                     "dataset_indices":self.dataset_indices_list})
@@ -64,7 +63,8 @@ async def forward(self):
             template.protocol.Train( 
                 dataset_indices = uid_dataset,
                 run_id = self.config.neuron.run_id,
-                batch_size = self.config.neuron.local_batch_size_train  #TODO let miners decide this? Based on their hardware. Then reconcile if needed?
+                batch_size = self.config.neuron.local_batch_size_train,
+                gradient_accumilation_steps = self.config.neuron.local_gradient_accumilation_steps_train
             )
         )
 
@@ -97,5 +97,13 @@ async def forward(self):
     
     # Update the scores based on the rewards.
     self.update_scores(rewards, self.miner_uids)
+
+    # Update the current_epoch
+    self.current_epoch = 1 # Dummy fix need to switch to self.tracker.global_progress.epoch
+
+    # Update global step
+    step_update_status = self.dataset_common_state.update_step()
+    if step_update_status is None:
+        self.global_step += 1
 
     return responses
