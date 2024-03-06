@@ -146,7 +146,6 @@ class Miner(BaseMinerNeuron):
         if not self.config.neuron.dont_wandb_log:
             self.wandb = load_wandb(self.config, self.wallet)
 
-        self.lock = asyncio.Lock()
 
     # Define encoding function
     def encode(self, examples):
@@ -174,7 +173,7 @@ class Miner(BaseMinerNeuron):
             template.protocol.Train: The synapse object with the 'loss' field set to models loss.
         """
 
-        if self.training_lock.locked():
+        if self.lock.locked():
             synapse.loss = -1
             bt.logging.info(f"Miner already training.")
         else:
