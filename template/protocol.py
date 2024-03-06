@@ -47,8 +47,8 @@ class Train( bt.Synapse ):
     #     validate_assignment set to True means the pydantic model will validate attribute assignments on the class.
     #     """
 
-    #     validate_assignment = False
-    #     arbitrary_types_allowed = True
+    validate_assignment = False
+    arbitrary_types_allowed = True
 
     # Required request input, filled by sending dendrite caller.
     dataset_indices: list = [0, 1]
