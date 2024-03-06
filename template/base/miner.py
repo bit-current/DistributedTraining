@@ -74,41 +74,52 @@ class BaseMinerNeuron(BaseNeuron):
             announce_maddrs = [f"/ip{version}/{address}/tcp/{self.config.dht.port}"]
 
         # Init list of available DHT addresses from wandb
-        api = wandb.Api()
-        initial_peers_list = set(self.config.neuron.initial_peers)
-        runs = api.runs(
-            f"{self.config.neuron.wandb_entity}/{self.config.neuron.wandb_project}"
-        )
-        for ru in runs:
-            if ru.state == "running":
-                initial_peers_list.update(ru.config["neuron"]["initial_peers"])
-        initial_peers_list = list(initial_peers_list)
-        # Init DHT
-        retries = 0
-        while retries <= len(initial_peers_list):
-            if retries == len(initial_peers_list):
-                raise Exception("Max retries reached, operation failed.")
-            try:
-                # Init DHT
-                self.dht = hivemind.DHT(
-                    host_maddrs=[
-                        f"/ip4/0.0.0.0/tcp/{self.config.dht.port}",
-                        f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic",
-                    ],
-                    initial_peers=[initial_peers_list[retries]],
-                    announce_maddrs=announce_maddrs,
-                    start=True,
-                )
-                bt.logging.info(
-                    f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}"
-                )
-                break
-            except Exception as e:
-                bt.logging.error(
-                    f"Attempt {retries + 1} to init DHT using initial_peer as {initial_peers_list[retries]} failed with error: {e}"
-                )
-                retries += 1
-                bt.logging.error(f"Retrying...")
+        try:
+            self.dht = hivemind.DHT(
+                        host_maddrs=[
+                            f"/ip4/0.0.0.0/tcp/{self.config.dht.port}",
+                            f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic",
+                        ],
+                        initial_peers=self.config.neuron.initial_peers,
+                        announce_maddrs=announce_maddrs,
+                        start=True,
+                    )
+        except:
+            api = wandb.Api()
+            initial_peers_list = set(self.config.neuron.initial_peers)
+            runs = api.runs(
+                f"{self.config.neuron.wandb_entity}/{self.config.neuron.wandb_project}"
+            )
+            for ru in runs:
+                if ru.state == "running":
+                    initial_peers_list.update(ru.config["neuron"]["initial_peers"])
+            initial_peers_list = list(initial_peers_list)
+            # Init DHT
+            retries = 0
+            while retries <= len(initial_peers_list):
+                if retries == len(initial_peers_list):
+                    raise Exception("Max retries reached, operation failed.")
+                try:
+                    # Init DHT
+                    self.dht = hivemind.DHT(
+                        host_maddrs=[
+                            f"/ip4/0.0.0.0/tcp/{self.config.dht.port}",
+                            f"/ip4/0.0.0.0/udp/{self.config.dht.port}/quic",
+                        ],
+                        initial_peers=[initial_peers_list[retries]],
+                        announce_maddrs=announce_maddrs,
+                        start=True,
+                    )
+                    bt.logging.info(
+                        f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}"
+                    )
+                    break
+                except Exception as e:
+                    bt.logging.error(
+                        f"Attempt {retries + 1} to init DHT using initial_peer as {initial_peers_list[retries]} failed with error: {e}"
+                    )
+                    retries += 1
+                    bt.logging.error(f"Retrying...")
         utils.log_visible_maddrs(self.dht.get_visible_maddrs(), only_p2p=True)
 
         # Add DHT address to wandb config
