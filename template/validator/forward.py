@@ -98,4 +98,6 @@ async def forward(self):
     # Update the scores based on the rewards.
     self.update_scores(rewards, self.miner_uids)
 
+    await asyncio.sleep(self.config.neuron.sleep_interval)
+
     return responses
