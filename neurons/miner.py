@@ -22,6 +22,7 @@ import typing
 from functools import partial
 from ipaddress import ip_address
 
+import asyncio
 import bittensor as bt
 import hivemind
 import requests
@@ -145,6 +146,8 @@ class Miner(BaseMinerNeuron):
         if not self.config.neuron.dont_wandb_log:
             self.wandb = load_wandb(self.config, self.wallet)
 
+        self.lock = asyncio.Lock()
+
     # Define encoding function
     def encode(self, examples):
         return self.tokenizer(
@@ -171,52 +174,57 @@ class Miner(BaseMinerNeuron):
             template.protocol.Train: The synapse object with the 'loss' field set to models loss.
         """
 
-        # Select dataset indices to use for optimization step
-        dataset = self.dataset.select(synapse.dataset_indices)
-        if not self.config.neuron.dont_wandb_log:
-            self.wandb.log({"received_indices": synapse.dataset_indices})
-
-        # Encode the dataset
-        encoded_dataset = dataset.map(self.encode, batched=True)
-
-        # Create a PyTorch DataLoader
-        dataloader = DataLoader(
-            encoded_dataset,
-            batch_size=synapse.batch_size,
-            collate_fn=default_data_collator,
-        )
-
-        total_loss = 0
-
-        # Train data for one epoch
-        for step, batch in enumerate(dataloader):
-            input_ids = batch["input_ids"].to(self.device)
-            attention_mask = batch["attention_mask"].to(self.device)
-            labels = input_ids.clone()
-
-            self.opt.zero_grad()
-
-            # Forward pass
-            outputs = self.model(
-                input_ids=input_ids, attention_mask=attention_mask, labels=labels
-            )
-            # Backward pass
-            loss = outputs.loss
-            if not self.config.neuron.dont_wandb_log:
-                self.wandb.log({"loss": loss, "opt_local_epoch": self.opt.local_epoch})
-            total_loss += loss.item()
-
-            loss.backward()
-            # Adjust gradient
-            self.opt.step()
-
-            bt.logging.info(f"Step {step} Loss: {loss}")
-
-        average_loss = total_loss / len(dataloader)
-        synapse.loss = average_loss
-
-        bt.logging.info(f"Final Loss: {synapse.loss}")
-
+        if self.training_lock.locked():
+            synapse.loss = -1
+            bt.logging.info(f"Miner already training.")
+        else:
+            async with self.training_lock:
+                # Select dataset indices to use for optimization step
+                dataset = self.dataset.select(synapse.dataset_indices)
+                if not self.config.neuron.dont_wandb_log:
+                    self.wandb.log({"received_indices": synapse.dataset_indices})
+        
+                # Encode the dataset
+                encoded_dataset = dataset.map(self.encode, batched=True)
+        
+                # Create a PyTorch DataLoader
+                dataloader = DataLoader(
+                    encoded_dataset,
+                    batch_size=synapse.batch_size,
+                    collate_fn=default_data_collator,
+                )
+        
+                total_loss = 0
+        
+                # Train data for one epoch
+                for step, batch in enumerate(dataloader):
+                    input_ids = batch["input_ids"].to(self.device)
+                    attention_mask = batch["attention_mask"].to(self.device)
+                    labels = input_ids.clone()
+        
+                    self.opt.zero_grad()
+        
+                    # Forward pass
+                    outputs = self.model(
+                        input_ids=input_ids, attention_mask=attention_mask, labels=labels
+                    )
+                    # Backward pass
+                    loss = outputs.loss
+                    if not self.config.neuron.dont_wandb_log:
+                        self.wandb.log({"loss": loss, "opt_local_epoch": self.opt.local_epoch})
+                    total_loss += loss.item()
+        
+                    loss.backward()
+                    # Adjust gradient
+                    self.opt.step()
+        
+                    bt.logging.info(f"Step {step} Loss: {loss}")
+        
+                average_loss = total_loss / len(dataloader)
+                synapse.loss = average_loss
+        
+                bt.logging.info(f"Final Loss: {synapse.loss}")
+    
         return synapse
 
     async def blacklist_base(self, synapse) -> typing.Tuple[bool, str]:
