@@ -104,12 +104,12 @@ def get_rewards(
     bt.logging.info(f"Current Global Loss:     {loss}")
 
     # Compute Global Score
-    if ((self.previous_loss is None) or ((loss - self.previous_loss) < 0)) and (responses[0] != []):
+    if ((self.previous_loss is None) or ((self.previous_loss - loss) < 0)) and (responses[0] != []):
         score = 1
         # self.dataset_common_state.set_dht("loss", float(loss))
         self.dataset_common_state.set_dht("loss", loss)
     else:
-        score = 0
+        score = 0.1 #Training has stagnated
 
     # Log score, previous and current loss
     bt.logging.info(f"Global Score:            {score}")
@@ -118,7 +118,7 @@ def get_rewards(
     self.previous_loss = loss
     
     # Get all the reward results by iteratively calling your reward() function.
-    scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] else 0 
+    scores = torch.FloatTensor([score if response.dendrite.status_code == 200 and response.loss != [] and response.loss != -1 else 0.1 
                                 for _, response in zip(uids, responses[0])]).to(self.device)
     bt.logging.info(f"Global Scores: {scores}")
 
