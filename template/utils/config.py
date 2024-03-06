@@ -74,6 +74,13 @@ def add_args(cls, parser):
     )
 
     parser.add_argument(
+        "--neuron.sleep_interval",
+        type=int,
+        help="How much the validator should wait after Train requests.",
+        default=30,
+    )
+
+    parser.add_argument(
         "--neuron.name",
         type=str,
         help="Trials for this neuron go in neuron.root / (wallet_cold - wallet_hot) / neuron.name. ",
