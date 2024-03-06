@@ -18,6 +18,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 from typing import Any, List, Optional
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 import bittensor as bt
 import numpy as np
@@ -46,10 +47,12 @@ class Train( bt.Synapse ):
     #     Pydantic model configuration class for Prompting. This class sets validation of attribute assignment as True.
     #     validate_assignment set to True means the pydantic model will validate attribute assignments on the class.
     #     """
-
+    model_config = ConfigDict(extra='allow')
     validate_assignment = False
     arbitrary_types_allowed = True
 
+    epoch: int = 0
+    gradient_accumulation_steps: int = 0
     # Required request input, filled by sending dendrite caller.
     dataset_indices: list = [0, 1]
 
