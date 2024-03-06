@@ -85,7 +85,7 @@ class BaseMinerNeuron(BaseNeuron):
                 f"{self.config.neuron.wandb_entity}/{self.config.neuron.wandb_project}"
             )
             bt.logging.info(
-                        f"Successfully initialised dht using initial_peer as {}"
+                        f"Failed to launch using provided initial_peers, attempting wandb search"
                     )
             for ru in runs:
                 if ru.state == "running":
