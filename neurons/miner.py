@@ -99,7 +99,7 @@ class Miner(BaseMinerNeuron):
     async def is_alive(
         self, synapse: template.protocol.IsAlive
     ) -> template.protocol.IsAlive:
-        bt.logging.info("Responded to be Active")
+        bt.logging.info("🤝 Responded to be Active")
         synapse.completion = "True"
         return synapse
 
@@ -174,7 +174,7 @@ class Miner(BaseMinerNeuron):
             #         self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
 
             # torch.cuda.empty_cache()
-            bt.logging.info(f"Step {step} Loss: {outputs.loss.detach().item()}")
+            bt.logging.info(f"⏳ Step {step} Loss: {outputs.loss.detach().item()}")
         
             if not self.config.neuron.dont_wandb_log:
                 self.wandb.log({"loss": outputs.loss.detach().item(), "opt_local_epoch": self.opt.local_epoch})
@@ -183,8 +183,8 @@ class Miner(BaseMinerNeuron):
         synapse.loss = average_loss
         synapse.epoch = self.opt.tracker.local_progress.epoch
 
-        bt.logging.info(f"Final Loss: {outputs.loss.detach().item()}")
-        bt.logging.info(f"Average Loss: {average_loss}")
+        bt.logging.success(f"✅ Final Loss: {outputs.loss.detach().item()}")
+        bt.logging.success(f"🎯 Average Loss: {average_loss}")
 
         return synapse
 
