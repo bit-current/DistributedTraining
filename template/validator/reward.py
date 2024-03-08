@@ -78,7 +78,7 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
     average_loss = total_loss / step
 
-    bt.logging.info(f"✅ Final Loss:           {outputs.loss.detach().item()}")
+    bt.logging.success(f"✅ Final Loss:           {outputs.loss.detach().item()}")
     bt.logging.success(f"🎯 Average Loss:         {average_loss}")
 
     return average_loss
