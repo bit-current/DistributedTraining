@@ -301,6 +301,8 @@ class BaseMinerNeuron(BaseNeuron):
                 wait_for_inclusion=False,
                 version_key=self.spec_version,
             )
+            print("subtensor: " + subtensor)
+
 
         except Exception as e:
             bt.logging.error(
