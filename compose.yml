@@ -1,0 +1,29 @@
+version: '3.9'
+
+services:
+  hivetrain:
+    image: ghcr.io/bit-current/distributedtraining:latest
+    entrypoint: bash ./entrypoint.sh
+    restart: 'always'
+    ipc: host
+    network_mode: host
+    tty: true
+    stdin_open: true
+    build:
+      dockerfile: Dockerfile
+    volumes:
+      - ./wallets:/root/.bittensor/wallets
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
+              count: all
+    environment:
+      NETUID: ${NETUID:-25}
+      WALLETNAME: ${WALLETNAME:-default}
+      WALLETHOTKEY: ${WALLETHOTKEY:-defaulthotkey}
+      DHTPORT: ${DHTPORT:-42316}
+      AXONPORT: ${AXONPORT:-42310}
+    env_file:
+      - .env
