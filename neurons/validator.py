@@ -171,8 +171,8 @@ class Validator(BaseValidatorNeuron):
                     start=True,
                     # client_mode = True,
                 )
-                bt.logging.info(
-                    f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}"
+                bt.logging.success(
+                    f"Successfully initialised DHT using initial_peer as {initial_peers_list[retries]}"
                 )
                 break
             except Exception as e:

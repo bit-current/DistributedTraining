@@ -124,7 +124,7 @@ class BaseValidatorNeuron(BaseNeuron):
             f"Running validator {self.axon} on network: {self.config.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
 
-        bt.logging.info(f"Validator starting at block: {self.block}")
+        bt.logging.info(f"🚀 Validator starting at block: {self.block}")
 
         # This loop maintains the validator's operations until intentionally stopped.
         try:

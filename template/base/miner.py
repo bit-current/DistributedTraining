@@ -110,8 +110,8 @@ class BaseMinerNeuron(BaseNeuron):
                         announce_maddrs=announce_maddrs,
                         start=True,
                     )
-                    bt.logging.info(
-                        f"Successfully initialised dht using initial_peer as {initial_peers_list[retries]}"
+                    bt.logging.success(
+                        f"Successfully initialised DHT using initial_peer as {initial_peers_list[retries]}"
                     )
                     break
                 except Exception as e:
@@ -192,7 +192,7 @@ class BaseMinerNeuron(BaseNeuron):
 
         # Start  starts the miner's axon, making it active on the network.
         self.axon.start()
-        bt.logging.info(f"Miner starting at block: {self.block}")
+        bt.logging.info(f"🚀 Miner starting at block: {self.block}")
         
         # This loop maintains the miner's operations until intentionally stopped.
         try:

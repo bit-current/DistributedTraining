@@ -71,15 +71,15 @@ def get_loss(self, dataset_indices, batch_size, gradient_accumilation_steps):
 
         # torch.cuda.empty_cache()
 
-        bt.logging.info(f"Step {step} Loss: {outputs.loss.detach().item()}")
+        bt.logging.info(f"⏳ Step {step} Loss: {outputs.loss.detach().item()}")
     
         if not self.config.neuron.dont_wandb_log:
             self.wandb.log({"loss": outputs.loss.detach().item()})
 
     average_loss = total_loss / step
 
-    bt.logging.info(f"Final Loss:           {outputs.loss.detach().item()}")
-    bt.logging.info(f"Average Loss:         {average_loss}")
+    bt.logging.info(f"✅ Final Loss:           {outputs.loss.detach().item()}")
+    bt.logging.success(f"🎯 Average Loss:         {average_loss}")
 
     return average_loss
 
