@@ -80,7 +80,10 @@ def start_training(rank, world_size, miner_script, batch_size, epochs, validator
     ]
     if len(validator_urls) > 0:
         cmd += ["--validator-urls"] + validator_urls
-    return subprocess.Popen(cmd, shell=False)
+
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
+    return process
+    
 
 def cleanup_child_processes(parent_pid, sig=signal.SIGTERM):
     try:
@@ -150,6 +153,8 @@ def main(orchestrator_url, miner_script, batch_size, epochs, tcp_store_address, 
                     _, validator_ips = get_validator_uids_and_addresses(metagraph, config.neuron.vpermit_tao_limit)
                     validator_ips = ["127.0.0.1:3000"]
                     torchrun_process = start_training(training_params['rank'], training_params['world_size'], miner_script, batch_size, epochs, validator_ips, tcp_store_address, tcp_store_port)
+
+
                 else:
                     print("Failed to get training params. Retrying...")
             elif state == "onboarding" and torchrun_process:
