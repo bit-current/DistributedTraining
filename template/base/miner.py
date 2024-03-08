@@ -29,6 +29,7 @@ import hivemind
 import requests
 import torch
 import wandb
+from ipaddress import ip_address
 from datasets import load_dataset
 from hivemind import utils
 from torch.utils.data import DataLoader
