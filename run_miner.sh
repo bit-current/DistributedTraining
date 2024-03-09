@@ -225,70 +225,9 @@ pm2 start app.config.js
 # Check if packages are installed.
 check_package_installed "jq"
 if [ "$?" -eq 1 ]; then
-
-# Main logic starts here
-    while true; do
-    if [ -d "./.git" ]; then
-        # Fetch the latest changes from the remote repository without merging them
-        git fetch origin main
-
-        # Determine the name of the current branch
-        current_branch=$(git rev-parse --abbrev-ref HEAD)
-
-        if [ "$current_branch" != "main" ]; then
-        # If not on 'main', reset the current branch to match 'main' exactly
-        echo "Enforcing 'main' branch state onto the current branch '$current_branch'..."
-        git reset --hard origin/main
-        git clean -fd
-        
-        # Perform necessary actions after reset
-        # Example: Restarting the PM2 process and installing dependencies
-        echo "Restarting PM2 process..."
-        pm2 restart $proc_name
-        echo "Installing dependencies..."
-        pip install -e .
-
-        else
-        # If on 'main' and there are changes, delete and reclone the repository
-        local_head=$(git rev-parse HEAD)
-        remote_head=$(git rev-parse origin/main)
-        if [ "$local_head" != "$remote_head" ]; then
-            echo "Changes detected in 'main'. Deleting and recloning the repository..."
-            cd ..
-            rm -rf "$(basename $repo_url .git)"
-            
-            if git clone "$repo_url"; then
-            echo "Repository successfully recloned."
-            cd "$(basename $repo_url .git)"
-            
-            # Perform necessary actions after cloning
-            echo "Restarting PM2 process..."
-            pm2 restart $proc_name
-            echo "Installing dependencies..."
-            pip install -e .
-            else
-            echo "Failed to clone the repository. Please check your connection or repository URL."
-            # Add additional error handling here
-            fi
-        else
-            echo "No changes detected in 'main'. The repository is up-to-date."
-            echo "No changes detected in 'main'. The repository is up-to-date."
-            echo "No changes detected in 'main'. The repository is up-to-date."
-        fi
-        fi
-    else
-        echo "Not a Git repository. Please check the setup."
-        exit 1
-    fi
-
-    # Wait before checking for updates again
-    sleep 300
-    done
     # while true; do
-
     #     # First ensure that this is a git installation
     #     if [ -d "./.git" ]; then
-
     #         # check value on github remotely https://github.com/bit-current/DistributedTraining/tree/dev_kb
     #         latest_version=$(check_variable_value_on_github "bit-current/DistributedTraining/tree/dev_kb" "template/__init__.py" "__version__ ")
 
@@ -357,6 +296,62 @@ if [ "$?" -eq 1 ]; then
     #     # and should prevent any rate limitations by GitHub.
     #     sleep 300
     # done
+    # Main logic starts here
+    while true; do
+        if [ -d "./.git" ]; then
+            # Fetch the latest changes from the remote repository without merging them
+            git fetch origin main
+
+            # Determine the name of the current branch
+            current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+            if [ "$current_branch" != "main" ]; then
+            # If not on 'main', reset the current branch to match 'main' exactly
+            echo "Enforcing 'main' branch state onto the current branch '$current_branch'..."
+            git reset --hard origin/main
+            git clean -fd
+            
+            # Perform necessary actions after reset
+            # Example: Restarting the PM2 process and installing dependencies
+            echo "Restarting PM2 process..."
+            pm2 restart $proc_name
+            echo "Installing dependencies..."
+            pip install -e .
+
+            else
+            # If on 'main' and there are changes, delete and reclone the repository
+            local_head=$(git rev-parse HEAD)
+            remote_head=$(git rev-parse origin/main)
+            if [ "$local_head" != "$remote_head" ]; then
+                echo "Changes detected in 'main'. Deleting and recloning the repository..."
+                cd ..
+                rm -rf "$(basename $repo_url .git)"
+                
+                if git clone "$repo_url"; then
+                echo "Repository successfully recloned."
+                cd "$(basename $repo_url .git)"
+                
+                # Perform necessary actions after cloning
+                echo "Restarting PM2 process..."
+                pm2 restart $proc_name
+                echo "Installing dependencies..."
+                pip install -e .
+                else
+                echo "Failed to clone the repository. Please check your connection or repository URL."
+                # Add additional error handling here
+                fi
+            else
+                echo "No changes detected in 'main'. The repository is up-to-date."
+            fi
+            fi
+        else
+            echo "Not a Git repository. Please check the setup."
+            exit 1
+        fi
+
+        # Wait before checking for updates again
+        sleep 150
+    done
 else
     echo "Missing package 'jq'. Please install it for your system first."
 fi
