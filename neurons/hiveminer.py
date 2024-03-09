@@ -13,11 +13,9 @@ import torch
 from datasets import load_dataset
 from lightning.fabric.utilities.seed import reset_seed, seed_everything
 from lightning.pytorch import LightningModule
-from lightning.pytorch.accelerators import TPUAccelerator
 from lightning.pytorch.callbacks import Callback
 from lightning.pytorch.core.datamodule import LightningDataModule
 from lightning.pytorch.trainer import Trainer
-from lightning.pytorch.utilities import CombinedLoader
 from lightning_hivemind.strategy import HivemindStrategy
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset, IterableDataset
@@ -57,7 +55,7 @@ initial_peers = args.initial_peers
 batch_size = args.batch_size
 block_size = 1024
 num_steps = 100_000
-target_batch_size = 256
+target_batch_size = 8
 
 dataset_config = {
     "dataset": "tiiuae/falcon-refinedweb",
