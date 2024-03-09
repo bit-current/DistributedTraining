@@ -35,7 +35,7 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument(
     "--initial_peers",
-    type=list,
+    action="append",
     help="Your peer. Use --initial_peers multiple times to pass multiple peers.",
     default=[],
     nargs="?",
@@ -69,7 +69,7 @@ dataset_config = {
 # initialized and load the model
 config = AutoConfig.from_pretrained(
     "gpt2",
-    n_emb=block_size,
+    n_embd=block_size,
     n_ctx=block_size,
     n_layer=6,
     n_head=6,
