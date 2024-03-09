@@ -9,27 +9,18 @@ from functools import partial
 from math import isnan
 
 import numpy as np
-import psutil
 import torch
 from datasets import load_dataset
 from lightning.fabric.utilities.seed import reset_seed, seed_everything
 from lightning.pytorch import LightningModule
 from lightning.pytorch.accelerators import TPUAccelerator
-from lightning.pytorch.callbacks import (
-    Callback,
-    ModelCheckpoint,
-    ModelPruning,
-    ProgressBar,
-    StochasticWeightAveraging,
-    TQDMProgressBar,
-)
+from lightning.pytorch.callbacks import Callback
 from lightning.pytorch.core.datamodule import LightningDataModule
 from lightning.pytorch.trainer import Trainer
 from lightning.pytorch.utilities import CombinedLoader
 from lightning_hivemind.strategy import HivemindStrategy
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset, IterableDataset
-from tqdm.auto import tqdm
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -66,7 +57,7 @@ initial_peers = args.initial_peers
 batch_size = args.batch_size
 block_size = 1024
 num_steps = 100_000
-target_batch_size = 8192
+target_batch_size = 256
 
 dataset_config = {
     "dataset": "tiiuae/falcon-refinedweb",
@@ -188,7 +179,6 @@ class MinerTrainer(LightningModule):
 
         self.model, self.optimizer = (model, optimizer)
         self.automatic_optimization = True
-        self.pbar = None
         self.save_hyperparameters(hparams)
 
     def forward(self, inputs):
@@ -203,18 +193,13 @@ class MinerTrainer(LightningModule):
         return loss
 
     def on_train_batch_end(self, trainer, lm, outputs):
-        schedule = self.lr_schedulers()
-        step = self.global_step
-
-        if hasattr(schedule, "current_step"):
-            step = schedule.current_step
-        elif hasattr(self.trainer.strategy.optimizers[0], "local_epoch"):
-            step = self.trainer.strategy.optimizers[0].local_epoch
-
-        self.log("step", int(step), on_step=True, on_epoch=False, sync_dist=True)
-
-        if hasattr(schedule, "step"):
-            schedule.step()
+        self.log(
+            "step",
+            int(self.trainer.current_epoch),
+            on_step=True,
+            on_epoch=False,
+            sync_dist=True,
+        )
 
     def configure_optimizers(self):
         "Create optimizer and scheduler"
@@ -229,7 +214,6 @@ hparams = dict(
     warmup_steps=0,
     batch_size=batch_size,
     num_steps=num_steps,
-    target_batch_size=target_batch_size,
     block_size=block_size,
 )
 
@@ -237,7 +221,7 @@ hparams = dict(
 strategy = HivemindStrategy(
     run_id=f"hivetrain-z",
     batch_size=batch_size,
-    target_batch_size=hparams.get("target_batch_size"),
+    target_batch_size=target_batch_size,
     initial_peers=initial_peers,
     use_ipfs=True,
     use_relay=True,
@@ -280,7 +264,7 @@ train_params = dict(
     accelerator="auto",
     strategy=strategy,
     devices="auto",
-    max_steps=hparams.get("num_steps", 10000) * hparams["target_batch_size"],
+    max_steps=num_steps * target_batch_size,
     max_epochs=-1,
     reload_dataloaders_every_n_epochs=1,
     precision="32-true",
@@ -288,12 +272,13 @@ train_params = dict(
     gradient_clip_val=1.0,
     gradient_clip_algorithm="norm",
     benchmark=True,
+    enable_progress_bar=False,
     callbacks=[],
 )
 
 
 # set weights as trainable
-def get_params(model, hparams):
+def set_trainable_parameters(model, hparams):
     no_decay = ["bias", "LayerNorm.weight"]
     grouped_parameters = []
 
@@ -317,7 +302,7 @@ def get_params(model, hparams):
 
 
 # set model parameters as trainable
-params = get_params(model, hparams)
+params = set_trainable_parameters(model, hparams)
 
 # create the optimizer
 optimizer = AdamW(
@@ -328,29 +313,16 @@ optimizer = AdamW(
 
 
 # for logging progress
-class MinerProgressBar(ProgressBar):
+class MinerConsoleLogging(Callback):
     """A variant progress bar that works off of steps and prints periodically."""
 
     def __init__(self, num_steps):
         super().__init__()
         self.num_steps = num_steps
-        self.last_step = 0
+        self.num_peers = 0
+        self.previous_step = None
         self.prev_avg_loss = None
         self.smoothing = 0.01
-
-    def on_train_start(self, trainer, lm):
-        super().on_train_start(trainer, lm)
-        trainer.pbar = tqdm(
-            # total=trainer.estimated_stepping_batches,
-            total=self.num_steps,
-            smoothing=0,
-            leave=True,
-            dynamic_ncols=True,
-            file=sys.stdout,
-        )
-
-    def on_train_end(self, trainer, lm):
-        trainer.pbar.close()
 
     def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
@@ -361,10 +333,6 @@ class MinerProgressBar(ProgressBar):
 
         current_loss = float(trainer.callback_metrics["train_loss"])
 
-        current_epoch = trainer.current_epoch
-        # if lm.train_len > 0:
-        #     current_epoch += batch_idx / lm.train_len
-
         avg_loss = 0
         if not isnan(current_loss):
             avg_loss = self.average_loss(
@@ -372,29 +340,15 @@ class MinerProgressBar(ProgressBar):
             )
             self.prev_avg_loss = avg_loss
 
-        mem_bytes = os.sysconf("SC_PAGE_SIZE") * os.sysconf(
-            "SC_PHYS_PAGES"
-        )  # e.g. 4015976448
-        mem_gib = mem_bytes / (1024.0**3)  # e.g. 3.74
-
-        memory = psutil.virtual_memory()
-
-        bar = f"Loss: {avg_loss:.3f}"
-
-        if current_epoch > 0:
-            bar += f", Epoch: {epoch_string}"
+        output = f"Global Step: {str(step)}, Local Loss: {avg_loss:.3f}"
 
         if hasattr(trainer.strategy, "num_peers"):
-            bar += f", Peers: {trainer.strategy.num_peers}"
+            output += f", Peers: {self.num_peers}"
 
-        if trainer.pbar.n != step:
-            trainer.pbar.update(step - trainer.pbar.n)
-
-        # this is a dumb hack to make TQDM print in Docker
-        if random.random() < 0.01:
-            print()
-
-        trainer.pbar.set_description(bar)
+        if step != self.previous_step or self.num_peers != trainer.strategy.num_peers:
+            print(output)
+            self.previous_step = step
+            self.num_peers = trainer.strategy.num_peers
 
     def average_loss(self, current_loss, prev_avg_loss, smoothing):
         if prev_avg_loss is None:
@@ -403,7 +357,7 @@ class MinerProgressBar(ProgressBar):
             return (smoothing * current_loss) + (1 - smoothing) * prev_avg_loss
 
 
-train_params["callbacks"].append(MinerProgressBar(hparams.get("num_steps")))
+train_params["callbacks"].append(MinerConsoleLogging(hparams.get("num_steps")))
 
 # Wrap the model in a pytorch-lightning module
 train_model = MinerTrainer(model, optimizer, hparams)

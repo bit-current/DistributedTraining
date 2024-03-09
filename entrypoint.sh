@@ -2,6 +2,6 @@
 
 cd /app/neurons
 
-python3 miner-z.py \
+python3 hiveminer.py \
     --initial_peers ${INITIAL_PEERS} \
     --batch_size ${BATCH_SIZE}
