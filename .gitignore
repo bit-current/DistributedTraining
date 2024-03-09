@@ -163,3 +163,4 @@ wandb/
 .vscode/
 
 wallets
+lightning_logs

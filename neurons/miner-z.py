@@ -1,3 +1,5 @@
+import os
+import sys
 import random
 import numpy as np
 import torch
@@ -14,9 +16,12 @@ from lightning.pytorch.callbacks import (
 from lightning.pytorch.trainer import Trainer
 from lightning.pytorch.utilities import CombinedLoader
 from lightning.pytorch import LightningModule
-
+from lightning.pytorch.callbacks import Callback, ProgressBar, TQDMProgressBar
 from lightning_hivemind.strategy import HivemindStrategy
 from functools import partial
+from tqdm.auto import tqdm
+import psutil
+from math import isnan
 
 from transformers import (
     AutoConfig,
@@ -25,14 +30,28 @@ from transformers import (
     GenerationConfig,
 )
 from datasets import load_dataset
+import ipaddress
+import re
+import logging
+import argparse
+
+logging.getLogger("lightning.pytorch").setLevel(logging.INFO)
+
+# capture arguments passed to this python script
+parser = argparse.ArgumentParser(description="Get configs from arguments to this script.")
+parser.add_argument('--initial_peers', type=list, help='Your peer. Use --initial_peers multiple times to pass multiple peers.', default=[], nargs='?')
+args = parser.parse_args()
+
+initial_peers = args.initial_peers
 
 # initialized and load the model
+block_size = 1024
 config = AutoConfig.from_pretrained(
     "gpt2",
     n_emb=256,
     n_layer=3,
     n_head=3,
-    n_inner=3,
+    n_inner=1024,
     torch_dtype=torch.float32
 )
 model = AutoModelForCausalLM.from_config(config)
@@ -47,6 +66,13 @@ tokenizer = AutoTokenizer.from_pretrained(
 )
 tokenizer.pad_token = tokenizer.eos_token
 
+dataset_config = {
+    "dataset": "tiiuae/falcon-refinedweb",
+    "key": "content",
+    "split": "train",
+    "block_size": block_size,
+}
+
 # create a datamodule to wrap our remote datasets
 class StreamingDataModule(LightningDataModule):
     def __init__(self, tokenizer, config):
@@ -54,13 +80,9 @@ class StreamingDataModule(LightningDataModule):
         self.tokenizer = tokenizer
         self.config = config
         self.train_data = None
-        # self.setup(self, self.config, stage=None)
         self.train_data = StreamingDataset(
             self.tokenizer, config
         )
-
-    # def setup(self, config, stage=None):
-
 
     def train_dataloader(self):
         return DataLoader(
@@ -87,7 +109,7 @@ class StreamingDataset(IterableDataset):
             buffer_size=1000,
         )
 
-        block_size = 512
+        block_size = self.config.get("block_size", 512)
 
         batch = []
         for document in shuffled:
@@ -115,11 +137,7 @@ class StreamingDataset(IterableDataset):
                 continue
 
 # prepare a dataset for use with training
-dataset = StreamingDataModule(tokenizer, {
-    "dataset": "tiiuae/falcon-refinedweb",
-    "key": "content",
-    "split": "train",
-})
+dataset = StreamingDataModule(tokenizer, dataset_config)
 
 # wrap the LightningModule in a custom class
 class MinerTrainer(LightningModule):
@@ -136,6 +154,7 @@ class MinerTrainer(LightningModule):
             tokenizer,
         )
         self.automatic_optimization = True
+        self.pbar = None
         self.save_hyperparameters(hparams)
 
     def forward(self, inputs):
@@ -144,6 +163,9 @@ class MinerTrainer(LightningModule):
     def training_step(self, batch, batch_idx):
         outputs = self({"input_ids": batch, "labels": batch})
         loss = outputs[0]
+        self.log(
+            "train_loss", float(loss), on_step=True, on_epoch=False, sync_dist=True
+        )
         return loss
 
     def on_train_batch_end(self, trainer, lm, outputs):
@@ -155,40 +177,37 @@ class MinerTrainer(LightningModule):
         elif hasattr(self.trainer.strategy.optimizers[0], "local_epoch"):
             step = self.trainer.strategy.optimizers[0].local_epoch
 
+        self.log("step", int(step), on_step=True, on_epoch=False, sync_dist=True)
+
         if hasattr(schedule, "step"):
             schedule.step()
 
     def configure_optimizers(self):
         "Create optimizer and scheduler"
-
-        # if self.scheduler:
-        #     return [self.optimizer], [self.scheduler()]
         return [self.optimizer]
 
 # define the model hyperparameters
 hparams = dict(
-    # optimizer="AdamW",
-    # scheduler=scheduler,
     learning_rate=0.001,
     weight_decay=0.1,
     eps=1e-8,
     warmup_steps=0,
     batch_size=1,
     num_steps=10000,
-    block_size=512
+    target_batch_size=512,
+    block_size=block_size
 )
 
 # define the hivemind strategy
-initial_peers = hparams.get("initial_peers", [])
 strategy = HivemindStrategy(
     run_id=f"hivetrain-z",
     batch_size=1,
-    target_batch_size=256,
+    target_batch_size=hparams.get("num_steps") * hparams.get("target_batch_size"),
     initial_peers=initial_peers,
     use_ipfs=True,
     use_relay=True,
     use_auto_relay=True,
-    verbose=True,
+    verbose=False,
     wait_timeout=30,
     bootstrap_timeout=20,
     matchmaking_time=45.0,
@@ -204,12 +223,31 @@ strategy = HivemindStrategy(
     scheduler_fn=partial(torch.optim.lr_scheduler.ExponentialLR, gamma=0.9999),
 )
 
+# print my peer id to console
+visible_addresses = [
+    str(a)
+    for a in strategy.dht.get_visible_maddrs()
+    if not ipaddress.ip_address(a.values()[0]).is_loopback
+]
+
+my_ids = []
+pattern = r"(/p2p/.*)"
+for peer in list(visible_addresses):
+    match = re.search(pattern, peer)
+    if match:
+        my_ids.append(match.group(1))
+
+for peer in list(set(my_ids)):
+    print(
+        f"PEER-ID: {peer}"
+    )
+
 # define training params
 train_params = dict(
     accelerator="auto",
     strategy=strategy,
     devices="auto",
-    max_steps=10000,
+    max_steps=hparams.get("num_steps", 10000),
     max_epochs=-1,
     reload_dataloaders_every_n_epochs=1,
     precision="32-true",
@@ -217,8 +255,7 @@ train_params = dict(
     gradient_clip_val=1.0,
     gradient_clip_algorithm="norm",
     benchmark=True,
-    # callbacks=callbacks,
-    # logger=loggers if loggers else False,
+    callbacks=[]
 )
 
 # set weights as trainable
@@ -253,6 +290,83 @@ optimizer = AdamW(
     lr=hparams.get("learning_rate", 0.001),
     eps=hparams.get("eps", 1e-8),
 )
+
+# for logging progress
+class MinerProgressBar(ProgressBar):
+    """A variant progress bar that works off of steps and prints periodically."""
+
+    def __init__(self, num_steps):
+        super().__init__()
+        self.num_steps = num_steps
+        self.last_step = 0
+        self.prev_avg_loss = None
+        self.smoothing = 0.01
+
+    def on_train_start(self, trainer, lm):
+        super().on_train_start(trainer, lm)
+        trainer.pbar = tqdm(
+            # total=trainer.estimated_stepping_batches,
+            total=self.num_steps,
+            smoothing=0,
+            leave=True,
+            dynamic_ncols=True,
+            file=sys.stdout,
+        )
+
+    def on_train_end(self, trainer, lm):
+        trainer.pbar.close()
+
+    def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
+        super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
+
+        step = int(trainer.callback_metrics.get("step", -1))
+        if step == -1:
+            return
+
+        current_loss = float(trainer.callback_metrics["train_loss"])
+
+        current_epoch = trainer.current_epoch
+        # if lm.train_len > 0:
+        #     current_epoch += batch_idx / lm.train_len
+
+        avg_loss = 0
+        if not isnan(current_loss):
+            avg_loss = self.average_loss(
+                current_loss, self.prev_avg_loss, self.smoothing
+            )
+            self.prev_avg_loss = avg_loss
+
+        mem_bytes = os.sysconf("SC_PAGE_SIZE") * os.sysconf(
+            "SC_PHYS_PAGES"
+        )  # e.g. 4015976448
+        mem_gib = mem_bytes / (1024.0**3)  # e.g. 3.74
+
+        memory = psutil.virtual_memory()
+
+        bar = f"Loss: {avg_loss:.3f}"
+
+        if current_epoch > 0:
+            bar += f", Epoch: {epoch_string}"
+
+        if hasattr(trainer.strategy, "num_peers"):
+            bar += f", Peers: {trainer.strategy.num_peers}"
+
+        if trainer.pbar.n != step:
+            trainer.pbar.update(step - trainer.pbar.n)
+
+        # this is a dumb hack to make TQDM print in Docker
+        if random.random() < 0.01:
+            print()
+
+        trainer.pbar.set_description(bar)
+
+    def average_loss(self, current_loss, prev_avg_loss, smoothing):
+        if prev_avg_loss is None:
+            return current_loss
+        else:
+            return (smoothing * current_loss) + (1 - smoothing) * prev_avg_loss
+
+train_params["callbacks"].append(MinerProgressBar(hparams.get("num_steps")))
 
 # Wrap the model in a pytorch-lightning module
 train_model = MinerTrainer(

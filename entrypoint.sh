@@ -2,7 +2,7 @@
 
 cd /app/neurons
 
-python3 minerz.py
+python3 miner-z.py --initial_peers ${INITIAL_PEERS}
 
 # python3 miner.py \
 #     --netuid ${NETUID} \
