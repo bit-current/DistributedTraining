@@ -8,7 +8,7 @@ repo_url="https://github.com/bit-current/DistributedTraining.git"  # Your reposi
 main_branch="main"
 
 
-# # Initialize variables
+(# # Initialize variables
 # script="neurons/miner.py"
 # autoRunLoc=$(readlink -f "$0")
 # proc_name="distributed_training_miner" 
@@ -17,7 +17,7 @@ main_branch="main"
 # version="__version__"
 # repo_url="https://github.com/bit-current/DistributedTraining.git/tree/dev_kb"
 
-# old_args=$@
+# old_args=$@)
 
 # Check if pm2 is installed
 if ! command -v pm2 &> /dev/null
@@ -48,22 +48,6 @@ check_package_installed() {
         return 0
     fi
 }
-
-
-
-# get_local_version() {
-#     grep "$version" $version_location | cut -d' ' -f3 | tr -d "'\""
-# }
-
-# # Define function to get remote main version
-# get_remote_version() {
-#     git fetch
-#     git show origin/main:$version_location | grep "$version" | cut -d' ' -f3 | tr -d "'\""
-# }
-
-# get_version() {
-#     grep '__version__' "$1" | cut -d '"' -f 2 | tr -d "'\""
-# }
 
 
 get_version() {
@@ -97,12 +81,6 @@ enforce_main() {
     pip install -e .
     pm2 restart "$proc_name"  # Restart the PM2 process
 }
-
-
-local_version=$(get_version "$version_location")
-git fetch origin "$main_branch"
-remote_version=$(git show "origin/$main_branch:$version_location" | get_version)
-
 
 
 # Loop through all command line arguments
@@ -181,52 +159,48 @@ pm2 start app.config.js
 
 # Check if packages are installed.
 check_package_installed "jq"
-
-# # Start main process
-# current_branch=$(git rev-parse --abbrev-ref HEAD)
-# local_version=$(get_local_version)
-# remote_version=$(get_remote_version)
-
-
+if [ "$?" -eq 1 ]; then
 # Start of the main script
-while true; do
-    if [ -d .git ]; then
-        local_version=$(get_version "$version_location")
-        # Fetch remote changes without applying them
-        git fetch origin "$main_branch"
-        remote_version=$(git show "origin/$main_branch:$version_location" | get_version)
+    while true; do
+        if [ -d .git ]; then
+            local_version=$(get_version "$version_location")
+            # Fetch remote changes without applying them
+            git fetch origin "$main_branch"
+            remote_version=$(git show "origin/$main_branch:$version_location" | get_version)
 
-        current_branch=$(git rev-parse --abbrev-ref HEAD)
+            current_branch=$(git rev-parse --abbrev-ref HEAD)
 
-        if [ "$local_version" != "$remote_version" ]; then
-            echo "Version mismatch detected. Local version: $local_version, Remote version: $remote_version."
-            if [ "$current_branch" = "$main_branch" ]; then
-                # Case 3: On main branch, and versions differ. Delete local and reclone.
-                echo "On main branch with version mismatch. Recloning..."
-                check_and_clone
-            else
-                # Case 2: On a different branch, enforce main.
-                echo "On branch $current_branch, enforcing main branch changes..."
+            if [ "$local_version" != "$remote_version" ]; then
+                echo "Version mismatch detected. Local version: $local_version, Remote version: $remote_version."
+                if [ "$current_branch" = "$main_branch" ]; then
+                    # Case 3: On main branch, and versions differ. Delete local and reclone.
+                    echo "On main branch with version mismatch. Recloning..."
+                    check_and_clone
+                else
+                    # Case 2: On a different branch, enforce main.
+                    echo "On branch $current_branch, enforcing main branch changes..."
+                    enforce_main
+                fi
+            elif [ "$current_branch" != "$main_branch" ]; then
+                # If on a different branch, but versions are the same, still enforce main
+                echo "On branch $current_branch, different from main. Enforcing main branch changes..."
                 enforce_main
+            else
+                echo "Local version is up-to-date with the remote main branch."
+                # Your regular operations here, e.g., restarting services
+                pm2 restart "$proc_name"
             fi
-        elif [ "$current_branch" != "$main_branch" ]; then
-            # If on a different branch, but versions are the same, still enforce main
-            echo "On branch $current_branch, different from main. Enforcing main branch changes..."
-            enforce_main
         else
-            echo "Local version is up-to-date with the remote main branch."
-            # Your regular operations here, e.g., restarting services
-            pm2 restart "$proc_name"
+            echo "This directory is not a Git repository."
+            exit 1
         fi
-    else
-        echo "This directory is not a Git repository."
-        exit 1
-    fi
 
-    # Sleep for a predefined time before checking again
-    sleep 300  # 20 minutes
-done
-
+        # Sleep for a predefined time before checking again
+        sleep 300  # 20 minutes
+    done
+else
+    echo "Missing package 'jq'. Please install it for your system first."
+fi
 
 
 
