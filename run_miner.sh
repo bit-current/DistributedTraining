@@ -228,59 +228,65 @@ if [ "$?" -eq 1 ]; then
 
 # Main logic starts here
     while true; do
-    if [ -d "./.git" ]; then
-        # Fetch the latest changes from the remote repository without merging them
-        git fetch origin main
 
-        # Determine the name of the current branch
-        current_branch=$(git rev-parse --abbrev-ref HEAD)
+        # First ensure that this is a git installation
+        if [ -d "./.git" ]; then
 
-        if [ "$current_branch" != "main" ]; then
-        # If not on 'main', reset the current branch to match 'main' exactly
-        echo "Enforcing 'main' branch state onto the current branch '$current_branch'..."
-        git reset --hard origin/main
-        git clean -fd
-        
-        # Perform necessary actions after reset
-        # Example: Restarting the PM2 process and installing dependencies
-        echo "Restarting PM2 process..."
-        pm2 restart $proc_name
-        echo "Installing dependencies..."
-        pip install -e .
+            # check value on github remotely
+            latest_version=$(check_variable_value_on_github "bit-current/DistributedTraining" "template/__init__.py" "__version__ ")
 
-        else
-        # If on 'main' and there are changes, delete and reclone the repository
-        local_head=$(git rev-parse HEAD)
-        remote_head=$(git rev-parse origin/main)
-        if [ "$local_head" != "$remote_head" ]; then
-            echo "Changes detected in 'main'. Deleting and recloning the repository..."
-            cd ..
-            rm -rf "$(basename $repo_url .git)"
-            
-            if git clone "$repo_url"; then
-            echo "Repository successfully recloned."
-            cd "$(basename $repo_url .git)"
-            
-            # Perform necessary actions after cloning
-            echo "Restarting PM2 process..."
-            pm2 restart $proc_name
-            echo "Installing dependencies..."
-            pip install -e .
+            # If the file has been updated
+            if version_less_than $current_version $latest_version; then
+                echo "latest version $latest_version"
+                echo "current version $current_version"
+                diff=$(get_version_difference $latest_version $current_version)
+                if [ "$diff" -eq 1 ]; then
+                    echo "current validator version:" "$current_version" 
+                    echo "latest validator version:" "$latest_version" 
+
+                    # Pull latest changes
+                    # Failed git pull will return a non-zero output
+                    if git pull origin $branch; then
+                        # latest_version is newer than current_version, should download and reinstall.
+                        echo "New version published. Updating the local copy."
+
+                        # Install latest changes just in case.
+                        pip install -e .
+
+                        # # Run the Python script with the arguments using pm2
+                        # TODO (shib): Remove this pm2 del in the next spec version update.
+                        pm2 del auto_run_validator
+                        echo "Restarting PM2 process"
+                        pm2 restart $proc_name
+
+                        # Update current version:
+                        current_version=$(read_version_value)
+                        echo ""
+
+                        # Restart autorun script
+                        echo "Restarting script..."
+                        ./$(basename $0) $old_args && exit
+                    else
+                        echo "**Will not update**"
+                        echo "It appears you have made changes on your local copy. Please stash your changes using git stash."
+                    fi
+                else
+                    # current version is newer than the latest on git. This is likely a local copy, so do nothing. 
+                    echo "**Will not update**"
+                    echo "The local version is $diff versions behind. Please manually update to the latest version and re-run this script."
+                fi
             else
-            echo "Failed to clone the repository. Please check your connection or repository URL."
-            # Add additional error handling here
+                echo "**Skipping update **"
+                echo "$current_version is the same as or more than $latest_version. You are likely running locally."
             fi
         else
             echo "No changes detected in 'main'. The repository is up-to-date."
         fi
-        fi
-    else
-        echo "Not a Git repository. Please check the setup."
-        exit 1
-    fi
-
-    # Wait before checking for updates again
-    sleep 1200
+        
+        # Wait about 30 minutes
+        # This should be plenty of time for validators to catch up
+        # and should prevent any rate limitations by GitHub.
+        sleep 1200
     done
     # while true; do
 
