@@ -36,9 +36,9 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--initial_peers",
     action="append",
-    help="Your peer. Use --initial_peers multiple times to pass multiple peers.",
+    help="Add a peer. Can be used multiple times to pass multiple peers.",
+    nargs="*",
     default=[],
-    nargs="?",
 )
 
 parser.add_argument(
@@ -52,8 +52,18 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+
+def flatten_list(nested_list):
+    """Flatten a nested list."""
+    if nested_list and isinstance(nested_list[0], list):
+        # Assumes only one level of nesting
+        return [item for sublist in nested_list for item in sublist]
+    return nested_list
+
+
 # set some basic configuration values
-initial_peers = args.initial_peers
+initial_peers = flatten_list(args.initial_peers)
+
 batch_size = args.batch_size
 block_size = 1024
 num_steps = 100_000
