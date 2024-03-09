@@ -32,6 +32,7 @@ logging.getLogger("lightning.pytorch").setLevel(logging.INFO)
 parser = argparse.ArgumentParser(
     description="Get configs from arguments to this script."
 )
+
 parser.add_argument(
     "--initial_peers",
     type=list,
@@ -45,6 +46,7 @@ parser.add_argument(
     type=int,
     help="The largest batch size able to fit on your GPU.",
     default=1,
+    const=1,
     nargs="?",
 )
 
@@ -55,7 +57,7 @@ initial_peers = args.initial_peers
 batch_size = args.batch_size
 block_size = 1024
 num_steps = 100_000
-target_batch_size = 8
+target_batch_size = 256
 
 dataset_config = {
     "dataset": "tiiuae/falcon-refinedweb",
@@ -70,7 +72,7 @@ config = AutoConfig.from_pretrained(
     n_emb=block_size,
     n_ctx=block_size,
     n_layer=6,
-    n_head=16,
+    n_head=6,
     n_positions=block_size,
     n_inner=block_size * 4,
     resid_pdrop=0.1,
@@ -117,6 +119,7 @@ class StreamingDataModule(LightningDataModule):
         )
 
 
+# create an iterable dataset, which loops over the streaming data
 class StreamingDataset(IterableDataset):
     def __init__(self, tokenizer, config):
         self.tokenizer = tokenizer
@@ -190,10 +193,10 @@ class MinerTrainer(LightningModule):
         )
         return loss
 
-    def on_train_batch_end(self, trainer, lm, outputs):
+    def on_train_batch_end(self, trainer, outputs, idx):
         self.log(
             "step",
-            int(self.trainer.current_epoch),
+            int(self.trainer.strategy.optimizers[0].local_epoch),
             on_step=True,
             on_epoch=False,
             sync_dist=True,
@@ -209,7 +212,7 @@ hparams = dict(
     learning_rate=0.001,
     weight_decay=0.1,
     eps=1e-8,
-    warmup_steps=0,
+    warmup_steps=10,
     batch_size=batch_size,
     num_steps=num_steps,
     block_size=block_size,
@@ -217,7 +220,7 @@ hparams = dict(
 
 # define the hivemind strategy
 strategy = HivemindStrategy(
-    run_id=f"hivetrain-z",
+    run_id=f"hiveminer",
     batch_size=batch_size,
     target_batch_size=target_batch_size,
     initial_peers=initial_peers,
@@ -323,7 +326,6 @@ class MinerConsoleLogging(Callback):
 
     def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
-
         step = int(trainer.callback_metrics.get("step", -1))
         if step == -1:
             return
