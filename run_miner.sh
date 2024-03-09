@@ -342,6 +342,10 @@ if [ "$?" -eq 1 ]; then
                 fi
             else
                 echo "No changes detected in 'main'. The repository is up-to-date."
+                echo "No changes detected in 'main'. The repository is up-to-date."
+                echo "No changes detected in 'main'. The repository is up-to-date."
+                echo "No changes detected in 'main'. The repository is up-to-date."
+                echo "No changes detected in 'main'. The repository is up-to-date."
             fi
             fi
         else
