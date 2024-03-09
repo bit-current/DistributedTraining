@@ -2,14 +2,16 @@
 
 cd /app/neurons
 
-python3 miner.py \
-    --netuid ${NETUID} \
-    --wallet.name ${WALLETNAME} \
-    --wallet.hotkey ${WALLETHOTKEY} \
-    --dht.port ${DHTPORT} \
-    --dht.announce_ip ${EXTERNALIP} \
-    --axon.port ${AXONPORT} \
-    --axon.external_ip ${EXTERNALIP}
+python3 minerz.py
+
+# python3 miner.py \
+#     --netuid ${NETUID} \
+#     --wallet.name ${WALLETNAME} \
+#     --wallet.hotkey ${WALLETHOTKEY} \
+#     --dht.port ${DHTPORT} \
+#     --dht.announce_ip ${EXTERNALIP} \
+#     --axon.port ${AXONPORT} \
+#     --axon.external_ip ${EXTERNALIP}
 
 # while [ true ]
 # do

@@ -12,6 +12,7 @@ services:
     build:
       dockerfile: Dockerfile
     volumes:
+      - ./neurons:/app/neurons
       - ./wallets:/root/.bittensor/wallets
     deploy:
       resources:

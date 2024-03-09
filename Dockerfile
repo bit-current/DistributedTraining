@@ -6,6 +6,7 @@ ENV DEBIAN_FRONTEND="noninteractive"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+    git \
     python3-dev \
     python3-pip \
     python3-packaging \
@@ -20,6 +21,8 @@ RUN pip install -r requirements.txt && \
     pip cache purge
 
 COPY ./ /app
+
+RUN pip install git+https://github.com/LuciferianInk/lightning-Hivemind.git
 
 RUN pip install -e . && \
     pip cache purge
