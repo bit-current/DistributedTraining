@@ -10,6 +10,7 @@ services:
     tty: true
     stdin_open: true
     build:
+      shm_size: '4gb'
       dockerfile: Dockerfile
     volumes:
       - ./neurons:/app/neurons

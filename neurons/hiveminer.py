@@ -63,6 +63,7 @@ def flatten_list(nested_list):
 
 # set some basic configuration values
 initial_peers = flatten_list(args.initial_peers)
+print(initial_peers)
 
 batch_size = args.batch_size
 block_size = 1024
@@ -84,7 +85,7 @@ config = AutoConfig.from_pretrained(
     n_layer=8,
     n_head=8,
     n_positions=block_size,
-    n_inner=block_size * 4,
+    n_inner=block_size * 6,
     resid_pdrop=0.1,
     embd_pdrop=0.1,
     attn_pdrop=0.1,
@@ -240,8 +241,8 @@ strategy = HivemindStrategy(
     verbose=False,
     wait_timeout=30,
     bootstrap_timeout=20,
-    matchmaking_time=45.0,
-    averaging_timeout=180.0,
+    matchmaking_time=60.0,
+    averaging_timeout=300.0,
     delay_state_averaging=True,
     delay_grad_averaging=True,
     delay_optimizer_step=True,
