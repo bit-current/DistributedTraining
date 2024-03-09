@@ -164,3 +164,4 @@ wandb/
 
 wallets
 lightning_logs
+.scale_batch_size*

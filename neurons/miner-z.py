@@ -1,62 +1,106 @@
+import argparse
+import ipaddress
+import logging
 import os
-import sys
 import random
-import numpy as np
-import torch
-from torch.utils.data import DataLoader, Dataset, IterableDataset
-from torch.optim import AdamW
-from lightning.fabric.utilities.seed import reset_seed, seed_everything
-from lightning.pytorch.accelerators import TPUAccelerator
-from lightning.pytorch.core.datamodule import LightningDataModule
-from lightning.pytorch.callbacks import (
-    ModelCheckpoint,
-    ModelPruning,
-    StochasticWeightAveraging,
-)
-from lightning.pytorch.trainer import Trainer
-from lightning.pytorch.utilities import CombinedLoader
-from lightning.pytorch import LightningModule
-from lightning.pytorch.callbacks import Callback, ProgressBar, TQDMProgressBar
-from lightning_hivemind.strategy import HivemindStrategy
+import re
+import sys
 from functools import partial
-from tqdm.auto import tqdm
-import psutil
 from math import isnan
 
+import numpy as np
+import psutil
+import torch
+from datasets import load_dataset
+from lightning.fabric.utilities.seed import reset_seed, seed_everything
+from lightning.pytorch import LightningModule
+from lightning.pytorch.accelerators import TPUAccelerator
+from lightning.pytorch.callbacks import (
+    Callback,
+    ModelCheckpoint,
+    ModelPruning,
+    ProgressBar,
+    StochasticWeightAveraging,
+    TQDMProgressBar,
+)
+from lightning.pytorch.core.datamodule import LightningDataModule
+from lightning.pytorch.trainer import Trainer
+from lightning.pytorch.utilities import CombinedLoader
+from lightning_hivemind.strategy import HivemindStrategy
+from torch.optim import AdamW
+from torch.utils.data import DataLoader, Dataset, IterableDataset
+from tqdm.auto import tqdm
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
     GenerationConfig,
 )
-from datasets import load_dataset
-import ipaddress
-import re
-import logging
-import argparse
 
 logging.getLogger("lightning.pytorch").setLevel(logging.INFO)
 
 # capture arguments passed to this python script
-parser = argparse.ArgumentParser(description="Get configs from arguments to this script.")
-parser.add_argument('--initial_peers', type=list, help='Your peer. Use --initial_peers multiple times to pass multiple peers.', default=[], nargs='?')
+parser = argparse.ArgumentParser(
+    description="Get configs from arguments to this script."
+)
+parser.add_argument(
+    "--initial_peers",
+    type=list,
+    help="Your peer. Use --initial_peers multiple times to pass multiple peers.",
+    default=[],
+    nargs="?",
+)
+
+parser.add_argument(
+    "--batch_size",
+    type=int,
+    help="The largest batch size able to fit on your GPU.",
+    default=1,
+    nargs="?",
+)
+
 args = parser.parse_args()
 
+# set some basic configuration values
 initial_peers = args.initial_peers
+batch_size = args.batch_size
+block_size = 1024
+num_steps = 100_000
+target_batch_size = 8192
+
+dataset_config = {
+    "dataset": "tiiuae/falcon-refinedweb",
+    "key": "content",
+    "split": "train",
+    "block_size": block_size,
+}
 
 # initialized and load the model
-block_size = 1024
 config = AutoConfig.from_pretrained(
     "gpt2",
-    n_emb=256,
-    n_layer=3,
-    n_head=3,
-    n_inner=1024,
-    torch_dtype=torch.float32
+    n_emb=block_size,
+    n_ctx=block_size,
+    n_layer=16,
+    n_head=16,
+    n_positions=block_size,
+    n_inner=block_size * 4,
+    resid_pdrop=0.1,
+    embd_pdrop=0.1,
+    attn_pdrop=0.1,
+    summary_first_dropout=0.1,
+    layer_norm_epsilon=1e-5,
+    initializer_range=0.05,
+    summary_type="cls_index",
+    summary_proj_to_labels=True,
+    summary_use_proj=True,
+    torch_dtype=torch.bfloat16,
 )
+
+print(config)
+
 model = AutoModelForCausalLM.from_config(config)
 tokenizer = AutoTokenizer.from_pretrained(
-    "openai-community/gpt2", 
+    "openai-community/gpt2",
     cache_dir="/tmp/tokenizer",
     padding="max_length",
     padding_side="left",
@@ -66,12 +110,6 @@ tokenizer = AutoTokenizer.from_pretrained(
 )
 tokenizer.pad_token = tokenizer.eos_token
 
-dataset_config = {
-    "dataset": "tiiuae/falcon-refinedweb",
-    "key": "content",
-    "split": "train",
-    "block_size": block_size,
-}
 
 # create a datamodule to wrap our remote datasets
 class StreamingDataModule(LightningDataModule):
@@ -79,34 +117,32 @@ class StreamingDataModule(LightningDataModule):
         super().__init__()
         self.tokenizer = tokenizer
         self.config = config
-        self.train_data = None
-        self.train_data = StreamingDataset(
-            self.tokenizer, config
-        )
+        self.train_data = StreamingDataset(self.tokenizer, config)
 
     def train_dataloader(self):
         return DataLoader(
             self.train_data,
-            batch_size=1,
+            batch_size=batch_size,
             pin_memory=True,
             num_workers=2,
         )
 
+
 class StreamingDataset(IterableDataset):
-    def __init__(self, tokenizer, conf):
+    def __init__(self, tokenizer, config):
         self.tokenizer = tokenizer
-        self.config = conf
+        self.config = config
         self.dataset = load_dataset(
             self.config.get("dataset", "tiiuae/falcon-refinedweb"),
             split=self.config.get("split", "train"),
             streaming=True,
-            cache_dir="/tmp/pile"
+            cache_dir="/tmp/pile",
         )
 
     def __iter__(self):
         shuffled = self.dataset.shuffle(
             seed=random.randint(0, 2**31),
-            buffer_size=1000,
+            buffer_size=10000,
         )
 
         block_size = self.config.get("block_size", 512)
@@ -136,8 +172,10 @@ class StreamingDataset(IterableDataset):
             else:
                 continue
 
+
 # prepare a dataset for use with training
 dataset = StreamingDataModule(tokenizer, dataset_config)
+
 
 # wrap the LightningModule in a custom class
 class MinerTrainer(LightningModule):
@@ -145,14 +183,10 @@ class MinerTrainer(LightningModule):
     A training module for AIGen.
     """
 
-    def __init__(self, model, optimizer, tokenizer, hparams):
+    def __init__(self, model, optimizer, hparams):
         super(MinerTrainer, self).__init__()
 
-        self.model, self.optimizer, self.tokenizer = (
-            model,
-            optimizer,
-            tokenizer,
-        )
+        self.model, self.optimizer = (model, optimizer)
         self.automatic_optimization = True
         self.pbar = None
         self.save_hyperparameters(hparams)
@@ -186,22 +220,23 @@ class MinerTrainer(LightningModule):
         "Create optimizer and scheduler"
         return [self.optimizer]
 
+
 # define the model hyperparameters
 hparams = dict(
     learning_rate=0.001,
     weight_decay=0.1,
     eps=1e-8,
     warmup_steps=0,
-    batch_size=1,
-    num_steps=10000,
-    target_batch_size=512,
-    block_size=block_size
+    batch_size=batch_size,
+    num_steps=num_steps,
+    target_batch_size=target_batch_size,
+    block_size=block_size,
 )
 
 # define the hivemind strategy
 strategy = HivemindStrategy(
     run_id=f"hivetrain-z",
-    batch_size=1,
+    batch_size=batch_size,
     target_batch_size=hparams.get("target_batch_size"),
     initial_peers=initial_peers,
     use_ipfs=True,
@@ -238,9 +273,7 @@ for peer in list(visible_addresses):
         my_ids.append(match.group(1))
 
 for peer in list(set(my_ids)):
-    print(
-        f"PEER-ID: {peer}"
-    )
+    print(f"PEER-ID: {peer}")
 
 # define training params
 train_params = dict(
@@ -251,12 +284,13 @@ train_params = dict(
     max_epochs=-1,
     reload_dataloaders_every_n_epochs=1,
     precision="32-true",
-    accumulate_grad_batches=1, # must be 1 for Hivemind training
+    accumulate_grad_batches=1,  # must be 1 for Hivemind training
     gradient_clip_val=1.0,
     gradient_clip_algorithm="norm",
     benchmark=True,
-    callbacks=[]
+    callbacks=[],
 )
+
 
 # set weights as trainable
 def get_params(model, hparams):
@@ -281,6 +315,7 @@ def get_params(model, hparams):
 
     return grouped_parameters
 
+
 # set model parameters as trainable
 params = get_params(model, hparams)
 
@@ -290,6 +325,7 @@ optimizer = AdamW(
     lr=hparams.get("learning_rate", 0.001),
     eps=hparams.get("eps", 1e-8),
 )
+
 
 # for logging progress
 class MinerProgressBar(ProgressBar):
@@ -366,20 +402,13 @@ class MinerProgressBar(ProgressBar):
         else:
             return (smoothing * current_loss) + (1 - smoothing) * prev_avg_loss
 
+
 train_params["callbacks"].append(MinerProgressBar(hparams.get("num_steps")))
 
 # Wrap the model in a pytorch-lightning module
-train_model = MinerTrainer(
-    model,
-    optimizer,
-    tokenizer,
-    hparams
-)
+train_model = MinerTrainer(model, optimizer, hparams)
 
 # fit the trainer and run
 model.train()
 trainer = Trainer(**train_params)
-trainer.fit(
-    train_model,
-    dataset
-)
+trainer.fit(train_model, dataset)
