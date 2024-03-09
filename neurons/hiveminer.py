@@ -67,7 +67,7 @@ initial_peers = flatten_list(args.initial_peers)
 batch_size = args.batch_size
 block_size = 1024
 num_steps = 100_000
-target_batch_size = 256
+target_batch_size = 8192
 
 dataset_config = {
     "dataset": "tiiuae/falcon-refinedweb",
