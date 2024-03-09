@@ -241,37 +241,49 @@ if [ "$?" -eq 1 ]; then
                     echo "current validator version:" "$current_version" 
                     echo "latest validator version:" "$latest_version" 
 
-                    # Pull latest changes
-                    # Failed git pull will return a non-zero output
-                    if git pull origin $branch; then
-                        # latest_version is newer than current_version, should download and reinstall.
-                        echo "New version published. Updating the local copy."
+                    echo "Version mismatch detected. Deleting local repository and recloning..."
 
-                        # Install latest changes just in case.
+                    # Navigate to the parent directory
+                    cd ..
+
+                    # Delete the local repository directory
+                    echo "Deleting local repository directory..."
+                    rm -rf "$(basename $repo_url .git)"
+
+                    # Attempt to reclone the repository
+                    echo "Cloning the repository from $repo_url..."
+                    if git clone "$repo_url"; then
+                        # Clone successful
+                        echo "Repository successfully cloned."
+
+                        # Navigate into the newly cloned directory
+                        cd "$(basename $repo_url .git)"
+
+                        # Install latest changes just in case
+                        echo "Installing dependencies..."
                         pip install -e .
 
-                        # # Run the Python script with the arguments using pm2
-                        # TODO (shib): Remove this pm2 del in the next spec version update.
-                        pm2 del auto_run_validator
-                        echo "Restarting PM2 process"
+                        # Restart the managed application with PM2
+                        echo "Restarting PM2 process..."
                         pm2 restart $proc_name
 
-                        # Update current version:
+                        # Update current version variable
                         current_version=$(read_version_value)
-                        echo ""
+                        echo "Repository reset to the latest version."
 
                         # Restart autorun script
                         echo "Restarting script..."
                         ./$(basename $0) $old_args && exit
                     else
-                        echo "**Will not update**"
-                        echo "It appears you have made changes on your local copy. Please stash your changes using git stash."
+                        # Clone failed
+                        echo "Failed to clone the repository. Please check your connection or repository URL."
+                        # Contingency action here (e.g., send notification, log the event, attempt a different recovery strategy, etc.)
                     fi
+
                 else
-                    # current version is newer than the latest on git. This is likely a local copy, so do nothing. 
-                    echo "**Will not update**"
-                    echo "The local version is $diff versions behind. Please manually update to the latest version and re-run this script."
-                fi
+                    echo "Local version is up-to-date with the main branch. No action required."
+                    
+                fi             
             else
                 echo "**Skipping update **"
                 echo "$current_version is the same as or more than $latest_version. You are likely running locally."
@@ -283,7 +295,7 @@ if [ "$?" -eq 1 ]; then
         # Wait about 30 minutes
         # This should be plenty of time for validators to catch up
         # and should prevent any rate limitations by GitHub.
-        sleep 1200
+        sleep 300
     done
 else
     echo "Missing package 'jq'. Please install it for your system first."
