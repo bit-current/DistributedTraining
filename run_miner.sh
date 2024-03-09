@@ -147,6 +147,8 @@ while true; do
             else
                 # 3. Main branch handling
                 echo "On main branch with updates available. Recloning repository..."
+                echo "On main branch with updates available. Recloning repository..."
+                echo "On main branch with updates available. Recloning repository..."
                 cd ..
                 rm -rf "$(basename $repo_url .git)"
                 git clone "$repo_url"
