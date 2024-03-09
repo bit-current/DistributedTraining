@@ -19,66 +19,6 @@ then
     exit 1
 fi
 
-# Checks if $1 is smaller than $2
-# If $1 is smaller than or equal to $2, then true. 
-# else false.
-version_less_than_or_equal() {
-    [  "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
-}
-
-# Checks if $1 is smaller than $2
-# If $1 is smaller than $2, then true. 
-# else false.
-version_less_than() {
-    [ "$1" = "$2" ] && return 1 || version_less_than_or_equal $1 $2
-}
-
-# Returns the difference between 
-# two versions as a numerical value.
-get_version_difference() {
-    local tag1="$1"
-    local tag2="$2"
-
-    # Extract the version numbers from the tags
-    local version1=$(echo "$tag1" | sed 's/v//')
-    local version2=$(echo "$tag2" | sed 's/v//')
-
-    # Split the version numbers into an array
-    IFS='.' read -ra version1_arr <<< "$version1"
-    IFS='.' read -ra version2_arr <<< "$version2"
-
-    # Calculate the numerical difference
-    local diff=0
-    for i in "${!version1_arr[@]}"; do
-        local num1=${version1_arr[$i]}
-        local num2=${version2_arr[$i]}
-
-        # Compare the numbers and update the difference
-        if (( num1 > num2 )); then
-            diff=$((diff + num1 - num2))
-        elif (( num1 < num2 )); then
-            diff=$((diff + num2 - num1))
-        fi
-    done
-
-    strip_quotes $diff
-}
-
-read_version_value() {
-    # Read each line in the file
-    while IFS= read -r line; do
-        # Check if the line contains the variable name
-        if [[ "$line" == *"$version"* ]]; then
-            # Extract the value of the variable
-            local value=$(echo "$line" | awk -F '=' '{print $2}' | tr -d ' ')
-            strip_quotes $value
-            return 0
-        fi
-    done < "$version_location"
-
-    echo ""
-}
-
 check_package_installed() {
     local package_name="$1"
     os_name=$(uname -s)
@@ -102,51 +42,16 @@ check_package_installed() {
     fi
 }
 
-check_variable_value_on_github() {
-    local repo="$1"
-    local file_path="$2"
-    local variable_name="$3"
-
-    local url="https://api.github.com/repos/$repo/contents/$file_path"
-    local response=$(curl -s "$url")
-
-    # Check if the response contains an error message
-    if [[ $response =~ "message" ]]; then
-        echo "Error: Failed to retrieve file contents from GitHub."
-        return 1
-    fi
-
-    # Extract the content from the response
-    local content=$(echo "$response" | tr -d '\n' | jq -r '.content')
-
-    if [[ "$content" == "null" ]]; then
-        echo "File '$file_path' not found in the repository."
-        return 1
-    fi
-
-    # Decode the Base64-encoded content
-    local decoded_content=$(echo "$content" | base64 --decode)
-
-    # Extract the variable value from the content
-    local variable_value=$(echo "$decoded_content" | grep "$variable_name" | awk -F '=' '{print $2}' | tr -d ' ')
-
-    if [[ -z "$variable_value" ]]; then
-        echo "Variable '$variable_name' not found in the file '$file_path'."
-        return 1
-    fi
-
-    strip_quotes $variable_value
+get_local_version() {
+    grep "$version" $version_location | cut -d' ' -f3 | tr -d "'\""
 }
 
-strip_quotes() {
-    local input="$1"
-
-    # Remove leading and trailing quotes using parameter expansion
-    local stripped="${input#\"}"
-    stripped="${stripped%\"}"
-
-    echo "$stripped"
+# Define function to get remote main version
+get_remote_version() {
+    git fetch
+    git show origin/main:$version_location | grep "$version" | cut -d' ' -f3 | tr -d "'\""
 }
+
 
 # Loop through all command line arguments
 while [[ $# -gt 0 ]]; do
@@ -224,138 +129,41 @@ pm2 start app.config.js
 
 # Check if packages are installed.
 check_package_installed "jq"
-if [ "$?" -eq 1 ]; then
-    # while true; do
-    #     # First ensure that this is a git installation
-    #     if [ -d "./.git" ]; then
-    #         # check value on github remotely https://github.com/bit-current/DistributedTraining/tree/dev_kb
-    #         latest_version=$(check_variable_value_on_github "bit-current/DistributedTraining/tree/dev_kb" "template/__init__.py" "__version__ ")
 
-    #         # If the file has been updated
-    #         if version_less_than $current_version $latest_version; then
-    #             echo "latest version $latest_version"
-    #             echo "current version $current_version"
-    #             diff=$(get_version_difference $latest_version $current_version)
-    #             if [ "$diff" -eq 1 ]; then
-    #                 echo "current validator version:" "$current_version" 
-    #                 echo "latest validator version:" "$latest_version" 
+# Start main process
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+local_version=$(get_local_version)
+remote_version=$(get_remote_version)
 
-    #                 echo "Version mismatch detected. Deleting local repository and recloning..."
-
-    #                 # Navigate to the parent directory
-    #                 cd ..
-
-    #                 # Delete the local repository directory
-    #                 echo "Deleting local repository directory..."
-    #                 rm -rf "$(basename $repo_url .git)"
-
-    #                 # Attempt to reclone the repository
-    #                 echo "Cloning the repository from $repo_url..."
-    #                 if git clone "$repo_url"; then
-    #                     # Clone successful
-    #                     echo "Repository successfully cloned."
-
-    #                     # Navigate into the newly cloned directory
-    #                     cd "$(basename $repo_url .git)"
-
-    #                     # Install latest changes just in case
-    #                     echo "Installing dependencies..."
-    #                     pip install -e .
-
-    #                     # Restart the managed application with PM2
-    #                     echo "Restarting PM2 process..."
-    #                     pm2 restart $proc_name
-
-    #                     # Update current version variable
-    #                     current_version=$(read_version_value)
-    #                     echo "Repository reset to the latest version."
-
-    #                     # Restart autorun script
-    #                     echo "Restarting script..."
-    #                     ./$(basename $0) $old_args && exit
-    #                 else
-    #                     # Clone failed
-    #                     echo "Failed to clone the repository. Please check your connection or repository URL."
-    #                     # Contingency action here (e.g., send notification, log the event, attempt a different recovery strategy, etc.)
-    #                 fi
-
-    #             else
-    #                 echo "Local version is up-to-date with the main branch. No action required."
-                    
-    #             fi             
-    #         else
-    #             echo "**Skipping update **"
-    #             echo "$current_version is the same as or more than $latest_version. You are likely running locally."
-    #         fi
-    #     else
-    #         echo "The installation does not appear to be done through Git. Please install from source at https://github.com/opentensor/validators and rerun this script."
-    #     fi
-        
-    #     # Wait about 30 minutes
-    #     # This should be plenty of time for validators to catch up
-    #     # and should prevent any rate limitations by GitHub.
-    #     sleep 300
-    # done
-    # Main logic starts here
-    while true; do
-        if [ -d "./.git" ]; then
-            # Fetch the latest changes from the remote repository without merging them
-            git fetch origin main
-
-            # Determine the name of the current branch
-            current_branch=$(git rev-parse --abbrev-ref HEAD)
-
-            if [ "$current_branch" != "main" ]; then
-            # If not on 'main', reset the current branch to match 'main' exactly
-            echo "Enforcing 'main' branch state onto the current branch '$current_branch'..."
-            git reset --hard origin/main
-            git clean -fd
-            
-            # Perform necessary actions after reset
-            # Example: Restarting the PM2 process and installing dependencies
-            echo "Restarting PM2 process..."
-            pm2 restart $proc_name
-            echo "Installing dependencies..."
-            pip install -e .
-
+while true; do
+    if [ -d "./.git" ]; then
+        if [ "$local_version" != "$remote_version" ]; then
+            # 2. Different branch handling
+            if [ "$current_branch" != "dev_kb" ]; then
+                echo "On branch $current_branch, which differs from main. Resetting to match remote main..."
+                git fetch origin dev_kb
+                git reset --hard origin/dev_kb
+                git clean -df
             else
-            # If on 'main' and there are changes, delete and reclone the repository
-            local_head=$(git rev-parse HEAD)
-            remote_head=$(git rev-parse origin/main)
-            if [ "$local_head" != "$remote_head" ]; then
-                echo "Changes detected in 'main'. Deleting and recloning the repository..."
+                # 3. Main branch handling
+                echo "On main branch with updates available. Recloning repository..."
                 cd ..
                 rm -rf "$(basename $repo_url .git)"
-                
-                if git clone "$repo_url"; then
-                echo "Repository successfully recloned."
+                git clone "$repo_url"
                 cd "$(basename $repo_url .git)"
-                
-                # Perform necessary actions after cloning
-                echo "Restarting PM2 process..."
-                pm2 restart $proc_name
-                echo "Installing dependencies..."
-                pip install -e .
-                else
-                echo "Failed to clone the repository. Please check your connection or repository URL."
-                # Add additional error handling here
-                fi
-            else
-                echo "No changes detected in 'main'. The repository is up-to-date."
-                echo "No changes detected in 'main'. The repository is up-to-date."
-                echo "No changes detected in 'main'. The repository is up-to-date."
-                echo "No changes detected in 'main'. The repository is up-to-date."
-                echo "No changes detected in 'main'. The repository is up-to-date."
             fi
-            fi
+            # Common steps after update
+            pip install -e .
+            pm2 restart $proc_name
         else
-            echo "Not a Git repository. Please check the setup."
+            # 4. No differences
+            echo "Local version matches remote main. No action required."
             exit 1
         fi
-
-        # Wait before checking for updates again
-        sleep 150
+        sleep 150       
     done
 else
     echo "Missing package 'jq'. Please install it for your system first."
 fi
+
+  
