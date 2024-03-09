@@ -52,14 +52,35 @@ def trigger_error():
 @app.route('/training_params', methods=['POST'])
 @authenticate_request_with_bittensor
 def training_params():
-    if orchestrator.state != "training":
+    if orchestrator.state == "training":
+        miner_id = orchestrator.public_address_to_miner_id.get(public_address)
+        if miner_id in orchestrator.meta_miners:
+            return jsonify({"world_size": len(orchestrator.meta_miners), "rank": miner_id, "state": orchestrator.state}), 200
+        else:
+            return jsonify({"error": "Miner not found"}), 404
+    elif orchestrator.state.startswith("filtering"):
+        # IF the miner is in the senders list assign a rank of 0
+        # Otherwise assign a rank of 1
+    else:
         return jsonify({"error": "Not in training state"}), 400
     public_address = request.json.get('public_address')
-    miner_id = orchestrator.public_address_to_miner_id.get(public_address)
-    if miner_id in orchestrator.meta_miners:
-        return jsonify({"world_size": len(orchestrator.meta_miners), "rank": miner_id, "state": orchestrator.state}), 200
+    
+
+@app.route('/training_report', methods=['POST'])
+@authenticate_request_with_bittensor
+def training_params():
+    if orchestrator.state == "training":
+        metrics = request.json.get('metrics')
+        public_address = request.get("public_address")
+    else if orchestrator.state.startswith("filtering"):
+        # If miners is in the receivers list evaluate
+        # otherwise ignore
+        metrics = request.json.get('hash')
+        public_address = request.get("public_address")
     else:
-        return jsonify({"error": "Miner not found"}), 404
+        return jsonify({"error": "Not in training/filtering state"}), 400
+    
+    
 
 if __name__ == "__main__":
     config = Configurator.combine_configs()

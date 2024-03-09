@@ -17,7 +17,7 @@ last_evaluation_time = time.time()
 evaluation_interval = 120
 
 last_evaluation_time = time.time()
-evaluation_interval = 120
+evaluation_interval = 300
 sync_interval = 600  # Synchronization interval in seconds
 last_sync_time = time.time()
 last_update = 0

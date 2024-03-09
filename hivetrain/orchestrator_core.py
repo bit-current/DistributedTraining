@@ -19,13 +19,14 @@ class Orchestrator:
         self.subprocess_handler = SubprocessHandler()
         self.store_address = os.environ.get("STORE_ADDRESS", "127.0.0.1")
         self.store_port = int(os.environ.get("STORE_PORT", 4999))
+        self.filtering_hash = None
 
 
     
     def register_or_update_miner(self, public_address):
         with self.lock:
-            current_time = time.time()
-            self.cleanup_inactive_miners(current_time)
+            #current_time = time.time()
+            #self.cleanup_inactive_miners(current_time)
 
             if public_address not in self.public_address_to_miner_id:
                 miner_id = self.register_new_miner(public_address, current_time)
@@ -72,23 +73,26 @@ class Orchestrator:
         self.meta_miners[miner_id]["last_seen"] = current_time
         self.meta_miners[miner_id]["total_uptime"] += elapsed_time
 
-    def cleanup_inactive_miners(self, current_time):
-        with self.lock:
-            inactive_miners = [miner_id for miner_id, miner_data in self.meta_miners.items() if current_time - miner_data["last_seen"] > self.max_inactive_time]
-            for miner_id in inactive_miners:
-                public_address = self.meta_miners[miner_id]["public_address"]
-                del self.meta_miners[miner_id]
-                del self.public_address_to_miner_id[public_address]
-            if len(inactive_miners) != 0 and StateManager.state == StateManager.TRAINING:
-                StateManager.transition_to_onboarding()
+    # def cleanup_inactive_miners(self, current_time):
+    #     with self.lock:
+    #         inactive_miners = [miner_id for miner_id, miner_data in self.meta_miners.items() if current_time - miner_data["last_seen"] > self.max_inactive_time]
+    #         for miner_id in inactive_miners:
+    #             public_address = self.meta_miners[miner_id]["public_address"]
+    #             del self.meta_miners[miner_id]
+    #             del self.public_address_to_miner_id[public_address]
+    #         if len(inactive_miners) != 0 and StateManager.state == StateManager.TRAINING:
+    #             StateManager.transition_to_onboarding()
 
     def _reassign_miner_ids(self):
         self.meta_miners = {index: miner_data for index, miner_data in enumerate(self.meta_miners.values())}
         self.public_address_to_miner_id = {miner_data["public_address"]: miner_id for miner_id, miner_data in self.meta_miners.items()}
 
     def start_filtering(self):
+        if not StateManager.state.startswith("filtering"):
+            self.blacklisted_miners.clear()
         StateManager.transition_to_filtering()
-        self.blacklisted_miners.clear() #TODO add blacklists over time
+        
+        
 
         for miner_id in list(self.meta_miners.keys()):
             self.start_pairwise_training(miner_id)
@@ -107,9 +111,13 @@ class Orchestrator:
                 self.meta_miners[miner_id] = miner_data
                 self._reassign_miner_ids()
 
-    def handle_pairwise_training_result(self, miner_id, success):
+    
+
+    def handle_pairwise_training_result(self, public_address, hash):
+        
         if not success:
-            self.blacklist_miner(miner_id)
+            self.blacklist_miner(rank_0_miner_id)
+            self.blacklist_miner(rank_1_miner_id)
 
     def log_activity(self, current_time):
         world_size = len(self.meta_miners)

@@ -3,7 +3,8 @@ import logging
 
 class StateManager:
     ONBOARDING = "onboarding"
-    FILTERING = "filtering"
+    FILTERING_1 = "filtering_1"
+    FILTERING_2 = "filtering_2"
     TRAINING = "training"
 
     # Class variables for shared state
@@ -16,10 +17,17 @@ class StateManager:
 
     @classmethod
     def transition_to_filtering(cls):
-        cls.state = cls.FILTERING
+        if cls.state == cls.ONBOARDING
+            cls.state = cls.FILTERING_1
+        elif cls.state = cls.FILTERING_1:
+            cls.state = cls.FILTERING_2
+        else: 
+            logging.info("Base state is not ONBOARDING or FILTERING_1 can't proceed.")   
+            return False
         cls.filtering_start_time = time.time()
         logging.info("Transitioned to filtering state.")
-
+        return True
+        
     @classmethod
     def transition_to_training(cls):
         cls.state = cls.TRAINING

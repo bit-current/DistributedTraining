@@ -5,6 +5,8 @@ import time
 from typing import List, Tuple
 import bittensor.utils.networking as net
 
+
+
 def initialize_bittensor_objects():
     global wallet, subtensor, metagraph, config
     base_config = copy.deepcopy(config)
