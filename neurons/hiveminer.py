@@ -71,7 +71,7 @@ config = AutoConfig.from_pretrained(
     "gpt2",
     n_emb=block_size,
     n_ctx=block_size,
-    n_layer=16,
+    n_layer=6,
     n_head=16,
     n_positions=block_size,
     n_inner=block_size * 4,
@@ -322,7 +322,6 @@ class MinerConsoleLogging(Callback):
         self.num_peers = 0
         self.previous_step = None
         self.prev_avg_loss = None
-        self.smoothing = 0.01
 
     def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
@@ -335,22 +334,20 @@ class MinerConsoleLogging(Callback):
 
         avg_loss = 0
         if not isnan(current_loss):
-            avg_loss = self.average_loss(
-                current_loss, self.prev_avg_loss, self.smoothing
-            )
+            avg_loss = self.average_loss(current_loss, self.prev_avg_loss)
             self.prev_avg_loss = avg_loss
 
         output = f"Global Step: {str(step)}, Local Loss: {avg_loss:.3f}"
 
         if hasattr(trainer.strategy, "num_peers"):
-            output += f", Peers: {self.num_peers}"
+            output += f", Peers: {trainer.strategy.num_peers}"
 
         if step != self.previous_step or self.num_peers != trainer.strategy.num_peers:
             print(output)
             self.previous_step = step
             self.num_peers = trainer.strategy.num_peers
 
-    def average_loss(self, current_loss, prev_avg_loss, smoothing):
+    def average_loss(self, current_loss, prev_avg_loss, smoothing=0.01):
         if prev_avg_loss is None:
             return current_loss
         else:
