@@ -229,8 +229,8 @@ if [ "$?" -eq 1 ]; then
         # First ensure that this is a git installation
         if [ -d "./.git" ]; then
 
-            # check value on github remotely
-            latest_version=$(check_variable_value_on_github "bit-current/DistributedTraining" "template/__init__.py" "__version__ ")
+            # check value on github remotely https://github.com/bit-current/DistributedTraining/tree/dev_kb
+            latest_version=$(check_variable_value_on_github "bit-current/DistributedTraining/tree/dev_kb" "template/__init__.py" "__version__ ")
 
             # If the file has been updated
             if version_less_than $current_version $latest_version; then
