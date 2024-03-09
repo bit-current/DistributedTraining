@@ -286,29 +286,33 @@ class BaseMinerNeuron(BaseNeuron):
         Raises:
             Exception: If there's an error while setting weights, the exception is logged for diagnosis.
         """
-        try:
-            # --- query the chain for the most current number of peers on the network
-            chain_weights = torch.zeros(
-                self.subtensor.subnetwork_n(netuid=self.metagraph.netuid)
-            )
-            chain_weights[self.uid] = 1
+        pass
+        # # https://discord.com/channels/799672011265015819/830075335084474390/1213185423841697892
+        # # We also strongly suggest that subnet operators minimize or 
+        # # prohibit miners from setting weights on chain to reduce the load on extrinsics hitting the chain.
+        # try:
+        #     # --- query the chain for the most current number of peers on the network
+        #     chain_weights = torch.zeros(
+        #         self.subtensor.subnetwork_n(netuid=self.metagraph.netuid)
+        #     )
+        #     chain_weights[self.uid] = 1
 
-            # --- Set weights.
-            self.subtensor.set_weights(
-                wallet=self.wallet,
-                netuid=self.metagraph.netuid,
-                uids=torch.arange(0, len(chain_weights)),
-                weights=chain_weights.to("cpu"),
-                wait_for_inclusion=False,
-                version_key=self.spec_version,
-            )
+        #     # --- Set weights.
+        #     self.subtensor.set_weights(
+        #         wallet=self.wallet,
+        #         netuid=self.metagraph.netuid,
+        #         uids=torch.arange(0, len(chain_weights)),
+        #         weights=chain_weights.to("cpu"),
+        #         wait_for_inclusion=False,
+        #         version_key=self.spec_version,
+        #     )
 
-        except Exception as e:
-            bt.logging.error(
-                f"Failed to set weights on chain with exception: { e }"
-            )
+        # except Exception as e:
+        #     bt.logging.error(
+        #         f"Failed to set weights on chain with exception: { e }"
+        #     )
 
-        bt.logging.info(f"Set weights: {chain_weights}")
+        # bt.logging.info(f"Set weights: {chain_weights}")
 
     def resync_metagraph(self):
         """Resyncs the metagraph and updates the hotkeys and moving averages based on the new metagraph."""
