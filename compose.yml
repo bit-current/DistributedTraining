@@ -1,7 +1,7 @@
 version: '3.9'
 
 services:
-  hivetrain:
+  miner:
     image: ghcr.io/bit-current/hivetrain:latest
     entrypoint: bash ./entrypoint.sh
     restart: 'always'
@@ -13,7 +13,7 @@ services:
       shm_size: '4gb'
       dockerfile: Dockerfile
     volumes:
-      - ./neurons:/app/neurons
+      - ./hivetrain:/hivetrain/hivetrain
       - ./data:/data
       - ./wallets:/root/.bittensor/wallets
     deploy:
@@ -30,3 +30,30 @@ services:
       AXONPORT: ${AXONPORT:-42310}
     env_file:
       - .env
+
+  # validator:
+  #   image: ghcr.io/bit-current/hivetrain:latest
+  #   command: python3 /hivetrain/validator.py --port 4000
+  #   restart: 'always'
+  #   ipc: host
+  #   network_mode: host
+  #   tty: true
+  #   stdin_open: true
+  #   volumes:
+  #     - ./hivetrain:/hivetrain/hivetrain
+  #     - ./data:/data
+  #     - ./wallets:/root/.bittensor/wallets
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - capabilities: ["gpu"]
+  #             count: all
+    # environment:
+    #   NETUID: ${NETUID:-25}
+    #   WALLETNAME: ${WALLETNAME:-default}
+    #   WALLETHOTKEY: ${WALLETHOTKEY:-defaulthotkey}
+    #   DHTPORT: ${DHTPORT:-42316}
+    #   AXONPORT: ${AXONPORT:-42310}
+    # env_file:
+    #   - .env
