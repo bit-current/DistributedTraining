@@ -19,6 +19,31 @@ def add_torch_miner_args(parser):
     parser.add_argument('--world-size', type=int, help='Number of processes/nodes in training run')
     parser.add_argument('--store-address', type=str,default="127.0.0.1", help='IP/URL of the TCPStore')#FIXME add the main from btt
     parser.add_argument('--store-port', type=int,default=4999, help='Port of the test TCPStore')#FIXME add the main from btt
+    parser.add_argument(
+    "--initial_peers",
+    action="append",
+    help="Add a peer. Can be used multiple times to pass multiple peers.",
+    nargs="*",
+    default=[],
+    )
+
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        help="The largest batch size able to fit on your GPU.",
+        default=1,
+        const=1,
+        nargs="?",
+    )
+
+    parser.add_argument(
+        "--save_every",
+        type=int,
+        help="Save the model every X global steps.",
+        default=0,
+        const=0,
+        nargs="?",
+    )
 
 
 
