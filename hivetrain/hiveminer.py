@@ -220,7 +220,7 @@ hparams = dict(
 
 # define the hivemind strategy
 strategy = HivemindStrategy(
-    run_id=f"hiveminer",
+    run_id=f"hivetrain",
     batch_size=batch_size,
     target_batch_size=target_batch_size,
     initial_peers=initial_peers,
