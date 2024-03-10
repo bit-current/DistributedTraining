@@ -25,15 +25,6 @@ COPY requirements.docker.txt requirements.docker.txt
 RUN pip install -r requirements.docker.txt && \
     pip cache purge
 
-# RUN git clone https://github.com/bit-current/NewArchScrapBook.git
-
-# RUN pip install -i ./NewArchScrapBook
-
 COPY ./ /app
-
-# RUN pip install -e . && \
-#     pip cache purge
-
-# RUN python3 post_install.py
 
 ENTRYPOINT "bash ./entrypoint.sh"
