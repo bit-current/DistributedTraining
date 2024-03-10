@@ -25,4 +25,4 @@ COPY ./ .
 RUN pip install -r requirements.docker.txt && \
     pip cache purge
 
-ENTRYPOINT "bash ./entrypoint.sh"
+ENTRYPOINT ["bash", "./entrypoint-miner.sh"]
