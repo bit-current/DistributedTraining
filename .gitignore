@@ -161,3 +161,8 @@ cython_debug/
 #.idea/
 
 testing/
+
+data
+wallets
+lightning_logs
+.scale_batch_size*

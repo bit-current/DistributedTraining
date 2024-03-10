@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   hivetrain:
-    image: ghcr.io/bit-current/distributedtraining:latest
+    image: ghcr.io/bit-current/hivetrain:latest
     entrypoint: bash ./entrypoint.sh
     restart: 'always'
     ipc: host

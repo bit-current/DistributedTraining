@@ -11,12 +11,6 @@ from math import isnan
 import numpy as np
 import torch
 from datasets import load_dataset
-from hivetrain.btt_connector import (
-    BittensorNetwork,
-    get_validator_uids_and_addresses,
-    serve_axon,
-)
-from hivetrain.config import Configurator
 from lightning.fabric.utilities.seed import reset_seed, seed_everything
 from lightning.pytorch import LightningModule
 from lightning.pytorch.callbacks import Callback
@@ -26,6 +20,13 @@ from lightning_hivemind.strategy import HivemindStrategy
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+
+from hivetrain.btt_connector import (
+    BittensorNetwork,
+    get_validator_uids_and_addresses,
+    serve_axon,
+)
+from hivetrain.config import Configurator
 
 logging.getLogger("lightning.pytorch").setLevel(logging.INFO)
 
@@ -383,7 +384,7 @@ class MinerModelSaver(Callback):
 class ValidationCommunicator(Callback):
     """Periodically save the model during training."""
 
-    def __init__(self,args, sync_interval=600):
+    def __init__(self, args, sync_interval=600):
         super().__init__()
 
         BittensorNetwork.initialize(args)
@@ -431,9 +432,7 @@ class ValidationCommunicator(Callback):
                     f"{ip}:{port}"
                 )  # Format and add 'ip:port' to the list
                 # For testing will append the 127.0.0.1:4000
-                validator_addresses.append(
-                    f"127.0.0.1:4000"
-                )
+                validator_addresses.append(f"127.0.0.1:4000")
         return available_uid_details, validator_addresses
 
     def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
@@ -518,4 +517,3 @@ train_model = MinerTrainer(model, optimizer, hparams)
 model.train()
 trainer = Trainer(**train_params)
 trainer.fit(train_model, dataset)
- 
