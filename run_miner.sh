@@ -462,6 +462,11 @@ if [ "$?" -eq 1 ]; then
 
             if [ "$local_version" != "$remote_version" ]; then
             echo "Version mismatch detected. Local version: $local_version, Remote version: $remote_version."
+            echo "Version mismatch detected. Local version: $local_version, Remote version: $remote_version."
+            echo "Version mismatch detected. Local version: $local_version, Remote version: $remote_version."
+            echo "Version mismatch detected. Local version: $local_version, Remote version: $remote_version."
+            echo "Version mismatch detected. Local version: $local_version, Remote version: $remote_version."
+            
                 if [ "$local_branch" = "$branch" ]; then
                     # Case 3: On main branch, and versions differ. Delete local and reclone.
                     echo "On main branch with version mismatch. Recloning..."
