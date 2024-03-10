@@ -11,6 +11,12 @@ from math import isnan
 import numpy as np
 import torch
 from datasets import load_dataset
+from hivetrain.btt_connector import (
+    BittensorNetwork,
+    get_validator_uids_and_addresses,
+    serve_axon,
+)
+from hivetrain.config import Configurator
 from lightning.fabric.utilities.seed import reset_seed, seed_everything
 from lightning.pytorch import LightningModule
 from lightning.pytorch.callbacks import Callback
@@ -19,12 +25,7 @@ from lightning.pytorch.trainer import Trainer
 from lightning_hivemind.strategy import HivemindStrategy
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset, IterableDataset
-from transformers import (
-    AutoConfig,
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    GenerationConfig,
-)
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 logging.getLogger("lightning.pytorch").setLevel(logging.INFO)
 
@@ -74,7 +75,7 @@ def flatten_list(nested_list):
 initial_peers = flatten_list(args.initial_peers)
 batch_size = args.batch_size
 save_every = args.save_every
-block_size = 1024
+block_size = 512
 num_steps = 100_000
 target_batch_size = 8192
 
@@ -90,10 +91,10 @@ config = AutoConfig.from_pretrained(
     "gpt2",
     n_embd=block_size,
     n_ctx=block_size,
-    n_layer=8,
-    n_head=8,
+    n_layer=2,
+    n_head=2,
     n_positions=block_size,
-    n_inner=block_size * 6,
+    n_inner=block_size * 4,
     resid_pdrop=0.1,
     embd_pdrop=0.1,
     attn_pdrop=0.1,
@@ -410,8 +411,133 @@ class MinerModelSaver(Callback):
         lm.model.save_pretrained(self.output_dir, safe_serialization=True)
 
 
+class ValidationCommunicator(Callback):
+    """Periodically save the model during training."""
+
+    def __init__(self, sync_interval=600):
+        super().__init__()
+
+        BittensorNetwork.initialize(Configurator.combine_configs())
+
+        # Now you can access wallet, subtensor, and metagraph like this:
+        self.wallet = BittensorNetwork.wallet
+        self.subtensor = BittensorNetwork.subtensor
+        self.metagraph = BittensorNetwork.metagraph
+        self.step = 0
+        self.sync_interval = sync_interval
+        self.last_sync_time = 0
+        self.validator_urls = []
+
+    def get_validator_uids_and_addresses(
+        self, metagraph: "bt.metagraph.Metagraph", vpermit_tao_limit: int = 2
+    ):
+        """
+        Check availability of all UIDs in a given subnet, returning their IP, port numbers, and hotkeys
+        if they are serving and have at least vpermit_tao_limit stake, along with a list of strings
+        formatted as 'ip:port' for each validator.
+
+        Args:
+            metagraph (bt.metagraph.Metagraph): Metagraph object.
+            vpermit_tao_limit (int): Validator permit tao limit.
+
+        Returns:
+            Tuple[List[dict], List[str]]: A tuple where the first element is a list of dicts with details
+                                            of available UIDs, including their IP, port, and hotkeys, and the
+                                            second element is a list of strings formatted as 'ip:port'.
+        """
+        available_uid_details = []
+        validator_addresses = []  # List to hold 'ip:port' strings
+        for uid in range(len(self.metagraph.S)):
+            if self.metagraph.S[uid] >= vpermit_tao_limit:
+                ip = self.metagraph.axons[uid].ip
+                port = self.metagraph.axons[uid].port
+                details = {
+                    "uid": uid,
+                    "ip": ip,
+                    "port": port,
+                    "hotkey": self.metagraph.hotkeys[uid],
+                }
+                available_uid_details.append(details)
+                validator_addresses.append(
+                    f"{ip}:{port}"
+                )  # Format and add 'ip:port' to the list
+
+        return available_uid_details, validator_addresses
+
+    def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
+        super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
+
+        self.step = int(trainer.callback_metrics.get("step", 0))
+
+        if self.step % 100:
+            if self.should_sync_metagraph():
+                self.resync_metagraph()
+                _, self.validator_urls = self.get_validator_uids_and_addresses()
+            message, signature, public_address = self.create_signed_message(timestamp)
+
+            for url in self.validator_urls:
+                try:
+                    requests.post(
+                        f"http://{url}/validate_metrics",
+                        json={"rank": rank, "checksum": checksum, "metrics": metrics},
+                    )
+                except:
+                    pass  # FIXME log sth
+            requests.post()
+
+    def create_signed_message(self, message):
+        """Sign a message and return the signature."""
+        signature = self.wallet.hotkey.sign(
+            message
+        ).hex()  # Convert bytes to hex string for easy transmission
+        public_address = wallet.hotkey.ss58_address
+        return message, signature, public_address
+
+    def send_metrics(metrics, rank, validator_urls):
+        timestamp = time.time()
+        message, signature, public_address = create_signed_message(timestamp)
+        data = {
+            "message": message,
+            "signature": signature,
+            "public_address": public_address,
+            "metrics": metrics,
+            "rank": rank,
+        }
+        # Ensure metrics is a dictionary
+        if not isinstance(metrics, dict):
+            raise ValueError("Metrics must be provided as a dictionary.")
+        # Ensure validator_urls is a list
+        if not isinstance(validator_urls, list):
+            raise ValueError("validator_urls must be provided as a list.")
+
+    def resync_metagraph(self):
+        self.metagraph.sync(subtensor=self.subtensor)
+
+    def should_sync_metagraph(self):
+        """
+        Check if enough epoch blocks have elapsed since the last checkpoint to sync.
+        """
+        return (time.time() - self.last_sync_time) > self.sync_interval
+        # return (
+        #    self.block - self.metagraph.last_update[self.uid]
+        # ) > self.config.neuron.epoch_length
+
+    def check_registered(self):
+        # --- Check for registration.
+        if not self.subtensor.is_hotkey_registered(
+            netuid=self.config.netuid,
+            hotkey_ss58=self.wallet.hotkey.ss58_address,
+        ):
+            bt.logging.error(
+                f"Wallet: {self.wallet} is not registered on netuid {self.config.netuid}."
+                f" Please register the hotkey using `btcli subnets register` before trying again"
+            )
+            exit()
+
+
 train_params["callbacks"].append(MinerConsoleLogging(hparams.get("num_steps")))
 train_params["callbacks"].append(MinerModelSaver(save_every, "/data"))
+# train_params["callbacks"].append(ValidationCommunicator())
 
 # Wrap the model in a pytorch-lightning module
 train_model = MinerTrainer(model, optimizer, hparams)
