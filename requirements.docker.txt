@@ -1,0 +1,2 @@
+lightning>=2.1.0
+git+https://github.com/LuciferianInk/lightning-Hivemind.git#egg=lightning-Hivemind

@@ -20,9 +20,12 @@ COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt && \
     pip cache purge
 
-COPY ./ /app
+COPY requirements.docker.txt requirements.docker.txt
 
-RUN pip install git+https://github.com/LuciferianInk/lightning-Hivemind.git
+RUN pip install -r requirements.docker.txt && \
+    pip cache purge
+
+COPY ./ /app
 
 RUN pip install -e . && \
     pip cache purge

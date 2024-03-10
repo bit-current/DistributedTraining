@@ -4,4 +4,3 @@ datasets
 transformers
 hivemind
 wandb
-lightning>=2.1.0

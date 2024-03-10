@@ -50,6 +50,15 @@ parser.add_argument(
     nargs="?",
 )
 
+parser.add_argument(
+    "--save_every",
+    type=int,
+    help="Save the model every X global steps.",
+    default=0,
+    const=0,
+    nargs="?",
+)
+
 args = parser.parse_args()
 
 
@@ -63,9 +72,8 @@ def flatten_list(nested_list):
 
 # set some basic configuration values
 initial_peers = flatten_list(args.initial_peers)
-print(initial_peers)
-
 batch_size = args.batch_size
+save_every = args.save_every
 block_size = 1024
 num_steps = 100_000
 target_batch_size = 8192
@@ -365,7 +373,45 @@ class MinerConsoleLogging(Callback):
             return (smoothing * current_loss) + (1 - smoothing) * prev_avg_loss
 
 
+class MinerModelSaver(Callback):
+    """Periodically save the model during training."""
+
+    def __init__(
+        self,
+        save_every,
+        output_dir,
+    ):
+        super().__init__()
+        self.step = 0
+        self.last_step = 0
+        self.save_every = save_every
+        self.output_dir = output_dir
+
+    @property
+    def save_every_check(self):
+        return (
+            self.step > 0
+            and self.save_every > 0
+            and self.last_step != self.step
+            and self.step % self.save_every == 0
+        )
+
+    def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
+        super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
+
+        self.step = int(trainer.callback_metrics.get("step", 0))
+
+        if self.save_every_check:
+            self.save_pytorch_model(trainer, lm)
+
+        self.last_step = self.step
+
+    def save_pytorch_model(self, trainer, lm):
+        lm.model.save_pretrained(self.output_dir, safe_serialization=True)
+
+
 train_params["callbacks"].append(MinerConsoleLogging(hparams.get("num_steps")))
+train_params["callbacks"].append(MinerModelSaver(save_every, "/data"))
 
 # Wrap the model in a pytorch-lightning module
 train_model = MinerTrainer(model, optimizer, hparams)
