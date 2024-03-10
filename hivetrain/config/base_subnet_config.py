@@ -98,7 +98,13 @@ def add_neuron_args(parser):
         default=False,
     )
 
-    
+    parser.add_argument(
+        "--neuron.initial_peers",
+        type=str,
+        nargs="+",
+        help="If set, we dont save events to a log file.",
+        default=False,
+    )
 
 
 def add_miner_args(parser):

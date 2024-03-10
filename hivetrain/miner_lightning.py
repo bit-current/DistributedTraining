@@ -60,7 +60,10 @@ metagraph = BittensorNetwork.metagraph
 #parser.add_argument('--initial_peers', type=list, help='Your peer. Use --initial_peers multiple times to pass multiple peers.', default=[], nargs='?')
 #args = parser.parse_args()
 #TODO add a method to provide 
-initial_peers = config.neuron.initial_peers#args.initial_peers
+if config.neuron.initial_peers:
+    initial_peers = config.neuron.initial_peers#args.initial_peers
+else:
+    initial_peers = None
 
 # initialized and load the model
 block_size = 1024 #I think this is the context length
@@ -405,38 +408,38 @@ class ValidationCommunicator(Callback):
         self.validator_urls = []
 
     def get_validator_uids_and_addresses(self,
-    metagraph: "bt.metagraph.Metagraph", vpermit_tao_limit: int = 2000
-    ) -> Tuple[List[dict], List[str]]:
-    """
-    Check availability of all UIDs in a given subnet, returning their IP, port numbers, and hotkeys 
-    if they are serving and have at least vpermit_tao_limit stake, along with a list of strings 
-    formatted as 'ip:port' for each validator.
+        metagraph: "bt.metagraph.Metagraph", vpermit_tao_limit: int = 2
+        ):
+        """
+        Check availability of all UIDs in a given subnet, returning their IP, port numbers, and hotkeys 
+        if they are serving and have at least vpermit_tao_limit stake, along with a list of strings 
+        formatted as 'ip:port' for each validator.
 
-    Args:
-        metagraph (bt.metagraph.Metagraph): Metagraph object.
-        vpermit_tao_limit (int): Validator permit tao limit.
+        Args:
+            metagraph (bt.metagraph.Metagraph): Metagraph object.
+            vpermit_tao_limit (int): Validator permit tao limit.
 
-    Returns:
-        Tuple[List[dict], List[str]]: A tuple where the first element is a list of dicts with details 
-                                      of available UIDs, including their IP, port, and hotkeys, and the 
-                                      second element is a list of strings formatted as 'ip:port'.
-    """
-    available_uid_details = []
-    validator_addresses = []  # List to hold 'ip:port' strings
-    for uid in range(len(self.metagraph.S)):
-        if self.metagraph.S[uid] >= vpermit_tao_limit:
-            ip = self.metagraph.axons[uid].ip
-            port = self.metagraph.axons[uid].port
-            details = {
-                "uid": uid,
-                "ip": ip,
-                "port": port,
-                "hotkey": self.metagraph.hotkeys[uid]
-            }
-            available_uid_details.append(details)
-            validator_addresses.append(f"{ip}:{port}")  # Format and add 'ip:port' to the list
+        Returns:
+            Tuple[List[dict], List[str]]: A tuple where the first element is a list of dicts with details 
+                                            of available UIDs, including their IP, port, and hotkeys, and the 
+                                            second element is a list of strings formatted as 'ip:port'.
+        """
+        available_uid_details = []
+        validator_addresses = []  # List to hold 'ip:port' strings
+        for uid in range(len(self.metagraph.S)):
+            if self.metagraph.S[uid] >= vpermit_tao_limit:
+                ip = self.metagraph.axons[uid].ip
+                port = self.metagraph.axons[uid].port
+                details = {
+                    "uid": uid,
+                    "ip": ip,
+                    "port": port,
+                    "hotkey": self.metagraph.hotkeys[uid]
+                }
+                available_uid_details.append(details)
+                validator_addresses.append(f"{ip}:{port}")  # Format and add 'ip:port' to the list
 
-    return available_uid_details, validator_addresses
+        return available_uid_details, validator_addresses
     
     def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
@@ -501,7 +504,7 @@ class ValidationCommunicator(Callback):
 
 
 train_params["callbacks"].append(MinerProgressBar(hparams.get("num_steps")))
-train_params["callbacks"].(ValidationCommunicator())
+train_params["callbacks"].append(ValidationCommunicator(0, wallet, subtensor, metagraph))
 # Wrap the model in a pytorch-lightning module
 train_model = MinerTrainer(
     model,
