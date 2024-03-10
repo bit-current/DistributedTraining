@@ -26,7 +26,7 @@ docker compose build
 ```
 
 ## make a .env file
-Make a file call `.env`, and place it in the root of this project.
+Make a file called `.env`, and place it in the root of this project.
 
 ## make a choice
 At this point, you must make one of two choices:
