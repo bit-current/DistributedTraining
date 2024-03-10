@@ -186,8 +186,16 @@ class MinerTrainer(LightningModule):
         return loss
 
     def on_train_batch_end(self, trainer, outputs, idx):
+        console.log(self.global_step)
         self.log(
-            "step",
+            "local_step",
+            int(self.global_step),
+            on_step=True,
+            on_epoch=False,
+            sync_dist=True,
+        )
+        self.log(
+            "global_step",
             int(self.trainer.strategy.optimizers[0].local_epoch),
             on_step=True,
             on_epoch=False,
@@ -318,7 +326,7 @@ class MinerConsoleLogging(Callback):
 
     def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
-        step = int(trainer.callback_metrics.get("step", -1))
+        step = int(trainer.callback_metrics.get("local_step", -1))
         if step == -1:
             return
 
@@ -372,7 +380,7 @@ class MinerModelSaver(Callback):
     def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
 
-        self.step = int(trainer.callback_metrics.get("step", 0))
+        self.step = int(trainer.callback_metrics.get("local_step", 0))
 
         if self.save_every_check:
             self.save_pytorch_model(trainer, lm)
@@ -440,13 +448,17 @@ class ValidationCommunicator(Callback):
     def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
 
-        self.step = int(trainer.callback_metrics.get("step", 0))
+        self.step = int(trainer.callback_metrics.get("local_step", 0))
 
         if self.step % 100:
             if self.should_sync_metagraph():
                 self.resync_metagraph()
-                _, self.validator_urls = self.get_validator_uids_and_addresses()
+                _, self.validator_urls = self.get_validator_uids_and_addresses(
+                    self.metagraph
+                )
+            timestamp = time.time()
             message, signature, public_address = self.create_signed_message(timestamp)
+            self.last_sync_time = timestamp
 
             for url in self.validator_urls:
                 try:
@@ -510,7 +522,7 @@ class ValidationCommunicator(Callback):
 
 train_params["callbacks"].append(MinerConsoleLogging(hparams.get("num_steps")))
 train_params["callbacks"].append(MinerModelSaver(save_every, "/data"))
-train_params["callbacks"].append(ValidationCommunicator(args))
+train_params["callbacks"].append(ValidationCommunicator(args, 60))
 
 # Wrap the model in a pytorch-lightning module
 train_model = MinerTrainer(model, optimizer, hparams)
