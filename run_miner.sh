@@ -214,7 +214,7 @@ args=()
 version_location="template/__init__.py"
 version="__version__ "
 repo="bit-current/DistributedTraining"
-branch="main"
+branch="dev_kb"
 repo_url="https://github.com/bit-current/DistributedTraining.git"
 
 
