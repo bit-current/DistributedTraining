@@ -186,7 +186,6 @@ class MinerTrainer(LightningModule):
         return loss
 
     def on_train_batch_end(self, trainer, outputs, idx):
-        console.log(self.global_step)
         self.log(
             "local_step",
             int(self.global_step),
@@ -220,7 +219,7 @@ hparams = dict(
 
 # define the hivemind strategy
 strategy = HivemindStrategy(
-    run_id=f"hivetrain",
+    run_id=f"hiveminer",
     batch_size=batch_size,
     target_batch_size=target_batch_size,
     initial_peers=initial_peers,
@@ -326,7 +325,7 @@ class MinerConsoleLogging(Callback):
 
     def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
-        step = int(trainer.callback_metrics.get("local_step", -1))
+        step = int(trainer.callback_metrics.get("global_step", -1))
         if step == -1:
             return
 
@@ -380,7 +379,7 @@ class MinerModelSaver(Callback):
     def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
 
-        self.step = int(trainer.callback_metrics.get("local_step", 0))
+        self.step = int(trainer.callback_metrics.get("global_step", 0))
 
         if self.save_every_check:
             self.save_pytorch_model(trainer, lm)
@@ -522,7 +521,7 @@ class ValidationCommunicator(Callback):
 
 train_params["callbacks"].append(MinerConsoleLogging(hparams.get("num_steps")))
 train_params["callbacks"].append(MinerModelSaver(save_every, "/data"))
-train_params["callbacks"].append(ValidationCommunicator(args, 60))
+# train_params["callbacks"].append(ValidationCommunicator(args, 60))
 
 # Wrap the model in a pytorch-lightning module
 train_model = MinerTrainer(model, optimizer, hparams)
