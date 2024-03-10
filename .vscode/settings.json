@@ -1,0 +1,22 @@
+{
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+  },
+  "black-formatter.args": [
+    "--line-length", 
+    "88"
+  ],
+  "isort.args":[
+    "--profile", 
+    "black"
+  ],
+  "isort.check": true,
+  "terminal.integrated.scrollback": 10000,
+  "search.useIgnoreFiles": true,
+  "workbench.editor.limit.value": 3,
+  "workbench.editor.limit.enabled": true
+}

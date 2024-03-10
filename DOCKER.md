@@ -7,17 +7,17 @@
 
 ## clone the repo
 ```
-git clone https://github.com/LuciferianInk/DistributedTraining.git
+git clone https://github.com/LuciferianInk/NewArchScrapBook.git
 ```
 
 ## move into the repo
 ```
-cd DistributedTraining
+cd NewArchScrapBook
 ```
 
 ## checkout the dev branch
 ```
-git checkout docker-setup
+git checkout docker-integration
 ```
 
 ## build the docker image
