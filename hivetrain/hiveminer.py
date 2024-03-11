@@ -481,7 +481,7 @@ class ValidationCommunicator(Callback):
         return message, signature, public_address
 
     def send_metrics(metrics, rank, validator_urls):
-        timestamp = time.time()
+        timestamp = str(int(time.time()))
         message, signature, public_address = create_signed_message(timestamp)
         data = {
             "message": message,
