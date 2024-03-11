@@ -49,7 +49,7 @@ initial_peers = flatten_list(args.initial_peers)
 use_ipfs = True
 batch_size = args.batch_size
 save_every = args.save_every
-block_size = 512
+block_size = 64
 num_steps = 100_000
 target_batch_size = 8192
 
@@ -65,10 +65,10 @@ config = AutoConfig.from_pretrained(
     "gpt2",
     n_embd=block_size,
     n_ctx=block_size,
-    n_layer=8,
-    n_head=8,
+    n_layer=1,
+    n_head=1,
     n_positions=block_size,
-    n_inner=block_size * 6,
+    n_inner=block_size, #* 6,
     resid_pdrop=0.1,
     embd_pdrop=0.1,
     attn_pdrop=0.1,
@@ -458,7 +458,7 @@ class ValidationCommunicator(Callback):
                 _, self.validator_urls = self.get_validator_uids_and_addresses(
                     self.metagraph
                 )
-            timestamp = time.time()
+            timestamp = str(int(time.time()))
             message, signature, public_address = self.create_signed_message(timestamp)
             self.last_sync_time = timestamp
 
@@ -524,7 +524,7 @@ class ValidationCommunicator(Callback):
 
 train_params["callbacks"].append(MinerConsoleLogging(hparams.get("num_steps")))
 train_params["callbacks"].append(MinerModelSaver(save_every, "/data"))
-# train_params["callbacks"].append(ValidationCommunicator(args, 60))
+train_params["callbacks"].append(ValidationCommunicator(args, 60))
 
 # Wrap the model in a pytorch-lightning module
 train_model = MinerTrainer(model, optimizer, hparams)
