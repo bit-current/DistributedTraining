@@ -524,7 +524,7 @@ class ValidationCommunicator(Callback):
 
 train_params["callbacks"].append(MinerConsoleLogging(hparams.get("num_steps")))
 train_params["callbacks"].append(MinerModelSaver(save_every, "/data"))
-# train_params["callbacks"].append(ValidationCommunicator(args, 60))
+train_params["callbacks"].append(ValidationCommunicator(args, 60))
 
 # Wrap the model in a pytorch-lightning module
 train_model = MinerTrainer(model, optimizer, hparams)
