@@ -477,7 +477,7 @@ class ValidationCommunicator(Callback):
         signature = self.wallet.hotkey.sign(
             message
         ).hex()  # Convert bytes to hex string for easy transmission
-        public_address = wallet.hotkey.ss58_address
+        public_address = self.wallet.hotkey.ss58_address
         return message, signature, public_address
 
     def send_metrics(metrics, rank, validator_urls):
