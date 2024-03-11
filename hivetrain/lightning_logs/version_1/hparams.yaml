@@ -1,7 +1,0 @@
-batch_size: 1
-block_size: 64
-eps: 1.0e-08
-learning_rate: 0.001
-num_steps: 100000
-warmup_steps: 10
-weight_decay: 0.1

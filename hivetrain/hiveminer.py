@@ -13,6 +13,7 @@ import numpy as np
 import requests
 import torch
 from datasets import load_dataset
+from hivemind.utils.networking import log_visible_maddrs
 from lightning.fabric.utilities.seed import reset_seed, seed_everything
 from lightning.pytorch import LightningModule
 from lightning.pytorch.callbacks import Callback
@@ -45,6 +46,7 @@ def flatten_list(nested_list):
 
 # set some basic configuration values
 initial_peers = flatten_list(args.initial_peers)
+use_ipfs = True
 batch_size = args.batch_size
 save_every = args.save_every
 block_size = 512
@@ -63,10 +65,10 @@ config = AutoConfig.from_pretrained(
     "gpt2",
     n_embd=block_size,
     n_ctx=block_size,
-    n_layer=2,
-    n_head=2,
+    n_layer=8,
+    n_head=8,
     n_positions=block_size,
-    n_inner=block_size * 4,
+    n_inner=block_size * 6,
     resid_pdrop=0.1,
     embd_pdrop=0.1,
     attn_pdrop=0.1,
@@ -223,7 +225,7 @@ strategy = HivemindStrategy(
     batch_size=batch_size,
     target_batch_size=target_batch_size,
     initial_peers=initial_peers,
-    use_ipfs=True,
+    use_ipfs=use_ipfs,
     use_relay=True,
     use_auto_relay=True,
     verbose=False,
@@ -249,15 +251,16 @@ visible_addresses = [
     if not ipaddress.ip_address(a.values()[0]).is_loopback
 ]
 
-my_ids = []
-pattern = r"(/p2p/.*)"
-for peer in list(visible_addresses):
-    match = re.search(pattern, peer)
-    if match:
-        my_ids.append(match.group(1))
+log_visible_maddrs(strategy.dht.get_visible_maddrs(), only_p2p=use_ipfs)
+# my_ids = []
+# pattern = r"(/p2p/.*)"
+# for peer in list(visible_addresses):
+#     match = re.search(pattern, peer)
+#     if match:
+#         my_ids.append(match.group(1))
 
-for peer in list(set(my_ids)):
-    print(f"PEER-ID: {peer}")
+# for peer in list(set(my_ids)):
+#     print(f"PEER-ID: {peer}")
 
 # define training params
 train_params = dict(

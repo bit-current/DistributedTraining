@@ -33,7 +33,6 @@ services:
   validator:
     image: ghcr.io/bit-current/hivetrain:latest
     entrypoint: bash ./entrypoint-validator.sh
-    restart: 'always'
     ipc: host
     network_mode: host
     tty: true
