@@ -22,6 +22,13 @@ sync_interval = 600  # Synchronization interval in seconds
 last_sync_time = time.time()
 last_update = 0
 
+config = Configurator.combine_configs()
+
+BittensorNetwork.initialize(config)
+wallet = BittensorNetwork.wallet
+subtensor = BittensorNetwork.subtensor
+metagraph = BittensorNetwork.metagraph
+
 def set_weights(scores):
     """
     Sets weights on the blockchain based on the scores from loss averaging.
@@ -150,8 +157,6 @@ def validate_metrics():
     return jsonify({"message": "Metrics received"})
 
 if __name__ == "__main__":
-    config = Configurator.combine_configs()
-
-    BittensorNetwork.initialize(config)
+    
     serve_axon(config.netuid,config.axon.ip,config.axon.external_ip, config.axon.port, config.axon.external_port)
     app.run(host="0.0.0.0", port=config.port)

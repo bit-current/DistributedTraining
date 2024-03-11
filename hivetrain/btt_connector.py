@@ -32,12 +32,8 @@ def resync_metagraph():
     global metagraph, config, subtensor
     # Fetch the latest state of the metagraph from the Bittensor network
     print("Resynchronizing metagraph...")
-    if not config.mock:
         # Update the metagraph with the latest information from the network
-        metagraph = BittensorNetwork.subtensor.metagraph(config.netuid)
-    else:
-        # In a mock environment, simply log the action without actual network interaction
-        print("Mock environment detected, skipping actual metagraph resynchronization.")
+    metagraph = BittensorNetwork.subtensor.metagraph(config.netuid)
     print("Metagraph resynchronization complete.")
 
 def should_sync_metagraph(last_sync_time,sync_interval):
