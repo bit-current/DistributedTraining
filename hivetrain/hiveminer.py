@@ -411,7 +411,7 @@ class ValidationCommunicator(Callback):
         self.validator_urls = []
 
     def get_validator_uids_and_addresses(
-        self, metagraph: "bt.metagraph.Metagraph", vpermit_tao_limit: int = 2
+        self, metagraph: "bt.metagraph.Metagraph", vpermit_tao_limit: int = 1
     ):
         """
         Check availability of all UIDs in a given subnet, returning their IP, port numbers, and hotkeys
@@ -470,7 +470,7 @@ class ValidationCommunicator(Callback):
                     )
                 except:
                     pass  # FIXME log sth
-            requests.post()
+            
 
     def create_signed_message(self, message):
         """Sign a message and return the signature."""
