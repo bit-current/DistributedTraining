@@ -460,7 +460,7 @@ class ValidationCommunicator(Callback):
                 )
             timestamp = str(int(time.time()))
             message, signature, public_address = self.create_signed_message(timestamp)
-            self.last_sync_time = timestamp
+            self.last_sync_time = int(timestamp)
 
             for url in self.validator_urls:
                 try:
