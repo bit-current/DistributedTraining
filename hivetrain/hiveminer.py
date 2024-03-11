@@ -467,6 +467,7 @@ class ValidationCommunicator(Callback):
                     requests.post(
                         f"http://{url}/validate_metrics",
                         json={"rank": rank, "checksum": checksum, "metrics": metrics},
+                        timeout=0.1
                     )
                 except:
                     pass  # FIXME log sth
