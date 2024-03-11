@@ -1,5 +1,6 @@
-import time
 import logging
+import time
+
 
 class StateManager:
     ONBOARDING = "onboarding"
@@ -17,17 +18,17 @@ class StateManager:
 
     @classmethod
     def transition_to_filtering(cls):
-        if cls.state == cls.ONBOARDING
+        if cls.state == cls.ONBOARDING:
             cls.state = cls.FILTERING_1
-        elif cls.state = cls.FILTERING_1:
+        elif cls.state == cls.FILTERING_1:
             cls.state = cls.FILTERING_2
-        else: 
-            logging.info("Base state is not ONBOARDING or FILTERING_1 can't proceed.")   
+        else:
+            logging.info("Base state is not ONBOARDING or FILTERING_1 can't proceed.")
             return False
         cls.filtering_start_time = time.time()
         logging.info("Transitioned to filtering state.")
         return True
-        
+
     @classmethod
     def transition_to_training(cls):
         cls.state = cls.TRAINING
