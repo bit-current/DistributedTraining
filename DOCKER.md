@@ -7,17 +7,17 @@
 
 ## clone the repo
 ```
-git clone https://github.com/LuciferianInk/NewArchScrapBook.git
+git clone https://github.com/bit-current/DistributedTraining
 ```
 
 ## move into the repo
 ```
-cd NewArchScrapBook
+cd DistributedTraining
 ```
 
 ## checkout the dev branch
 ```
-git checkout docker-integration
+git checkout test-lightning
 ```
 
 ## build the docker image
@@ -26,21 +26,14 @@ docker compose build
 ```
 
 ## make a .env file
-Make a file called `.env`, and place it in the root of this project.
+Edit the existing .env file to include values that reflect your machine/network.
 
-## make a choice
-At this point, you must make one of two choices:
-
-### 1. bootstrap
-If you intend to bootstrap a new training run.
+## join a training run
+To join the existing training run on the subnet. Find the peer id of a running node on the network.
+This will be provided for you. For the lastest, see pinned post on the discord channel. 
+ add this environment variable to your `.env` file:
 ```
-docker compose up
-```
-
-### 2. join
-If you intend to join an existing training run, then add this environment variable to your `.env` file:
-```
-INITIAL_PEERS="/p2p/12D3KooWE1fyvZHhuc2UQqAN35oXgexHKRpVqgXKo9EUQ4hguny9"
+INITIAL_PEERS="/ip4/peer_ip/tcp/peer_dht_port/p2p/12D3KooWE_some_hash_that_looks_like_this_VqgXKo9EUQ4hguny9"
 ```
 After that, you may join the training run with:
 ```
