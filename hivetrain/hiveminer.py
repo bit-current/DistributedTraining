@@ -226,7 +226,7 @@ strategy = HivemindStrategy(
     batch_size=batch_size,
     target_batch_size=target_batch_size,
     initial_peers=initial_peers,
-    use_ipfs=use_ipfs,
+    use_ipfs=False,
     use_relay=True,
     use_auto_relay=True,
     verbose=False,
@@ -252,7 +252,7 @@ visible_addresses = [
     if not ipaddress.ip_address(a.values()[0]).is_loopback
 ]
 
-log_visible_maddrs(strategy.dht.get_visible_maddrs(), only_p2p=use_ipfs)
+log_visible_maddrs(strategy.dht.get_visible_maddrs(), only_p2p=False)
 # my_ids = []
 # pattern = r"(/p2p/.*)"
 # for peer in list(visible_addresses):
@@ -397,7 +397,7 @@ class MinerModelSaver(Callback):
 class ValidationCommunicator(Callback):
     """Periodically save the model during training."""
 
-    def __init__(self, args, sync_interval=600):
+    def __init__(self, args, sync_interval=600, batch_to_send = 100):
         super().__init__()
 
         BittensorNetwork.initialize(args)
@@ -410,6 +410,7 @@ class ValidationCommunicator(Callback):
         self.sync_interval = sync_interval
         self.last_sync_time = 0
         self.validator_urls = []
+        self.batch_to_send = batch_to_send
 
     def get_validator_uids_and_addresses(
         self, metagraph: "bt.metagraph.Metagraph", vpermit_tao_limit: int = 1
@@ -447,11 +448,11 @@ class ValidationCommunicator(Callback):
                 
         return available_uid_details, validator_addresses
 
-    def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx, checksum = None, batch_to_send = 1):
+    def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx, checksum = None):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
 
         self.step = int(trainer.callback_metrics.get("local_step", 0)) + 1
-        if (self.step % batch_to_send) == 0:
+        if (self.step % self.batch_to_send) == 0:
             if self.should_sync_metagraph():
                 self.resync_metagraph()
                 _, self.validator_urls = self.get_validator_uids_and_addresses(
