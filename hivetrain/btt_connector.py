@@ -40,7 +40,7 @@ def should_sync_metagraph(last_sync_time,sync_interval):
     current_time = time.time()
     return (current_time - last_sync_time) > sync_interval
 
-def sync(last_sync_time, sync_interval):
+def sync(last_sync_time, sync_interval, config):
     if should_sync_metagraph(last_sync_time,sync_interval):
         # Assuming resync_metagraph is a method to update the metagraph with the latest state from the network.
         # This method would need to be defined or adapted from the BaseNeuron implementation.

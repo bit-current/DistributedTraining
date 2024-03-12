@@ -1,3 +1,4 @@
+import bittensor as bt
 import argparse
 from flask import Flask, request, jsonify
 import numpy as np
@@ -37,7 +38,7 @@ def set_weights(scores):
         scores (list): A list of dictionaries containing 'rank' and 'score' for each model.
     """
     try:
-        chain_weights = torch.zeros(self.subtensor.subnetwork_n(netuid=self.metagraph.netuid))
+        chain_weights = torch.zeros(BittensorNetwork.subtensor.subnetwork_n(netuid=BittensorNetwork.metagraph.netuid))
         for uid, public_address in enumerate(BittensorNetwork.metagraph.hotkeys):
             
             #rank = score['rank']
@@ -46,7 +47,7 @@ def set_weights(scores):
             except:
                 continue
 
-        self.subtensor.set_weights(
+        BittensorNetwork.subtensor.set_weights(
             wallet=BittensorNetwork.wallet,
             netuid=BittensorNetwork.metagraph.netuid,
             uids=torch.arange(0, len(chain_weights)),
@@ -128,7 +129,7 @@ def run_evaluation():
 
 @app.before_request
 def before_request():
-    global last_evaluation_time
+    global last_evaluation_time, config
     current_time = time.time()
     if current_time - last_evaluation_time > evaluation_interval:
         run_evaluation()
@@ -136,7 +137,7 @@ def before_request():
 
     global last_sync_time, sync_interval
     # Existing before_request code...
-    last_sync_time = sync(last_sync_time,sync_interval)  # Ensure the validator is synchronized with the network state before processing any request.
+    last_sync_time = sync(last_sync_time,sync_interval, config)  # Ensure the validator is synchronized with the network state before processing any request.
 
 
 @app.route('/validate_model', methods=['POST'])
@@ -157,6 +158,9 @@ def validate_metrics():
     return jsonify({"message": "Metrics received"})
 
 if __name__ == "__main__":
+    #breakpoint()
+    axon = bt.axon(wallet=wallet, config=config)
+    axon.serve(netuid=config.netuid, subtensor=subtensor)    
+    #serve_axon(config.netuid,config.axon.ip,config.axon.external_ip, config.axon.port, config.axon.external_port)
     
-    serve_axon(config.netuid,config.axon.ip,config.axon.external_ip, config.axon.port, config.axon.external_port)
-    app.run(host="0.0.0.0", port=config.port)
+    app.run(host=config.axon.ip, port=config.axon.port)

@@ -46,7 +46,7 @@ def flatten_list(nested_list):
 
 # set some basic configuration values
 initial_peers = flatten_list(args.initial_peers)
-use_ipfs = True
+use_ipfs = False
 batch_size = args.batch_size
 save_every = args.save_every
 block_size = 64
