@@ -4,10 +4,7 @@
 (WARNING : IN ACTIVE DEVELOPMENT)
 
 ## Vision
-This project aims to revolutionize distributed computing and mining by leveraging distributed training on the Bittensor blockchain. It introduces a scalable, efficient, and secure system for training deep learning models across distributed nodes. Participants are rewarded in TAO cryptocurrency for their computational contributions, fostering a decentralized ecosystem of computational resources.
-
-## Usefulness
-- **Decentralized Computing:** Offers a framework for executing deep learning tasks across distributed nodes, reducing reliance on centralized cloud services.
+This project aims to revolutionize distributed computing and mining by leveraging distributed training on the Bittensor blockchain. It introduces a scalable, efficient, and secure system for training deep learning models across distributed nodes. Participants are rewarded in TAO for their computational contributions, fostering a decentralized ecosystem of computational resources.
 
 ## How to Use (Docker)
 
