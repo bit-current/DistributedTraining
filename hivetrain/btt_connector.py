@@ -33,7 +33,7 @@ def resync_metagraph():
     # Fetch the latest state of the metagraph from the Bittensor network
     print("Resynchronizing metagraph...")
         # Update the metagraph with the latest information from the network
-    metagraph = BittensorNetwork.subtensor.metagraph(config.netuid)
+    metagraph = BittensorNetwork.subtensor.metagraph(BittensorNetwork.config.netuid)
     print("Metagraph resynchronization complete.")
 
 def should_sync_metagraph(last_sync_time,sync_interval):

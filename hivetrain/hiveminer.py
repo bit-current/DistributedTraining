@@ -32,6 +32,7 @@ from hivetrain.btt_connector import (
 from hivetrain.config import Configurator
 
 logging.getLogger("lightning.pytorch").setLevel(logging.INFO)
+logger = logging.getLogger("lightning.pytorch")
 
 args = Configurator.combine_configs()
 
@@ -46,10 +47,9 @@ def flatten_list(nested_list):
 
 # set some basic configuration values
 initial_peers = flatten_list(args.initial_peers)
-use_ipfs = False
 batch_size = args.batch_size
 save_every = args.save_every
-block_size = 64
+block_size = 512
 num_steps = 100_000
 target_batch_size = 8192
 
@@ -65,10 +65,10 @@ config = AutoConfig.from_pretrained(
     "gpt2",
     n_embd=block_size,
     n_ctx=block_size,
-    n_layer=8,
-    n_head=8,
+    n_layer=2,
+    n_head=2,
     n_positions=block_size,
-    n_inner=block_size * 6,
+    n_inner=block_size * 4,
     resid_pdrop=0.1,
     embd_pdrop=0.1,
     attn_pdrop=0.1,
@@ -80,6 +80,7 @@ config = AutoConfig.from_pretrained(
     summary_use_proj=True,
     torch_dtype=torch.bfloat16,
 )
+
 
 print(config)
 
@@ -241,7 +242,7 @@ strategy = HivemindStrategy(
     # grad_compression=Float16Compression(),
     # state_averaging_compression=Float16Compression(),
     # load_state_compression=NoCompression(),
-    scheduler_fn=partial(torch.optim.lr_scheduler.ExponentialLR, gamma=0.9999),
+    #scheduler_fn=partial(torch.optim.lr_scheduler.ExponentialLR, gamma=0.9999),
 )
 
 # print my peer id to console
@@ -443,16 +444,14 @@ class ValidationCommunicator(Callback):
                 validator_addresses.append(
                     f"{ip}:{port}"
                 )  # Format and add 'ip:port' to the list
-                # For testing will append the 127.0.0.1:4000
-                validator_addresses.append(f"127.0.0.1:4000")
+                
         return available_uid_details, validator_addresses
 
-    def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx):
+    def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx, checksum = None, batch_to_send = 1):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
 
-        self.step = int(trainer.callback_metrics.get("local_step", 0))
-
-        if self.step % 100:
+        self.step = int(trainer.callback_metrics.get("local_step", 0)) + 1
+        if (self.step % batch_to_send) == 0:
             if self.should_sync_metagraph():
                 self.resync_metagraph()
                 _, self.validator_urls = self.get_validator_uids_and_addresses(
@@ -464,13 +463,18 @@ class ValidationCommunicator(Callback):
 
             for url in self.validator_urls:
                 try:
-                    requests.post(
+                    response = requests.post(
                         f"http://{url}/validate_metrics",
-                        json={"rank": rank, "checksum": checksum, "metrics": metrics},
+                        json={ "metrics": {"loss": outputs["loss"].item()} ,
+                        "message":message, "signature":signature, "public_address":public_address},
                         timeout=0.1
                     )
+                    if response.status_code == 200:
+                        logger.info(f"Metrics reported successfully to validator {url}")
+                    else: 
+                        logger.warn(f"Error @ validator {url} --- Error: {response.json['error']}") #FIXME add gen
                 except:
-                    pass  # FIXME log sth
+                    logger.warn(f"Failed to send to validator at {url} -- Failure to communicate with validators will impact your incentive")
             
 
     def create_signed_message(self, message):
@@ -481,15 +485,14 @@ class ValidationCommunicator(Callback):
         public_address = self.wallet.hotkey.ss58_address
         return message, signature, public_address
 
-    def send_metrics(metrics, rank, validator_urls):
+    def send_metrics(metrics, validator_urls):
         timestamp = str(int(time.time()))
         message, signature, public_address = create_signed_message(timestamp)
         data = {
             "message": message,
             "signature": signature,
             "public_address": public_address,
-            "metrics": metrics,
-            "rank": rank,
+            "metrics": metrics
         }
         # Ensure metrics is a dictionary
         if not isinstance(metrics, dict):

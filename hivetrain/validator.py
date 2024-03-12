@@ -1,3 +1,4 @@
+import threading
 import bittensor as bt
 import argparse
 from flask import Flask, request, jsonify
@@ -15,9 +16,6 @@ model_checksums = {}
 metrics_data = {}
 
 last_evaluation_time = time.time()
-evaluation_interval = 120
-
-last_evaluation_time = time.time()
 evaluation_interval = 300
 sync_interval = 600  # Synchronization interval in seconds
 last_sync_time = time.time()
@@ -29,6 +27,11 @@ BittensorNetwork.initialize(config)
 wallet = BittensorNetwork.wallet
 subtensor = BittensorNetwork.subtensor
 metagraph = BittensorNetwork.metagraph
+
+model_checksums_lock = threading.Lock()
+metrics_data_lock = threading.Lock()
+evaluation_time_lock = threading.Lock()
+sync_time_lock = threading.Lock()
 
 def set_weights(scores):
     """
@@ -55,6 +58,7 @@ def set_weights(scores):
             wait_for_inclusion=False,
             version_key=__spec_version__,
         )
+        print("Set weights Successfully")
     except Exception as e:
         print(f"Error setting weights: {e}")
 
@@ -67,34 +71,41 @@ def should_set_weights() -> bool:
 
 def verify_model_checksum(public_address, checksum):
     global model_checksums
-    model_checksums[public_address] = checksum
+    with model_checksums_lock:
+        model_checksums[public_address] = checksum
 
 def detect_metric_anomaly(metric="loss", OUTLIER_THRESHOLD=2):
     global metrics_data
+        # Check if metrics_data is empty
     if not metrics_data:
-        return []
+        return {}
 
+    # Initialize a dictionary to aggregate metrics by public_address
     aggregated_metrics = {}
-    for public_address, data in metrics_data.items():
-        for metric_recorded in data:
-            if metric in metric_recorded.keys():
-                #rank = data['rank']
-                if public_address in aggregated_metrics:
-                    aggregated_metrics[public_address].append(metric_recorded[metric])
-                else:
-                    aggregated_metrics[public_address] = [metric_recorded[metric]]
 
-    average_losses = {public_address: np.mean(losses) for rank, losses in aggregated_metrics.items()}
-    
-    losses = np.array(list(average_losses.values()))
+    # Aggregate metric values by public_address
+    for public_address, data in metrics_data.items():
+        if metric in data:
+            if public_address in aggregated_metrics:
+                aggregated_metrics[public_address].append(data[metric])
+            else:
+                aggregated_metrics[public_address] = [data[metric]]
+
+    # Calculate average and standard deviation of the metric for each public_address
+    average_metrics = {addr: np.mean(vals) for addr, vals in aggregated_metrics.items()}
+    losses = np.array(list(average_metrics.values()))
     mean_loss = np.mean(losses)
     std_loss = np.std(losses)
-    z_scores = np.abs((losses - mean_loss) / std_loss) if std_loss > 0 else np.zeros_like(losses)
-    outliers = np.array([z > OUTLIER_THRESHOLD for z in z_scores])
-    
+
+    # Determine outliers based on the OUTLIER_THRESHOLD
+    is_outlier = {}
+    for addr, avg_loss in average_metrics.items():
+        z_score = abs((avg_loss - mean_loss) / std_loss) if std_loss > 0 else 0
+        is_outlier[addr] = z_score > OUTLIER_THRESHOLD
+
     scores = {}
     for i, (public_address, _) in enumerate(average_losses.items()):
-        score = 0 if outliers[public_address] else 1
+        score = 0 if is_outlier[public_address] else 1
         scores[public_address]({'public_address': public_address, 'score': score})
     
     for score_data in scores:
@@ -123,21 +134,25 @@ def run_evaluation():
     if should_set_weights():
         set_weights(scores)
 
-    model_checksums.clear()
-    metrics_data.clear()
+    with model_checksums_lock:
+        model_checksums.clear()
+    with metrics_data_lock:
+        metrics_data.clear()
 
 
 @app.before_request
 def before_request():
     global last_evaluation_time, config
     current_time = time.time()
-    if current_time - last_evaluation_time > evaluation_interval:
-        run_evaluation()
-        last_evaluation_time = current_time
+    with evaluation_time_lock:
+        if current_time - last_evaluation_time > evaluation_interval:
+            run_evaluation()
+            last_evaluation_time = current_time
 
     global last_sync_time, sync_interval
     # Existing before_request code...
-    last_sync_time = sync(last_sync_time,sync_interval, config)  # Ensure the validator is synchronized with the network state before processing any request.
+    with sync_time_lock:
+        last_sync_time = sync(last_sync_time,sync_interval, config)  # Ensure the validator is synchronized with the network state before processing any request.
 
 
 @app.route('/validate_model', methods=['POST'])
@@ -151,10 +166,11 @@ def validate_model():
 @authenticate_request_with_bittensor
 def validate_metrics():
     data = request.get_json()
-    data['rank'] = int(data['rank'])
-    if data['rank'] not in metrics_data:
-        metrics_data[data['public_address']] = []
-    metrics_data[data['public_address']].append({'public_address': data['public_address'], 'loss': data['metrics']['loss']})
+    #data['rank'] = int(data['rank'])
+    with metrics_data_lock:
+        if data['public_address'] not in metrics_data:
+            metrics_data[data['public_address']] = []
+        metrics_data[data['public_address']].append({'public_address': data['public_address'], 'loss': data['metrics']['loss']})
     return jsonify({"message": "Metrics received"})
 
 if __name__ == "__main__":
