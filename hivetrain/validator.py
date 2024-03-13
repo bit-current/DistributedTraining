@@ -104,7 +104,7 @@ def detect_metric_anomaly(metric="loss", OUTLIER_THRESHOLD=2):
         is_outlier[addr] = z_score > OUTLIER_THRESHOLD
 
     scores = {}
-    for i, (public_address, _) in enumerate(average_losses.items()):
+    for i, (public_address, _) in enumerate(average_metrics.items()):
         score = 0 if is_outlier[public_address] else 1
         scores[public_address]({'public_address': public_address, 'score': score})
     
