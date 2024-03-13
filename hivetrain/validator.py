@@ -179,4 +179,4 @@ if __name__ == "__main__":
     axon.serve(netuid=config.netuid, subtensor=subtensor)    
     #serve_axon(config.netuid,config.axon.ip,config.axon.external_ip, config.axon.port, config.axon.external_port)
     
-    app.run(host=config.axon.ip, port=config.axon.port)
+    app.run(host=config.flask.host_address, port=config.flask.host_port)
