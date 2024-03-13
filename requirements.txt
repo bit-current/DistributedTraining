@@ -8,4 +8,4 @@ hivemind
 lightning>=2.1.0
 datasets
 transformers
-git+https://github.com/bit-current/lightning-Hivemind
+lightning-hivemind @ git+https://github.com/bit-current/lightning-Hivemind
