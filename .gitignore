@@ -161,3 +161,8 @@ cython_debug/
 bittensor-subnet-template/
 wandb/
 .vscode/
+
+data
+wallets
+lightning_logs
+.scale_batch_size*

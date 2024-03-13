@@ -61,7 +61,7 @@ Done : Train TINYGPT
 
 ## How Miners are Rewarded
 
-Hivetrain uses a simmple score assignment system designed to reward users for their participation and adherence to network guidelines. The system evaluates two critical aspects of user behavior: responsiveness and loss values. By applying a set of predefined rules, we aim to foster a healthy and productive network environment where all participants are incentivized to contribute positively. Whilst maintaining network integrity with few gameable variables.
+Hivetrain uses a simple score assignment system designed to reward users for their participation and adherence to network guidelines. The system evaluates two critical aspects of user behavior: responsiveness and loss values. By applying a set of predefined rules, we aim to foster a healthy and productive network environment where all participants are incentivized to contribute positively. Whilst maintaining network integrity with few gameable variables.
 
 ### 1.0 
 Users who actively respond to network activities and maintain their losses within an acceptable threshold are awarded a score of 1.0. This top score reflects exemplary user behavior and strict adherence to network standards, highlighting the user as a model participant.
