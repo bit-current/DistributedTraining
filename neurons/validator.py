@@ -10,6 +10,9 @@ from hivetrain.btt_connector import sync, BittensorNetwork, serve_axon
 from hivetrain import __spec_version__
 import torch
 
+from waitress import serve
+
+
 app = Flask(__name__)
 
 model_checksums = {}
@@ -178,5 +181,4 @@ if __name__ == "__main__":
     axon = bt.axon(wallet=wallet, config=config)
     axon.serve(netuid=config.netuid, subtensor=subtensor)    
     #serve_axon(config.netuid,config.axon.ip,config.axon.external_ip, config.axon.port, config.axon.external_port)
-    
-    app.run(host=config.flask.host_address, port=config.flask.host_port)
+    serve(app, host=config.flask.host_address, port=config.flask.host_port)
