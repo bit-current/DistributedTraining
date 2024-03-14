@@ -9,6 +9,10 @@ from hivetrain.config import Configurator
 from hivetrain.btt_connector import sync, BittensorNetwork, serve_axon
 from hivetrain import __spec_version__
 import torch
+import logging
+
+logger = logging.getLogger('waitress')
+logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
 
@@ -58,9 +62,9 @@ def set_weights(scores):
             wait_for_inclusion=False,
             version_key=__spec_version__,
         )
-        print("Set weights Successfully")
+        logger.info("Set weights Successfully")
     except Exception as e:
-        print(f"Error setting weights: {e}")
+        logger.info(f"Error setting weights: {e}")
 
 def should_set_weights() -> bool:
     global last_update
@@ -115,7 +119,7 @@ def detect_metric_anomaly(metric="loss", OUTLIER_THRESHOLD=2):
 
 def run_evaluation():
     global model_checksums, metrics_data
-
+    logger.info("Evaluating miners")
     checksum_frequencies = {}
     for public_address, checksum in model_checksums.items():
         checksum_frequencies[public_address] = checksum_frequencies.get(public_address, 0) + 1
@@ -124,7 +128,7 @@ def run_evaluation():
     try:
         most_common_checksum = max(checksum_frequencies, key=checksum_frequencies.get)
         model_scores = {public_address: (1 if checksum == most_common_checksum else 0) for public_address, checksum in model_checksums.items()}
-        print("Model scores based on checksum consensus:", model_scores)
+        logger.info("Model scores based on checksum consensus:", model_scores)
 
     except ValueError:
         pass
@@ -160,6 +164,7 @@ def before_request():
 def validate_model():
     data = request.get_json()
     verify_model_checksum(data['public_address'], data['checksum'])
+    logging.info(f"Received model validation data from {data['public_address']}")
     return jsonify({"message": "Model checksum received and verified"})
 
 @app.route('/validate_metrics', methods=['POST'])
@@ -171,6 +176,7 @@ def validate_metrics():
         if data['public_address'] not in metrics_data:
             metrics_data[data['public_address']] = []
         metrics_data[data['public_address']].append({'public_address': data['public_address'], 'loss': data['metrics']['loss']})
+    logging.info(f"Received model metrics data from {data['public_address']}")
     return jsonify({"message": "Metrics received"})
 
 if __name__ == "__main__":
