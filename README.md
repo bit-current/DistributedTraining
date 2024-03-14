@@ -104,7 +104,7 @@ btcli s register --netuid 100 --subtensor.network test
 ## Miner Run Command
 
 ```
-python hiveminer.py --netuid 100 --wallet.name some_test_wallet_cold --wallet.hotkey some_test_wallet_hot --initial_peers (please add an existing miner's dht address here. Check discord pinned post or ask on discord channel)
+python miner.py --netuid 25 --wallet.name some_test_wallet_cold --wallet.hotkey some_test_wallet_hot --initial_peers (please add an existing miner's dht address here. Check discord pinned post or ask on discord channel)
 ```
 
 ## Validator
@@ -112,7 +112,7 @@ python hiveminer.py --netuid 100 --wallet.name some_test_wallet_cold --wallet.ho
 ### Validators need to have at least 10 test TAO to be able to set weights.
 
 ```
-python validator.py --netuid 100 --wallet.name some_test_wallet_cold --wallet.hotkey some_test_wallet_hot --axon.external_ip your_external_ip --axon.port your_external_port --logging.debug --logging.trace --axon.ip your_extrenal_ip_still --axon.external_port your_external_port_still --flask.host_address on_device_ip_to_bind_to --flask.host_port on_device_port_to_bind_to --subtensor.network test
+python validator.py --netuid 25 --wallet.name some_test_wallet_cold --wallet.hotkey some_test_wallet_hot --axon.external_ip your_external_ip --axon.port your_external_port --logging.debug --logging.trace --axon.ip your_extrenal_ip_still --axon.external_port your_external_port_still --flask.host_address on_device_ip_to_bind_to --flask.host_port on_device_port_to_bind_to
 ```
 
 ## Bug Reporting and Contributions
