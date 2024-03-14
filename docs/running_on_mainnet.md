@@ -1,1 +1,0 @@
-See instructions on homepage
