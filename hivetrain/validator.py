@@ -46,7 +46,7 @@ def set_weights(scores):
             
             #rank = score['rank']
             try:
-                chain_weights[public_address] = scores[public_address]['score'] #FIXME this is blasphemy 
+                chain_weights[uid] = scores[public_address]['score'] 
             except:
                 continue
 
