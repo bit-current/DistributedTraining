@@ -50,6 +50,7 @@ def set_weights(scores):
             except:
                 continue
 
+        print("Sending weights to subtensor")
         BittensorNetwork.subtensor.set_weights(
             wallet=BittensorNetwork.wallet,
             netuid=BittensorNetwork.metagraph.netuid,
@@ -58,7 +59,7 @@ def set_weights(scores):
             wait_for_inclusion=False,
             version_key=__spec_version__,
         )
-        print("Set weights Successfully")
+        
     except Exception as e:
         print(f"Error setting weights: {e}")
 
