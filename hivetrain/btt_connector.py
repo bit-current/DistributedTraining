@@ -5,6 +5,10 @@ import time
 from typing import List, Tuple
 import bittensor.utils.networking as net
 import threading
+import logging
+
+logger = logging.getLogger('waitress')
+logger.setLevel(logging.DEBUG)
 
 
 def initialize_bittensor_objects():
@@ -287,7 +291,8 @@ class BittensorNetwork:
     _weights_lock = threading.Lock()  # Lock for set_weights
     _anomaly_lock = threading.Lock()  # Lock for detect_metric_anomaly
     _config_lock = threading.Lock()  # Lock for modifying config
-    
+    metrics_data = {}
+    model_checksums = {}
 
     def __new__(cls):
         with cls._lock:
@@ -342,13 +347,12 @@ class BittensorNetwork:
 
     @classmethod
     def detect_metric_anomaly(cls, metric="loss", OUTLIER_THRESHOLD=2):
-        global metrics_data
         with cls._anomaly_lock:
             if not metrics_data:
                 return {}
 
             aggregated_metrics = {}
-            for public_address, data in metrics_data.items():
+            for public_address, data in cls.metrics_data.items():
                 if metric in data:
                     if public_address in aggregated_metrics:
                         aggregated_metrics[public_address].append(data[metric])
@@ -368,4 +372,29 @@ class BittensorNetwork:
             scores = {public_address: 0 if is_outlier[public_address] else 1 for public_address in average_metrics}
             return scores
 
+    @classmethod
+    def run_evaluation(cls):
+        #global model_checksums, metrics_data
+        logger.info("Evaluating miners")
+        checksum_frequencies = {}
+        for public_address, checksum in cls.model_checksums.items():
+            checksum_frequencies[public_address] = checksum_frequencies.get(public_address, 0) + 1
+        
+        model_scores = {}
+        try:
+            most_common_checksum = max(checksum_frequencies, key=checksum_frequencies.get)
+            model_scores = {public_address: (1 if checksum == most_common_checksum else 0) for public_address, checksum in cls.model_checksums.items()}
+            logger.info("Model scores based on checksum consensus:", model_scores)
+
+        except ValueError:
+            pass
+
+        scores = BittensorNetwork.detect_metric_anomaly()
+        if BittensorNetwork.should_set_weights():
+            BittensorNetwork.set_weights(scores)
+
+            with cls.model_checksums_lock:
+                cls.model_checksums.clear()
+            with cls.metrics_data_lock:
+                cls.metrics_data.clear()
     

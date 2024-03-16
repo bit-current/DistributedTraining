@@ -19,8 +19,8 @@ from waitress import serve
 
 app = Flask(__name__)
 
-model_checksums = {}
-metrics_data = {}
+#model_checksums = {}
+#metrics_data = {}
 
 last_evaluation_time = time.time()
 evaluation_interval = 300
@@ -114,39 +114,17 @@ def detect_metric_anomaly(metric="loss", OUTLIER_THRESHOLD=2):
     
     return scores
 
-def run_evaluation():
-    global model_checksums, metrics_data
-    logger.info("Evaluating miners")
-    checksum_frequencies = {}
-    for public_address, checksum in model_checksums.items():
-        checksum_frequencies[public_address] = checksum_frequencies.get(public_address, 0) + 1
-    
-    model_scores = {}
-    try:
-        most_common_checksum = max(checksum_frequencies, key=checksum_frequencies.get)
-        model_scores = {public_address: (1 if checksum == most_common_checksum else 0) for public_address, checksum in model_checksums.items()}
-        logger.info("Model scores based on checksum consensus:", model_scores)
 
-    except ValueError:
-        pass
-
-    scores = BittensorNetwork.detect_metric_anomaly()
-    if BittensorNetwork.should_set_weights():
-        BittensorNetwork.set_weights(scores)
-
-        with model_checksums_lock:
-            model_checksums.clear()
-        with metrics_data_lock:
-            metrics_data.clear()
 
 
 @app.before_request
 def before_request():
-    global last_evaluation_time, config
-    current_time = time.time()
+
     with evaluation_time_lock:
+        global last_evaluation_time, config
+        current_time = time.time()
         if current_time - last_evaluation_time > evaluation_interval:
-            run_evaluation()
+            BittensorNetwork.run_evaluation()
             last_evaluation_time = current_time
 
     global last_sync_time, sync_interval
@@ -169,9 +147,9 @@ def validate_metrics():
     data = request.get_json()
     #data['rank'] = int(data['rank'])
     with metrics_data_lock:
-        if data['public_address'] not in metrics_data:
-            metrics_data[data['public_address']] = []
-        metrics_data[data['public_address']].append({'public_address': data['public_address'], 'loss': data['metrics']['loss']})
+        if data['public_address'] not in BittensorNetwork.metrics_data:
+            BittensorNetwork.metrics_data[data['public_address']] = []
+        BittensorNetwork.metrics_data[data['public_address']].append({'public_address': data['public_address'], 'loss': data['metrics']['loss']})
     logging.info(f"Received model metrics data from {data['public_address']}")
     return jsonify({"message": "Metrics received"})
 

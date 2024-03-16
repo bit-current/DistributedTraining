@@ -30,6 +30,7 @@ from hivetrain.btt_connector import (
     serve_axon,
 )
 from hivetrain.config import Configurator
+import logging
 
 logging.getLogger("lightning.pytorch").setLevel(logging.INFO)
 logger = logging.getLogger("lightning.pytorch")
@@ -226,7 +227,7 @@ strategy = HivemindStrategy(
     batch_size=batch_size,
     target_batch_size=target_batch_size,
     initial_peers=initial_peers,
-    use_ipfs=True,
+    use_ipfs=False,
     use_relay=True,
     use_auto_relay=True,
     verbose=False,
@@ -450,14 +451,16 @@ class ValidationCommunicator(Callback):
 
     def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx, checksum = None):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
-
+        
         self.step = int(trainer.callback_metrics.get("local_step", 0)) + 1
+        logger.info(f"Batch {self.step}")
         if (self.step % self.batch_to_send) == 0:
             if self.should_sync_metagraph():
                 self.resync_metagraph()
-                _, self.validator_urls = self.get_validator_uids_and_addresses(
-                    self.metagraph
-                )
+                #_, self.validator_urls = self.get_validator_uids_and_addresses(
+                #    self.metagraph
+                #)
+                self.validator_urls = ["127.0.0.1:8888"]
             timestamp = str(int(time.time()))
             message, signature, public_address = self.create_signed_message(timestamp)
             self.last_sync_time = int(timestamp)
