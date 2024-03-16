@@ -4,7 +4,7 @@ import math
 import time
 from typing import List, Tuple
 import bittensor.utils.networking as net
-
+import threading
 
 
 def initialize_bittensor_objects():
@@ -280,28 +280,92 @@ def serve_axon(netuid,host_address,external_address, host_port, external_port):
     return axon
 
 
+
 class BittensorNetwork:
     _instance = None
+    _lock = threading.Lock()  # Singleton lock
+    _weights_lock = threading.Lock()  # Lock for set_weights
+    _anomaly_lock = threading.Lock()  # Lock for detect_metric_anomaly
+    _config_lock = threading.Lock()  # Lock for modifying config
     
+
     def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(BittensorNetwork, cls).__new__(cls)
-            cls.wallet = None
-            cls.subtensor = None
-            cls.metagraph = None
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(BittensorNetwork, cls).__new__(cls)
+                cls.wallet = None
+                cls.subtensor = None
+                cls.metagraph = None
+                cls.config = None
         return cls._instance
 
     @classmethod
     def initialize(cls, config):
-        if config.mock:
-            cls.wallet = bt.MockWallet(config=config)
-            cls.subtensor = bt.subtensor.mock(config=config)
-            cls.metagraph = cls.subtensor.metagraph()
-            cls.config = config
-        else:
-            cls.wallet = bt.wallet(config=config)
-            cls.subtensor = bt.subtensor(config=config)
-            cls.metagraph = cls.subtensor.metagraph(config.netuid)
-            cls.config = config
+        with cls._lock:
+                cls.wallet = bt.wallet(config=config)
+                cls.subtensor = bt.subtensor(config=config)
+                cls.metagraph = cls.subtensor.metagraph(config.netuid)
+                cls.config = config
+                cls.uid = cls.metagraph.hotkeys.index(
+                    cls.wallet.hotkey.ss58_address
+                )
+            # Additional initialization logic here
 
-        # Additional initialization logic here
+    @classmethod
+    def set_weights(cls, scores):
+        with cls._weights_lock:
+            try:
+                chain_weights = torch.zeros(cls.subtensor.subnetwork_n(netuid=cls.metagraph.netuid))
+                for uid, public_address in enumerate(cls.metagraph.hotkeys):
+                    try:
+                        chain_weights[uid] = scores.get(public_address, 0)
+                    except KeyError:
+                        continue
+
+                print("Sending weights to subtensor")
+                cls.subtensor.set_weights(
+                    wallet=cls.wallet,
+                    netuid=cls.metagraph.netuid,
+                    uids=torch.arange(0, len(chain_weights)),
+                    weights=chain_weights.to("cpu"),
+                    wait_for_inclusion=False,
+                    version_key=__spec_version__,
+                )
+
+            except Exception as e:
+                print(f"Error setting weights: {e}")
+
+    @classmethod
+    def should_set_weights(cls) -> bool:
+        with cls._lock:  # Assuming last_update modification is protected elsewhere with the same lock
+            return (cls.subtensor.get_current_block() - cls.metagraph.last_update[cls.uid]) > cls.config.neuron.epoch_length
+
+    @classmethod
+    def detect_metric_anomaly(cls, metric="loss", OUTLIER_THRESHOLD=2):
+        global metrics_data
+        with cls._anomaly_lock:
+            if not metrics_data:
+                return {}
+
+            aggregated_metrics = {}
+            for public_address, data in metrics_data.items():
+                if metric in data:
+                    if public_address in aggregated_metrics:
+                        aggregated_metrics[public_address].append(data[metric])
+                    else:
+                        aggregated_metrics[public_address] = [data[metric]]
+
+            average_metrics = {addr: np.mean(vals) for addr, vals in aggregated_metrics.items()}
+            losses = np.array(list(average_metrics.values()))
+            mean_loss = np.mean(losses)
+            std_loss = np.std(losses)
+
+            is_outlier = {}
+            for addr, avg_loss in average_metrics.items():
+                z_score = abs((avg_loss - mean_loss) / std_loss) if std_loss > 0 else 0
+                is_outlier[addr] = z_score > OUTLIER_THRESHOLD
+
+            scores = {public_address: 0 if is_outlier[public_address] else 1 for public_address in average_metrics}
+            return scores
+
+    

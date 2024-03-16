@@ -69,12 +69,6 @@ def set_weights(scores):
     except Exception as e:
         logger.info(f"Error setting weights: {e}")
 
-def should_set_weights() -> bool:
-    global last_update
-    return (BittensorNetwork.subtensor.get_current_block() - last_update) > BittensorNetwork.config.neuron.epoch_length
-
-  # Initialize Validator object properly with required parameters
-
 
 def verify_model_checksum(public_address, checksum):
     global model_checksums
@@ -136,15 +130,14 @@ def run_evaluation():
     except ValueError:
         pass
 
+    scores = BittensorNetwork.detect_metric_anomaly()
+    if BittensorNetwork.should_set_weights():
+        BittensorNetwork.set_weights(scores)
 
-    scores = detect_metric_anomaly()
-    if should_set_weights():
-        set_weights(scores)
-
-    with model_checksums_lock:
-        model_checksums.clear()
-    with metrics_data_lock:
-        metrics_data.clear()
+        with model_checksums_lock:
+            model_checksums.clear()
+        with metrics_data_lock:
+            metrics_data.clear()
 
 
 @app.before_request
@@ -186,5 +179,4 @@ if __name__ == "__main__":
     #breakpoint()
     axon = bt.axon(wallet=wallet, config=config)
     axon.serve(netuid=config.netuid, subtensor=subtensor)    
-    #serve_axon(config.netuid,config.axon.ip,config.axon.external_ip, config.axon.port, config.axon.external_port)
     serve(app, host=config.flask.host_address, port=config.flask.host_port)
