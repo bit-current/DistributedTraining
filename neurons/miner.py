@@ -8,6 +8,8 @@ import sys
 import time
 from functools import partial
 from math import isnan
+import bittensor as bt
+from bittensor import metagraph
 
 import numpy as np
 import requests
@@ -460,7 +462,7 @@ class ValidationCommunicator(Callback):
                 #_, self.validator_urls = self.get_validator_uids_and_addresses(
                 #    self.metagraph
                 #)
-                self.validator_urls = ["127.0.0.1:8888"]
+                self.validator_urls = ["0.0.0.0:8888"]
             timestamp = str(int(time.time()))
             message, signature, public_address = self.create_signed_message(timestamp)
             self.last_sync_time = int(timestamp)
@@ -489,9 +491,9 @@ class ValidationCommunicator(Callback):
         public_address = self.wallet.hotkey.ss58_address
         return message, signature, public_address
 
-    def send_metrics(metrics, validator_urls):
+    def send_metrics(self, metrics, validator_urls):
         timestamp = str(int(time.time()))
-        message, signature, public_address = create_signed_message(timestamp)
+        message, signature, public_address = self.create_signed_message(timestamp)
         data = {
             "message": message,
             "signature": signature,
