@@ -1,11 +1,15 @@
 import bittensor as bt
 import copy
 import math
+import numpy as np
+import bittensor
+import torch
 import time
 from typing import List, Tuple
 import bittensor.utils.networking as net
 import threading
 import logging
+__spec_version__ = "1.0"
 
 logger = logging.getLogger('waitress')
 logger.setLevel(logging.DEBUG)
@@ -334,7 +338,7 @@ class BittensorNetwork:
                     uids=torch.arange(0, len(chain_weights)),
                     weights=chain_weights.to("cpu"),
                     wait_for_inclusion=False,
-                    version_key=__spec_version__,
+                    # version_key=__spec_version__,
                 )
 
             except Exception as e:
@@ -348,7 +352,7 @@ class BittensorNetwork:
     @classmethod
     def detect_metric_anomaly(cls, metric="loss", OUTLIER_THRESHOLD=2):
         with cls._anomaly_lock:
-            if not metrics_data:
+            if not BittensorNetwork.metrics_data:
                 return {}
 
             aggregated_metrics = {}
@@ -393,8 +397,6 @@ class BittensorNetwork:
         if BittensorNetwork.should_set_weights():
             BittensorNetwork.set_weights(scores)
 
-            with cls.model_checksums_lock:
-                cls.model_checksums.clear()
-            with cls.metrics_data_lock:
-                cls.metrics_data.clear()
+            cls.model_checksums.clear()
+            cls.metrics_data.clear()
     
