@@ -9,6 +9,7 @@ import time
 from functools import partial
 from math import isnan
 import bittensor as bt
+from bittensor import metagraph
 
 import numpy as np
 import requests
@@ -461,7 +462,7 @@ class ValidationCommunicator(Callback):
                 #_, self.validator_urls = self.get_validator_uids_and_addresses(
                 #    self.metagraph
                 #)
-                self.validator_urls = ["127.0.0.1:8888"]
+                self.validator_urls = ["0.0.0.0:8888"]
             timestamp = str(int(time.time()))
             message, signature, public_address = self.create_signed_message(timestamp)
             self.last_sync_time = int(timestamp)
