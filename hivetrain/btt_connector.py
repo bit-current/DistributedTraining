@@ -9,7 +9,7 @@ from typing import List, Tuple
 import bittensor.utils.networking as net
 import threading
 import logging
-__spec_version__ = "1.0"
+from . import __spec_version__
 
 logger = logging.getLogger('waitress')
 logger.setLevel(logging.DEBUG)

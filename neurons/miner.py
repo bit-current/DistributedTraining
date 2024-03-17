@@ -459,10 +459,10 @@ class ValidationCommunicator(Callback):
         if (self.step % self.batch_to_send) == 0:
             if self.should_sync_metagraph():
                 self.resync_metagraph()
-                #_, self.validator_urls = self.get_validator_uids_and_addresses(
-                #    self.metagraph
-                #)
-                self.validator_urls = ["0.0.0.0:8888"]
+                _, self.validator_urls = self.get_validator_uids_and_addresses(
+                   self.metagraph
+                )
+                #self.validator_urls = ["0.0.0.0:8888"]
             timestamp = str(int(time.time()))
             message, signature, public_address = self.create_signed_message(timestamp)
             self.last_sync_time = int(timestamp)
