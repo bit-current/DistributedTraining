@@ -18,7 +18,7 @@ logger.setLevel(logging.DEBUG)
 def initialize_bittensor_objects():
     global wallet, subtensor, metagraph, config
     base_config = copy.deepcopy(config)
-    check_config(base_config)
+    # check_config(base_config)
 
     if base_config.mock:
         wallet = bt.MockWallet(config=base_config)
@@ -283,9 +283,9 @@ class BittensorNetwork:
                 cls.subtensor = bt.subtensor(config=config)
                 cls.metagraph = cls.subtensor.metagraph(config.netuid)
                 cls.config = config
-                cls.uid = cls.metagraph.hotkeys.index(
-                    cls.wallet.hotkey.ss58_address
-                )
+                if not BittensorNetwork.subtensor.is_hotkey_registered(netuid=config.netuid, hotkey_ss58=BittensorNetwork.wallet.hotkey.ss58_address):
+                    print(f"Wallet: {config.wallet} is not registered on netuid {config.netuid}. Please register the hotkey before trying again")
+                    exit()
             # Additional initialization logic here
 
     @classmethod
