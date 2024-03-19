@@ -40,35 +40,6 @@ metrics_data_lock = threading.Lock()
 evaluation_time_lock = threading.Lock()
 sync_time_lock = threading.Lock()
 
-def set_weights(scores):
-    """
-    Sets weights on the blockchain based on the scores from loss averaging.
-
-    Args:
-        scores (list): A list of dictionaries containing 'rank' and 'score' for each model.
-    """
-    try:
-        chain_weights = torch.zeros(BittensorNetwork.subtensor.subnetwork_n(netuid=BittensorNetwork.metagraph.netuid))
-        for uid, public_address in enumerate(BittensorNetwork.metagraph.hotkeys):
-            
-            #rank = score['rank']
-            try:
-                chain_weights[public_address] = scores[public_address]['score'] #FIXME this is blasphemy 
-            except:
-                continue
-
-        BittensorNetwork.subtensor.set_weights(
-            wallet=BittensorNetwork.wallet,
-            netuid=BittensorNetwork.metagraph.netuid,
-            uids=torch.arange(0, len(chain_weights)),
-            weights=chain_weights.to("cpu"),
-            wait_for_inclusion=False,
-            version_key=__spec_version__,
-        )
-        logger.info("Set weights Successfully")
-    except Exception as e:
-        logger.info(f"Error setting weights: {e}")
-
 
 def verify_model_checksum(public_address, checksum):
     global model_checksums
@@ -148,9 +119,13 @@ def validate_metrics():
     #data['rank'] = int(data['rank'])
     with metrics_data_lock:
         if data['public_address'] not in BittensorNetwork.metrics_data:
-            BittensorNetwork.metrics_data[data['public_address']] = []
-        BittensorNetwork.metrics_data[data['public_address']].append({'public_address': data['public_address'], 'loss': data['metrics']['loss']})
-    logging.info(f"Received model metrics data from {data['public_address']}")
+            BittensorNetwork.metrics_data[data['public_address']] = {"loss":[]}
+        try:
+            BittensorNetwork.metrics_data[data['public_address']]['loss'].append(data['metrics']['loss'])
+        except Exception as e:
+            logger.warning(f"Failed to add data from {data["public_address"]} due to {e}")
+            #BittensorNetwork.metrics_data[data['public_address']]['loss'] = [data['metrics']['loss']]
+    logger.info(f"Received model metrics data from {data['public_address']}")
     return jsonify({"message": "Metrics received"})
 
 if __name__ == "__main__":

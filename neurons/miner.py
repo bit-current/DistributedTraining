@@ -53,8 +53,8 @@ initial_peers = flatten_list(args.initial_peers)
 batch_size = args.batch_size
 save_every = args.save_every
 block_size = 512
-num_steps = 100_000
-target_batch_size = 8192
+num_steps = 100_000_000_000 #infinite training
+target_batch_size = 8192 #when to average all weights.
 
 dataset_config = {
     "dataset": "tiiuae/falcon-refinedweb",
@@ -285,6 +285,7 @@ train_params = dict(
 
 
 # set weights as trainable
+#FIXME looks like this is useless
 def set_trainable_parameters(model, hparams):
     no_decay = ["bias", "LayerNorm.weight"]
     grouped_parameters = []
@@ -349,7 +350,7 @@ class MinerConsoleLogging(Callback):
             output += f", Peers: {trainer.strategy.num_peers}"
 
         if step != self.previous_step or self.num_peers != trainer.strategy.num_peers:
-            print(output)
+            logger.info(output)
             self.previous_step = step
             self.num_peers = trainer.strategy.num_peers
 
@@ -416,7 +417,7 @@ class ValidationCommunicator(Callback):
         self.batch_to_send = batch_to_send
 
     def get_validator_uids_and_addresses(
-        self, metagraph: "bt.metagraph.Metagraph", vpermit_tao_limit: int = 1
+        self, metagraph: "bt.metagraph.Metagraph", vpermit_tao_limit: int = 1024
     ):
         """
         Check availability of all UIDs in a given subnet, returning their IP, port numbers, and hotkeys
@@ -460,9 +461,9 @@ class ValidationCommunicator(Callback):
             if self.should_sync_metagraph():
                 self.resync_metagraph()
                 _, self.validator_urls = self.get_validator_uids_and_addresses(
-                   self.metagraph
+                    self.metagraph
                 )
-                #self.validator_urls = ["0.0.0.0:8888"]
+                #self.validator_urls = ["127.0.0.1:8888"]
             timestamp = str(int(time.time()))
             message, signature, public_address = self.create_signed_message(timestamp)
             self.last_sync_time = int(timestamp)
@@ -473,14 +474,14 @@ class ValidationCommunicator(Callback):
                         f"http://{url}/validate_metrics",
                         json={ "metrics": {"loss": outputs["loss"].item()} ,
                         "message":message, "signature":signature, "public_address":public_address},
-                        timeout=0.1
+                        timeout=3
                     )
                     if response.status_code == 200:
                         logger.info(f"Metrics reported successfully to validator {url}")
                     else: 
                         logger.warn(f"Error @ validator {url} --- Error: {response.json['error']}") #FIXME add gen
                 except:
-                    logger.warn(f"Failed to send to validator at {url} -- Failure to communicate with validators will impact your incentive")
+                    logger.warn(f"Failed to confirm reception at {url}")
             
 
     def create_signed_message(self, message):
@@ -491,24 +492,12 @@ class ValidationCommunicator(Callback):
         public_address = self.wallet.hotkey.ss58_address
         return message, signature, public_address
 
-    def send_metrics(self, metrics, validator_urls):
-        timestamp = str(int(time.time()))
-        message, signature, public_address = self.create_signed_message(timestamp)
-        data = {
-            "message": message,
-            "signature": signature,
-            "public_address": public_address,
-            "metrics": metrics
-        }
-        # Ensure metrics is a dictionary
-        if not isinstance(metrics, dict):
-            raise ValueError("Metrics must be provided as a dictionary.")
-        # Ensure validator_urls is a list
-        if not isinstance(validator_urls, list):
-            raise ValueError("validator_urls must be provided as a list.")
-
     def resync_metagraph(self):
-        self.metagraph.sync(subtensor=self.subtensor)
+        try:
+            self.metagraph.sync(subtensor=self.subtensor)
+            logger.info("Syncing Metagraph Successful")
+        except Exception as e:
+            logger.warning(f"Failed to sync metagraph: {e}")
 
     def should_sync_metagraph(self):
         """
@@ -519,6 +508,7 @@ class ValidationCommunicator(Callback):
         #    self.block - self.metagraph.last_update[self.uid]
         # ) > self.config.neuron.epoch_length
 
+    #FIXME merge helios changes
     def check_registered(self):
         # --- Check for registration.
         if not self.subtensor.is_hotkey_registered(

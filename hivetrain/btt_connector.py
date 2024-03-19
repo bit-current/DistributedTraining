@@ -58,39 +58,7 @@ def sync(last_sync_time, sync_interval, config):
     else:
         return last_sync_time
 
-def get_validator_uids_and_addresses(
-    metagraph: "bt.metagraph.Metagraph", vpermit_tao_limit: int
-) -> Tuple[List[dict], List[str]]:
-    """
-    Check availability of all UIDs in a given subnet, returning their IP, port numbers, and hotkeys 
-    if they are serving and have at least vpermit_tao_limit stake, along with a list of strings 
-    formatted as 'ip:port' for each validator.
 
-    Args:
-        metagraph (bt.metagraph.Metagraph): Metagraph object.
-        vpermit_tao_limit (int): Validator permit tao limit.
-
-    Returns:
-        Tuple[List[dict], List[str]]: A tuple where the first element is a list of dicts with details 
-                                      of available UIDs, including their IP, port, and hotkeys, and the 
-                                      second element is a list of strings formatted as 'ip:port'.
-    """
-    available_uid_details = []
-    validator_addresses = []  # List to hold 'ip:port' strings
-    for uid in range(len(metagraph.S)):
-        if metagraph.S[uid] >= vpermit_tao_limit:
-            ip = metagraph.axons[uid].ip
-            port = metagraph.axons[uid].port
-            details = {
-                "uid": uid,
-                "ip": ip,
-                "port": port,
-                "hotkey": metagraph.hotkeys[uid]
-            }
-            available_uid_details.append(details)
-            validator_addresses.append(f"{ip}:{port}")  # Format and add 'ip:port' to the list
-
-    return available_uid_details, validator_addresses
 
 # def serve_on_subtensor(external_ip, external_port, netuid, max_retries=5, wait_for_inclusion=True, wait_for_finalization=False):
 #     retry_count = 0
@@ -242,7 +210,7 @@ def serve_extrinsic(
 def serve_axon(netuid,host_address,external_address, host_port, external_port):
     """Serve axon to enable external connections."""
 
-    bt.logging.info("serving ip to chain...")
+    logger.info("serving ip to chain...")
     try:
         axon = bt.axon(
             config=BittensorNetwork.config,
@@ -273,15 +241,15 @@ def serve_axon(netuid,host_address,external_address, host_port, external_port):
                 print("success")
             else:
                 print("ARGH")
-            bt.logging.info(
+            logger.info(
                 f"Served Axon {axon} on network: {BittensorNetwork.config.subtensor.chain_endpoint} with netuid: {BittensorNetwork.config.netuid}"
             )
         except Exception as e:
-            bt.logging.error(f"Failed to serve Axon with exception: {e}")
+            logger.error(f"Failed to serve Axon with exception: {e}")
             pass
 
     except Exception as e:
-        bt.logging.error(
+        logger.error(
             f"Failed to create Axon initialize with exception: {e}"
         )
         pass
@@ -322,27 +290,50 @@ class BittensorNetwork:
 
     @classmethod
     def set_weights(cls, scores):
-        with cls._weights_lock:
-            try:
-                chain_weights = torch.zeros(cls.subtensor.subnetwork_n(netuid=cls.metagraph.netuid))
-                for uid, public_address in enumerate(cls.metagraph.hotkeys):
-                    try:
-                        chain_weights[uid] = scores.get(public_address, 0)
-                    except KeyError:
-                        continue
+        try:
+            chain_weights = torch.zeros(cls.subtensor.subnetwork_n(netuid=cls.metagraph.netuid))
+            uids = []
+            for uid, public_address in enumerate(cls.metagraph.hotkeys):
+                try:
+                    chain_weights[uid] = scores.get(public_address, 0)
+                    uids.append(uid)
+                except KeyError:
+                    continue
+            uids = torch.tensor(uids)
+            logger.info(f"raw_weights {chain_weights}")
+            logger.info(f"raw_weight_uids {uids}")
+            # Process the raw weights to final_weights via subtensor limitations.
+            (
+                processed_weight_uids,
+                processed_weights,
+            ) = bt.utils.weight_utils.process_weights_for_netuid(
+                uids=uids.to("cpu"),
+                weights=chain_weights.to("cpu"),
+                netuid=cls.config.netuid,
+                subtensor=cls.subtensor,
+                metagraph=cls.metagraph,
+            )
+            logger.info(f"processed_weights {processed_weights}")
+            logger.info(f"processed_weight_uids {processed_weight_uids}")
 
-                print("Sending weights to subtensor")
-                cls.subtensor.set_weights(
-                    wallet=cls.wallet,
-                    netuid=cls.metagraph.netuid,
-                    uids=torch.arange(0, len(chain_weights)),
-                    weights=chain_weights.to("cpu"),
-                    wait_for_inclusion=False,
-                    # version_key=__spec_version__,
-                )
-
-            except Exception as e:
-                print(f"Error setting weights: {e}")
+            # Convert to uint16 weights and uids.
+            (
+                uint_uids,
+                uint_weights,
+            ) = bt.utils.weight_utils.convert_weights_and_uids_for_emit(
+                uids=processed_weight_uids, weights=processed_weights
+            )
+            logger.info("Sending weights to subtensor")
+            result = cls.subtensor.set_weights(
+                wallet=cls.wallet,
+                netuid=cls.metagraph.netuid,
+                uids=uint_uids, 
+                weights=uint_weights,
+                wait_for_inclusion=False,
+                version_key=__spec_version__
+            )
+        except Exception as e:
+            logger.info(f"Error setting weights: {e}")
 
     @classmethod
     def should_set_weights(cls) -> bool:
@@ -355,10 +346,11 @@ class BittensorNetwork:
             if not BittensorNetwork.metrics_data:
                 return {}
 
+            logger.info(f"Metrics Data: {cls.metrics_data}")
             aggregated_metrics = {}
-            for public_address, data in cls.metrics_data.items():
+            for public_address, data in cls.metrics_data.items():#FIXME can't aggregate from dict on same key.
                 if metric in data:
-                    if public_address in aggregated_metrics:
+                    if public_address in aggregated_metrics:#FIXME no need for an if condition
                         aggregated_metrics[public_address].append(data[metric])
                     else:
                         aggregated_metrics[public_address] = [data[metric]]
@@ -374,29 +366,31 @@ class BittensorNetwork:
                 is_outlier[addr] = z_score > OUTLIER_THRESHOLD
 
             scores = {public_address: 0 if is_outlier[public_address] else 1 for public_address in average_metrics}
+            logger.info(f"Scores calculated: {scores}")
             return scores
 
     @classmethod
     def run_evaluation(cls):
         #global model_checksums, metrics_data
         logger.info("Evaluating miners")
-        checksum_frequencies = {}
-        for public_address, checksum in cls.model_checksums.items():
-            checksum_frequencies[public_address] = checksum_frequencies.get(public_address, 0) + 1
+        # checksum_frequencies = {}
+        # for public_address, checksum in cls.model_checksums.items():
+        #     checksum_frequencies[public_address] = checksum_frequencies.get(public_address, 0) + 1
         
-        model_scores = {}
-        try:
-            most_common_checksum = max(checksum_frequencies, key=checksum_frequencies.get)
-            model_scores = {public_address: (1 if checksum == most_common_checksum else 0) for public_address, checksum in cls.model_checksums.items()}
-            logger.info("Model scores based on checksum consensus:", model_scores)
+        # model_scores = {}
+        # try:
+        #     most_common_checksum = max(checksum_frequencies, key=checksum_frequencies.get)
+        #     model_scores = {public_address: (1 if checksum == most_common_checksum else 0) for public_address, checksum in cls.model_checksums.items()}
+        #     logger.info("Model scores based on checksum consensus:", model_scores)
 
-        except ValueError:
-            pass
+        # except ValueError:
+        #     pass        
+        
+        with cls._weights_lock:
+            if BittensorNetwork.should_set_weights():
+                scores = BittensorNetwork.detect_metric_anomaly()
+                BittensorNetwork.set_weights(scores)
 
-        scores = BittensorNetwork.detect_metric_anomaly()
-        if BittensorNetwork.should_set_weights():
-            BittensorNetwork.set_weights(scores)
-
-            cls.model_checksums.clear()
-            cls.metrics_data.clear()
+                cls.model_checksums.clear()
+                cls.metrics_data.clear()
     
