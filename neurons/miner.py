@@ -28,7 +28,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from hivetrain.btt_connector import (
     BittensorNetwork,
-    get_validator_uids_and_addresses,
+    # get_validator_uids_and_addresses,
     serve_axon,
 )
 from hivetrain.config import Configurator
