@@ -283,9 +283,12 @@ class BittensorNetwork:
                 cls.subtensor = bt.subtensor(config=config)
                 cls.metagraph = cls.subtensor.metagraph(config.netuid)
                 cls.config = config
-                if not BittensorNetwork.subtensor.is_hotkey_registered(netuid=config.netuid, hotkey_ss58=BittensorNetwork.wallet.hotkey.ss58_address):
+                if not cls.subtensor.is_hotkey_registered(netuid=config.netuid, hotkey_ss58=cls.wallet.hotkey.ss58_address):
                     print(f"Wallet: {config.wallet} is not registered on netuid {config.netuid}. Please register the hotkey before trying again")
                     exit()
+                cls.uid = cls.metagraph.hotkeys.index(
+                    cls.wallet.hotkey.ss58_address
+                )
             # Additional initialization logic here
 
     @classmethod
