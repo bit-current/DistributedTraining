@@ -123,7 +123,7 @@ def validate_metrics():
         try:
             BittensorNetwork.metrics_data[data['public_address']]['loss'].append(data['metrics']['loss'])
         except Exception as e:
-            logger.warning(f"Failed to add data from {data["public_address"]} due to {e}")
+            logger.warning(f"Failed to add data from {data['public_address']} due to {e}")
             #BittensorNetwork.metrics_data[data['public_address']]['loss'] = [data['metrics']['loss']]
     logger.info(f"Received model metrics data from {data['public_address']}")
     return jsonify({"message": "Metrics received"})
