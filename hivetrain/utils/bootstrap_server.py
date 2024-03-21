@@ -76,7 +76,7 @@ def return_dht_address():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='DHT Manager')
-    parser.add_argument('--flask.host_address', type=str, default="0.0.0.0", required=True, help='Machine\'s external IP')
-    parser.add_argument('--flask.host_port', type=int, default=5000, help='Port number (default: 5000)')
+    parser.add_argument('--host_address', type=str, default="0.0.0.0", help='Machine\'s external IP')
+    parser.add_argument('--host_port', type=int, default=5000, help='Port number (default: 5000)')
     args = parser.parse_args()
-    app.run(threaded=True)
+    app.run(host=args.host_address, port=args.host_port,threaded=True)
