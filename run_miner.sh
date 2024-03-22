@@ -10,7 +10,7 @@ args=()
 version_location="template/__init__.py"
 version="__version__ "
 repo="bit-current/DistributedTraining"
-branch="dev_kb"
+branch="main"
 repo_url="https://github.com/$repo.git"
 
 
