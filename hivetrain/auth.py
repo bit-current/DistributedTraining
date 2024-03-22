@@ -1,8 +1,8 @@
 from functools import wraps
 from flask import request, make_response, jsonify
 import bittensor
-from hivetrain.btt_connector import BittensorNetwork
-from hivetrain import __spec_version__
+from .btt_connector import BittensorNetwork
+from . import __spec_version__
 from substrateinterface import Keypair, KeypairType
 #metagraph = bittensor.metagraph()  # Ensure this metagraph is synced before using it in the decorator.
 import logging
@@ -18,7 +18,7 @@ def authenticate_request_with_bittensor(f):
         message = data.get('message') if data else None
         signature = data.get('signature') if data else None
         public_address = data.get('public_address') if data else None
-        miner_version = data.get("miner_version")
+        miner_version = data.get("miner_version",0)
 
         if not (message and signature and public_address):
             logger.info(f"Rejected request without auth data")
