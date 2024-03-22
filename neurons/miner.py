@@ -32,6 +32,7 @@ from hivetrain.btt_connector import (
     serve_axon,
 )
 from hivetrain.config import Configurator
+from hivetrain import __spec_version__
 import logging
 
 logging.getLogger("lightning.pytorch").setLevel(logging.INFO)
@@ -49,7 +50,9 @@ def flatten_list(nested_list):
 
 
 # set some basic configuration values
-initial_peers = flatten_list(args.initial_peers)
+inital_peers_request = requests.get(args.miner.bootstrapping_server)
+initial_peers = inital_peers_request.json()["initial_peers"]
+#initial_peers = flatten_list(args.initial_peers)
 batch_size = args.batch_size
 save_every = args.save_every
 block_size = 512
@@ -225,7 +228,7 @@ hparams = dict(
 
 # define the hivemind strategy
 strategy = HivemindStrategy(
-    run_id=f"hiveminer",
+    run_id=f"hiveminer_{str(__spec_version__)}",
     batch_size=batch_size,
     target_batch_size=target_batch_size,
     initial_peers=initial_peers,
@@ -473,7 +476,7 @@ class ValidationCommunicator(Callback):
                     response = requests.post(
                         f"http://{url}/validate_metrics",
                         json={ "metrics": {"loss": outputs["loss"].item()} ,
-                        "message":message, "signature":signature, "public_address":public_address},
+                        "message":message, "signature":signature, "public_address":public_address, "miner_version":__spec_version__},
                         timeout=3
                     )
                     if response.status_code == 200:

@@ -2,6 +2,7 @@ from functools import wraps
 from flask import request, make_response, jsonify
 import bittensor
 from hivetrain.btt_connector import BittensorNetwork
+from hivetrain import __spec_version__
 from substrateinterface import Keypair, KeypairType
 #metagraph = bittensor.metagraph()  # Ensure this metagraph is synced before using it in the decorator.
 import logging
@@ -17,11 +18,16 @@ def authenticate_request_with_bittensor(f):
         message = data.get('message') if data else None
         signature = data.get('signature') if data else None
         public_address = data.get('public_address') if data else None
+        miner_version = data.get("miner_version")
 
         if not (message and signature and public_address):
             logger.info(f"Rejected request without auth data")
             return make_response(jsonify({'error': 'Missing message, signature, or public_address'}), 400)
             
+        #Check if miner version is correct
+        if int(miner_version) < __spec_version__:
+            logger.info(f"Rejected request with wrong miner version")
+            return make_response(jsonify({'error': f'Miner version is {miner_version} while current minimum version is {str(__spec_version__)}'}), 403)
 
         # Check if public_address is in the metagraph's list of registered public keys
         if public_address not in BittensorNetwork.metagraph.hotkeys:
