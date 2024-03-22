@@ -52,6 +52,7 @@ def flatten_list(nested_list):
 # set some basic configuration values
 inital_peers_request = requests.get(args.miner.bootstrapping_server)
 initial_peers = inital_peers_request.json()["initial_peers"]
+assert not (initial_peers is None)
 #initial_peers = flatten_list(args.initial_peers)
 batch_size = args.batch_size
 save_every = args.save_every
