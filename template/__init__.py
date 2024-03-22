@@ -1,3 +1,5 @@
+#For backward compatibility with Auto-Update
+
 # The MIT License (MIT)
 # Copyright © 2023 Yuma Rao
 # TODO(developer): Set your name
@@ -18,10 +20,8 @@
 # DEALINGS IN THE SOFTWARE.
 
 # version nomenclature = __training_type__.__model__.__other_changes__
-__version__ = "0.0.31"
+
+__version__ = "0.0.26"
+
 version_split = __version__.split(".")
 __spec_version__ = (100 * int(version_split[0])) + (10 * int(version_split[1])) + (1 * int(version_split[2]))
-
-
-# Import all submodules.
-from . import protocol
