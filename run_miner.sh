@@ -1,3 +1,4 @@
+
 #!/bin/bash
 # Inspired by https://github.com/surcyf123/smart-scrape/blob/main/run.sh
 
@@ -6,10 +7,15 @@ script="neurons/miner.py"
 autoRunLoc=$(readlink -f "$0")
 proc_name="distributed_training_miner" 
 args=()
-version_location="./template/__init__.py"
-version="__version__"
+version_location="template/__init__.py"
+version="__version__ "
+repo="bit-current/DistributedTraining"
+branch="dev_kb"
+repo_url="https://github.com/$repo.git"
+
 
 old_args=$@
+echo "=====old_args"
 
 # Check if pm2 is installed
 if ! command -v pm2 &> /dev/null
@@ -17,20 +23,6 @@ then
     echo "pm2 could not be found. To install see: https://pm2.keymetrics.io/docs/usage/quick-start/"
     exit 1
 fi
-
-# Checks if $1 is smaller than $2
-# If $1 is smaller than or equal to $2, then true. 
-# else false.
-version_less_than_or_equal() {
-    [  "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
-}
-
-# Checks if $1 is smaller than $2
-# If $1 is smaller than $2, then true. 
-# else false.
-version_less_than() {
-    [ "$1" = "$2" ] && return 1 || version_less_than_or_equal $1 $2
-}
 
 # Returns the difference between 
 # two versions as a numerical value.
@@ -78,6 +70,27 @@ read_version_value() {
     echo ""
 }
 
+
+check_variable_value_on_github() {
+    local repo="$1"
+    local file_path="$2"
+    local variable_name="$3"
+    local branch="$4"
+
+    # Simplified URL construction to include the branch directly
+    local url="https://api.github.com/repos/$repo/contents/$file_path?ref=$branch"
+    
+    # Fetch file content from GitHub and decode from Base64 in one go
+    local variable_value=$(curl -s "$url" | jq -r '.content' | base64 --decode | grep "$variable_name" | cut -d '=' -f 2 | tr -d '[:space:]' | tr -d "'\"")
+
+    if [[ -z "$variable_value" ]]; then
+        echo "Error: Variable '$variable_name' not found in the file '$file_path' on branch '$branch'."
+        return 1
+    else
+        echo "$variable_value"
+    fi
+}
+
 check_package_installed() {
     local package_name="$1"
     os_name=$(uname -s)
@@ -101,42 +114,6 @@ check_package_installed() {
     fi
 }
 
-check_variable_value_on_github() {
-    local repo="$1"
-    local file_path="$2"
-    local variable_name="$3"
-
-    local url="https://api.github.com/repos/$repo/contents/$file_path"
-    local response=$(curl -s "$url")
-
-    # Check if the response contains an error message
-    if [[ $response =~ "message" ]]; then
-        echo "Error: Failed to retrieve file contents from GitHub."
-        return 1
-    fi
-
-    # Extract the content from the response
-    local content=$(echo "$response" | tr -d '\n' | jq -r '.content')
-
-    if [[ "$content" == "null" ]]; then
-        echo "File '$file_path' not found in the repository."
-        return 1
-    fi
-
-    # Decode the Base64-encoded content
-    local decoded_content=$(echo "$content" | base64 --decode)
-
-    # Extract the variable value from the content
-    local variable_value=$(echo "$decoded_content" | grep "$variable_name" | awk -F '=' '{print $2}' | tr -d ' ')
-
-    if [[ -z "$variable_value" ]]; then
-        echo "Variable '$variable_name' not found in the file '$file_path'."
-        return 1
-    fi
-
-    strip_quotes $variable_value
-}
-
 strip_quotes() {
     local input="$1"
 
@@ -145,6 +122,36 @@ strip_quotes() {
     stripped="${stripped%\"}"
 
     echo "$stripped"
+}
+
+# reclone and install packages
+
+check_and_clone() {
+    cd ..
+    rm -rf $(basename "$repo_url" .git)
+    if git clone "$repo_url"; then
+        echo "Successfully cloned repository."
+        cd $(basename "$repo_url" .git) || exit
+        # Additional setup after cloning, if necessary
+        pip install -e .
+        pm2 restart "$proc_name"  # Restart the PM2 process
+    else
+        echo "Failed to clone the repository. Please check the URL and your internet connection."
+        exit 1
+    fi
+}
+
+
+
+# enforce what's on main branch
+enforce_main() {
+    git stash
+    git fetch origin "$branch"
+    git reset --hard "origin/$branch"
+    git clean -df
+    # Additional commands after enforcing main, if necessary
+    pip install -e .
+    pm2 restart "$proc_name"  # Restart the PM2 process
 }
 
 # Loop through all command line arguments
@@ -182,12 +189,12 @@ if [[ -z "$script" ]]; then
     exit 1
 fi
 
-branch=$(git branch --show-current)            # get current branch.
-echo watching branch: $branch
+local_branch=$(git branch --show-current)            # get current branch.
+echo watching branch: $local_branch
 echo pm2 process name: $proc_name
 
 # Get the current version locally.
-current_version=$(read_version_value)
+local_version=$(read_version_value)
 
 # Check if script is already running with pm2
 if pm2 status | grep -q $proc_name; then
@@ -218,73 +225,49 @@ echo "module.exports = {
 
 # Print configuration to be used
 cat app.config.js
-
 pm2 start app.config.js
 
 # Check if packages are installed.
 check_package_installed "jq"
 if [ "$?" -eq 1 ]; then
     while true; do
-
         # First ensure that this is a git installation
         if [ -d "./.git" ]; then
-
+            # Fetch remote changes without applying them
+            git fetch origin "$branch"
             # check value on github remotely
-            latest_version=$(check_variable_value_on_github "bit-current/DistributedTraining" "template/__init__.py" "__version__ ")
+            remote_version=$(check_variable_value_on_github "$repo" "$version_location" "$version" "$branch")
 
-            # If the file has been updated
-            if version_less_than $current_version $latest_version; then
-                echo "latest version $latest_version"
-                echo "current version $current_version"
-                diff=$(get_version_difference $latest_version $current_version)
-                if [ "$diff" -eq 1 ]; then
-                    echo "current validator version:" "$current_version" 
-                    echo "latest validator version:" "$latest_version" 
-
-                    # Pull latest changes
-                    # Failed git pull will return a non-zero output
-                    if git pull origin $branch; then
-                        # latest_version is newer than current_version, should download and reinstall.
-                        echo "New version published. Updating the local copy."
-
-                        # Install latest changes just in case.
-                        pip install -e .
-
-                        # # Run the Python script with the arguments using pm2
-                        # TODO (shib): Remove this pm2 del in the next spec version update.
-                        pm2 del auto_run_validator
-                        echo "Restarting PM2 process"
-                        pm2 restart $proc_name
-
-                        # Update current version:
-                        current_version=$(read_version_value)
-                        echo ""
-
-                        # Restart autorun script
-                        echo "Restarting script..."
-                        ./$(basename $0) $old_args && exit
-                    else
-                        echo "**Will not update**"
-                        echo "It appears you have made changes on your local copy. Please stash your changes using git stash."
-                    fi
+            if [ "$local_version" != "$remote_version" ]; then
+            echo "Version mismatch detected. Local version: $local_version, Remote version: $remote_version."
+            
+                if [ "$local_branch" = "$branch" ]; then
+                    # Case 3: On main branch, and versions differ. Delete local and reclone.
+                    echo "On main branch with version mismatch. Recloning..."
+                    check_and_clone
                 else
-                    # current version is newer than the latest on git. This is likely a local copy, so do nothing. 
-                    echo "**Will not update**"
-                    echo "The local version is $diff versions behind. Please manually update to the latest version and re-run this script."
+                    # Case 2: On a different branch, enforce main.
+                    echo "On branch $local_branch, enforcing main branch changes..."
+                    enforce_main
                 fi
+
+                local_version=$(read_version_value)
+                echo "Repository reset to the latest version."
+                # Restart autorun script
+                echo "Restarting script..."
+                ./$(basename $0) $old_args && exit
             else
                 echo "**Skipping update **"
-                echo "$current_version is the same as or more than $latest_version. You are likely running locally."
-            fi
+                echo "$local_version is the same as or more than $remote_version. You are likely running locally."
+            fi    
         else
             echo "The installation does not appear to be done through Git. Please install from source at https://github.com/opentensor/validators and rerun this script."
         fi
-        
-        # Wait about 30 minutes
-        # This should be plenty of time for validators to catch up
-        # and should prevent any rate limitations by GitHub.
-        sleep 1200
+        # wait for 3hrs and then check for changes again
+        sleep 10800
     done
 else
     echo "Missing package 'jq'. Please install it for your system first."
 fi
+
+
