@@ -84,7 +84,7 @@ cd DistributedTraining
 ## Checkout Current Branch
 
 ```
-cd DistributedTraining
+git checkout main
 ```
 
 ## Install Repo + Requirements
