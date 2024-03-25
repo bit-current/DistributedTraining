@@ -64,7 +64,10 @@ def detect_metric_anomaly(metric="loss", OUTLIER_THRESHOLD=2):
                 aggregated_metrics[public_address] = [data[metric]]
 
     # Calculate average and standard deviation of the metric for each public_address
-    average_metrics = {addr: np.mean(vals) for addr, vals in aggregated_metrics.items()}
+    average_metrics = {
+    addr: np.nanmean([val for val in vals if isinstance(val, (int, float, np.float32, np.float64))])
+    for addr, vals in aggregated_metrics.items()
+    }
     losses = np.array(list(average_metrics.values()))
     mean_loss = np.mean(losses)
     std_loss = np.std(losses)
