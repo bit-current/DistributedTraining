@@ -405,7 +405,7 @@ class MinerModelSaver(Callback):
 class ValidationCommunicator(Callback):
     """Periodically save the model during training."""
 
-    def __init__(self, args, sync_interval=600, batch_to_send = 100):
+    def __init__(self, args, sync_interval=600, batch_to_send = 20):
         super().__init__()
 
         BittensorNetwork.initialize(args)
