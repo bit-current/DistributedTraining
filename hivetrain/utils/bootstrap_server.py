@@ -50,7 +50,6 @@ def check_and_manage_dhts():
             logger.info("DHT Alive")
         except Exception as e:
             logger.info(f"DHT failed. {e}")
-            breakpoint()
             # If the connection fails, mark the DHT as non-responsive
             dht.terminate()
             dht_list.remove(dht)
