@@ -265,6 +265,8 @@ class BittensorNetwork:
     _config_lock = threading.Lock()  # Lock for modifying config
     metrics_data = {}
     model_checksums = {}
+    
+
 
     def __new__(cls):
         with cls._lock:
@@ -289,21 +291,26 @@ class BittensorNetwork:
                 cls.uid = cls.metagraph.hotkeys.index(
                     cls.wallet.hotkey.ss58_address
                 )
+                cls.device="cpu"
+                cls.base_scores = torch.zeros(
+                    cls.metagraph.n, dtype=torch.float32, device=cls.device
+                )
             # Additional initialization logic here
 
     @classmethod
     def set_weights(cls, scores):
         try:
-            chain_weights = torch.zeros(cls.subtensor.subnetwork_n(netuid=cls.metagraph.netuid))
+            #chain_weights = torch.zeros(cls.subtensor.subnetwork_n(netuid=cls.metagraph.netuid))
             uids = []
             for uid, public_address in enumerate(cls.metagraph.hotkeys):
                 try:
-                    chain_weights[uid] = scores.get(public_address, 0)
+                    alpha = 0.333333 # T=5 (2/(5+1))
+                    cls.base_scores[uid] = alpha * scores.get(public_address, 0) + (1 - alpha) * cls.base_scores[uid].to(cls.device)                    
                     uids.append(uid)
                 except KeyError:
                     continue
             uids = torch.tensor(uids)
-            logger.info(f"raw_weights {chain_weights}")
+            logger.info(f"raw_weights {cls.base_scores}")
             logger.info(f"raw_weight_uids {uids}")
             # Process the raw weights to final_weights via subtensor limitations.
             (
@@ -311,7 +318,7 @@ class BittensorNetwork:
                 processed_weights,
             ) = bt.utils.weight_utils.process_weights_for_netuid(
                 uids=uids.to("cpu"),
-                weights=chain_weights.to("cpu"),
+                weights=cls.base_scores.to("cpu"),
                 netuid=cls.config.netuid,
                 subtensor=cls.subtensor,
                 metagraph=cls.metagraph,
