@@ -264,7 +264,7 @@ if [ "$?" -eq 1 ]; then
             echo "The installation does not appear to be done through Git. Please install from source at https://github.com/opentensor/validators and rerun this script."
         fi
         # wait for 3hrs and then check for changes again
-        sleep 10800
+        sleep 1800
     done
 else
     echo "Missing package 'jq'. Please install it for your system first."
