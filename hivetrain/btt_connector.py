@@ -263,6 +263,7 @@ class BittensorNetwork:
     _weights_lock = threading.Lock()  # Lock for set_weights
     _anomaly_lock = threading.Lock()  # Lock for detect_metric_anomaly
     _config_lock = threading.Lock()  # Lock for modifying config
+    _rate_limit_lock = threading.Lock()
     metrics_data = {}
     model_checksums = {}
     request_counts = {}  # Track request counts
