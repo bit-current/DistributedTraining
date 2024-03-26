@@ -13,7 +13,7 @@ def add_meta_miner_args(parser):
     parser.add_argument('--miner.validator-urls', type=str, nargs="+", help='URLs of the validators for local testing only')
     parser.add_argument('--miner.tcp-store-address', type=str, help='URLs of the validators for local testing only')
     parser.add_argument('--miner.tcp-store-port', type=int, help='URLs of the validators for local testing only')
-    parser.add_argument('--miner.bootstrapping_server', type=str, default="http://108.59.84.51:4999/return_dht_address", help='Bootstrapping server address')
+    parser.add_argument('--miner.bootstrapping_server', type=str, default="http://45.8.133.222:3999/return_dht_address", help='Bootstrapping server address')
     parser.add_argument('--flask.host_address', type=str, help='URLs of the validators for local testing only')
     parser.add_argument('--flask.host_port', type=int, help='URLs of the validators for local testing only')
     
