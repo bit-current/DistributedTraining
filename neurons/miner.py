@@ -419,6 +419,7 @@ class ValidationCommunicator(Callback):
         self.last_sync_time = 0
         self.validator_urls = []
         self.batch_to_send = batch_to_send
+        self.last_report_time = 0
 
     def get_validator_uids_and_addresses(
         self, metagraph: "bt.metagraph.Metagraph", vpermit_tao_limit: int = 1024
