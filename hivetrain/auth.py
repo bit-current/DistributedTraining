@@ -39,6 +39,9 @@ def authenticate_request_with_bittensor(f):
         signature_bytes = bytes.fromhex(signature) if isinstance(signature, str) else signature
         keypair_public = Keypair(ss58_address=public_address, crypto_type=KeypairType.SR25519)
         is_valid = keypair_public.verify(message.encode('utf-8'), signature_bytes)
+        if is_valid and BittensorNetwork.rate_limiter(public_address):
+            logger.info(f"Rejected request from blacklisted or too frequent address: {public_address}")
+            return make_response(jsonify({'error': 'Too many requests or blacklisted'}), 429)
         if is_valid:
             return f(*args, **kwargs)
         else:

@@ -234,8 +234,8 @@ strategy = HivemindStrategy(
     target_batch_size=target_batch_size,
     initial_peers=initial_peers,
     use_ipfs=False,
-    use_relay=True,
-    use_auto_relay=True,
+    use_relay=True, ##FIXME Remove me and add a port for dht :(
+    use_auto_relay=True, ##FIXME Remove me too :'(
     verbose=False,
     wait_timeout=180,
     bootstrap_timeout=135,
@@ -456,37 +456,41 @@ class ValidationCommunicator(Callback):
                 
         return available_uid_details, validator_addresses
 
-    def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx, checksum = None):
+    def on_train_batch_end(self, trainer, lm, outputs, batch, batch_idx, checksum=None):
         super().on_train_batch_end(trainer, lm, outputs, batch, batch_idx)
-        
+
         self.step = int(trainer.callback_metrics.get("local_step", 0)) + 1
         logger.info(f"Batch {self.step}")
         if (self.step % self.batch_to_send) == 0:
-            if self.should_sync_metagraph():
-                self.resync_metagraph()
-                _, self.validator_urls = self.get_validator_uids_and_addresses(
-                    self.metagraph
-                )
-                #self.validator_urls = ["127.0.0.1:8888"]
-            timestamp = str(int(time.time()))
-            message, signature, public_address = self.create_signed_message(timestamp)
-            self.last_sync_time = int(timestamp)
-
-            for url in self.validator_urls:
-                try:
-                    response = requests.post(
-                        f"http://{url}/validate_metrics",
-                        json={ "metrics": {"loss": outputs["loss"].item()} ,
-                        "message":message, "signature":signature, "public_address":public_address, "miner_version":__spec_version__},
-                        timeout=3
+            current_time = int(time.time())
+            # Check if the last report was at least t seconds ago
+            t = 60  # Minimum time between reports in seconds
+            if current_time - self.last_report_time >= t:
+                if self.should_sync_metagraph():
+                    self.resync_metagraph()
+                    _, self.validator_urls = self.get_validator_uids_and_addresses(
+                        self.metagraph
                     )
-                    if response.status_code == 200:
-                        logger.info(f"Metrics reported successfully to validator {url}")
-                    else: 
-                        logger.warn(f"Error @ validator {url} --- Error: {response.json['error']}") #FIXME add gen
-                except:
-                    logger.warn(f"Failed to confirm reception at {url}")
-            
+                timestamp = str(current_time)
+                message, signature, public_address = self.create_signed_message(timestamp)
+
+                self.last_report_time = current_time
+                for url in self.validator_urls:
+                    try:
+                        response = requests.post(
+                            f"http://{url}/validate_metrics",
+                            json={"metrics": {"loss": outputs["loss"].item()},
+                                  "message": message, "signature": signature, "public_address": public_address, "miner_version": __spec_version__},
+                            timeout=3
+                        )
+                        if response.status_code == 200:
+                            logger.info(f"Metrics reported successfully to validator {url}")
+                        else:
+                            logger.warn(f"Error @ validator {url} --- Error: {response.json()['error']}")
+                    except Exception as e:
+                        logger.warn(f"Failed to confirm reception at {url}: {str(e)}")
+            else:
+                logger.info(f"Skipping metric report to prevent overreporting. Waiting for the next eligible batch.")           
 
     def create_signed_message(self, message):
         """Sign a message and return the signature."""

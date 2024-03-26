@@ -265,6 +265,9 @@ class BittensorNetwork:
     _config_lock = threading.Lock()  # Lock for modifying config
     metrics_data = {}
     model_checksums = {}
+    request_counts = {}  # Track request counts
+    blacklisted_addresses = {}  # Track blacklisted addresses
+
     
 
 
@@ -351,36 +354,39 @@ class BittensorNetwork:
             return (cls.subtensor.get_current_block() - cls.metagraph.last_update[cls.uid]) > cls.config.neuron.epoch_length
 
     @classmethod
-    def detect_metric_anomaly(cls, metric="loss", OUTLIER_THRESHOLD=2):
+    def detect_metric_anomaly(cls, metric="loss", OUTLIER_THRESHOLD=2, MEDIAN_ABSOLUTE_DEVIATION=True):
+        from scipy.stats import median_abs_deviation
         with cls._anomaly_lock:
             if not BittensorNetwork.metrics_data:
                 return {}
 
             logger.info(f"Metrics Data: {cls.metrics_data}")
             aggregated_metrics = {}
-            for public_address, data in cls.metrics_data.items():#FIXME can't aggregate from dict on same key.
+            for data in cls.metrics_data.values():
                 if metric in data:
-                    if public_address in aggregated_metrics:#FIXME no need for an if condition
-                        aggregated_metrics[public_address].append(data[metric])
-                    else:
-                        aggregated_metrics[public_address] = [data[metric]]
+                    public_address = data['public_address'] # Assuming public_address is part of data
+                    aggregated_metrics.setdefault(public_address, []).append(data[metric])
 
-            average_metrics = {
-            addr: np.nanmean([val for val in vals if isinstance(val, (int, float, np.float32, np.float64))])
-            for addr, vals in aggregated_metrics.items()
-            }
-            losses = np.array(list(average_metrics.values()))
-            mean_loss = np.mean(losses)
-            std_loss = np.std(losses)
+            if MEDIAN_ABSOLUTE_DEVIATION:
+                # Use Median Absolute Deviation for outlier detection
+                values = [np.median(vals) for vals in aggregated_metrics.values()]
+                median = np.median(values)
+                deviation = median_abs_deviation(values, scale='normal')
+                is_outlier = {addr: abs(np.median(vals) - median) / deviation > OUTLIER_THRESHOLD 
+                            for addr, vals in aggregated_metrics.items()}
+            else:
+                # Use Mean and Standard Deviation for outlier detection
+                average_metrics = {addr: np.nanmean(vals) for addr, vals in aggregated_metrics.items()}
+                losses = np.array(list(average_metrics.values()))
+                mean_loss = np.mean(losses)
+                std_loss = np.std(losses)
+                is_outlier = {addr: abs(avg_loss - mean_loss) / std_loss > OUTLIER_THRESHOLD 
+                            for addr, avg_loss in average_metrics.items()}
 
-            is_outlier = {}
-            for addr, avg_loss in average_metrics.items():
-                z_score = abs((avg_loss - mean_loss) / std_loss) if std_loss > 0 else 0
-                is_outlier[addr] = z_score > OUTLIER_THRESHOLD
-
-            scores = {public_address: 0 if is_outlier[public_address] else 1 for public_address in average_metrics}
+            scores = {public_address: 0 if is_outlier.get(public_address, False) else 1 for public_address in aggregated_metrics}
             logger.info(f"Scores calculated: {scores}")
             return scores
+
 
     @classmethod
     def run_evaluation(cls):
@@ -407,3 +413,29 @@ class BittensorNetwork:
                 cls.model_checksums.clear()
                 cls.metrics_data.clear()
     
+    @classmethod
+    def rate_limiter(cls, public_address, n=10, t=60):
+        """
+        Check if a public_address has exceeded n requests in t seconds.
+        If exceeded, add to blacklist.
+        """
+        with cls._rate_limit_lock:
+            current_time = time.time()
+            if public_address in cls.blacklisted_addresses:
+                # Check if the blacklist period is over
+                if current_time - cls.blacklisted_addresses[public_address] > t:
+                    del cls.blacklisted_addresses[public_address]
+                else:
+                    return False  # Still blacklisted
+
+            request_times = cls.request_counts.get(public_address, [])
+            # Filter out requests outside of the time window
+            request_times = [rt for rt in request_times if current_time - rt <= t]
+            request_times.append(current_time)
+            cls.request_counts[public_address] = request_times
+
+            if len(request_times) > n:
+                cls.blacklisted_addresses[public_address] = current_time
+                return False  # Too many requests, added to blacklist
+
+            return True  # Request allowed
