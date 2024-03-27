@@ -58,7 +58,7 @@ batch_size = args.batch_size
 save_every = args.save_every
 block_size = 512
 num_steps = 100_000_000_000 #infinite training
-target_batch_size = 8192 #when to average all weights.
+target_batch_size = 81920 #when to average all weights.
 
 dataset_config = {
     "dataset": "tiiuae/falcon-refinedweb",
@@ -241,10 +241,10 @@ strategy = HivemindStrategy(
     bootstrap_timeout=135,
     matchmaking_time=360.0,
     averaging_timeout=600.0,
-    delay_state_averaging=False,
-    delay_grad_averaging=False,
-    delay_optimizer_step=False,
-    offload_optimizer=False,
+    delay_state_averaging=True,
+    delay_grad_averaging=True,
+    delay_optimizer_step=True,
+    offload_optimizer=True,
     reuse_grad_buffers=False,
     # grad_compression=Float16Compression(),
     # state_averaging_compression=Float16Compression(),
