@@ -52,8 +52,11 @@ def sync(last_sync_time, sync_interval, config):
     if should_sync_metagraph(last_sync_time,sync_interval):
         # Assuming resync_metagraph is a method to update the metagraph with the latest state from the network.
         # This method would need to be defined or adapted from the BaseNeuron implementation.
-        resync_metagraph()
-        last_sync_time = time.time()
+        try:
+            resync_metagraph()
+            last_sync_time = time.time()
+        except Exception as e:
+            logger.warn(f"Failed to resync metagraph: {e}")
         return last_sync_time
     else:
         return last_sync_time
@@ -436,6 +439,7 @@ class BittensorNetwork:
             cls.request_counts[public_address] = request_times
 
             if len(request_times) > n:
+                logger.info(f"Blacklisted {public_address} for making {len(request_times)} in {t} seconds")
                 cls.blacklisted_addresses[public_address] = current_time
                 return False  # Too many requests, added to blacklist
 
