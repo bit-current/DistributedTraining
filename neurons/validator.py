@@ -41,52 +41,52 @@ evaluation_time_lock = threading.Lock()
 sync_time_lock = threading.Lock()
 
 
-def verify_model_checksum(public_address, checksum):
-    global model_checksums
-    with model_checksums_lock:
-        model_checksums[public_address] = checksum
+# def verify_model_checksum(public_address, checksum):
+#     global model_checksums
+#     with model_checksums_lock:
+#         model_checksums[public_address] = checksum
 
-def detect_metric_anomaly(metric="loss", OUTLIER_THRESHOLD=2):
-    global metrics_data
-        # Check if metrics_data is empty
-    if not metrics_data:
-        return {}
+# def detect_metric_anomaly(metric="loss", OUTLIER_THRESHOLD=2):
+#     global metrics_data
+#         # Check if metrics_data is empty
+#     if not metrics_data:
+#         return {}
 
-    # Initialize a dictionary to aggregate metrics by public_address
-    aggregated_metrics = {}
+#     # Initialize a dictionary to aggregate metrics by public_address
+#     aggregated_metrics = {}
 
-    # Aggregate metric values by public_address
-    for public_address, data in metrics_data.items():
-        if metric in data:
-            if public_address in aggregated_metrics:
-                aggregated_metrics[public_address].append(data[metric])
-            else:
-                aggregated_metrics[public_address] = [data[metric]]
+#     # Aggregate metric values by public_address
+#     for public_address, data in metrics_data.items():
+#         if metric in data:
+#             if public_address in aggregated_metrics:
+#                 aggregated_metrics[public_address].append(data[metric])
+#             else:
+#                 aggregated_metrics[public_address] = [data[metric]]
 
-    # Calculate average and standard deviation of the metric for each public_address
-    average_metrics = {
-    addr: np.nanmean([val for val in vals if isinstance(val, (int, float, np.float32, np.float64))])
-    for addr, vals in aggregated_metrics.items()
-    }
-    losses = np.array(list(average_metrics.values()))
-    mean_loss = np.mean(losses)
-    std_loss = np.std(losses)
+#     # Calculate average and standard deviation of the metric for each public_address
+#     average_metrics = {
+#     addr: np.nanmean([val for val in vals if isinstance(val, (int, float, np.float32, np.float64))])
+#     for addr, vals in aggregated_metrics.items()
+#     }
+#     losses = np.array(list(average_metrics.values()))
+#     mean_loss = np.mean(losses)
+#     std_loss = np.std(losses)
 
-    # Determine outliers based on the OUTLIER_THRESHOLD
-    is_outlier = {}
-    for addr, avg_loss in average_metrics.items():
-        z_score = abs((avg_loss - mean_loss) / std_loss) if std_loss > 0 else 0
-        is_outlier[addr] = z_score > OUTLIER_THRESHOLD
+#     # Determine outliers based on the OUTLIER_THRESHOLD
+#     is_outlier = {}
+#     for addr, avg_loss in average_metrics.items():
+#         z_score = abs((avg_loss - mean_loss) / std_loss) if std_loss > 0 else 0
+#         is_outlier[addr] = z_score > OUTLIER_THRESHOLD
 
-    scores = {}
-    for i, (public_address, _) in enumerate(average_metrics.items()):
-        score = 0 if is_outlier[public_address] else 1
-        scores[public_address]({'public_address': public_address, 'score': score})
+#     scores = {}
+#     for i, (public_address, _) in enumerate(average_metrics.items()):
+#         score = 0 if is_outlier[public_address] else 1
+#         scores[public_address]({'public_address': public_address, 'score': score})
     
-    for score_data in scores:
-        print(f"Public Key: {score_data['public_address']}, Score: {score_data['score']}")
+#     for score_data in scores:
+#         print(f"Public Key: {score_data['public_address']}, Score: {score_data['score']}")
     
-    return scores
+#     return scores
 
 
 

@@ -361,23 +361,30 @@ class BittensorNetwork:
     def detect_metric_anomaly(cls, metric="loss", OUTLIER_THRESHOLD=2, MEDIAN_ABSOLUTE_DEVIATION=True):
         from scipy.stats import median_abs_deviation
         with cls._anomaly_lock:
-            if not BittensorNetwork.metrics_data:
+            if not cls.metrics_data:
                 return {}
 
             logger.info(f"Metrics Data: {cls.metrics_data}")
             aggregated_metrics = {}
-            for data in cls.metrics_data.values():
+            for public_address, data in cls.metrics_data.items():
                 if metric in data:
-                    public_address = data['public_address'] # Assuming public_address is part of data
-                    aggregated_metrics.setdefault(public_address, []).append(data[metric])
+                    if public_address in aggregated_metrics:#FIXME no need for an if condition
+                        aggregated_metrics[public_address].append(data[metric])
+                    else:
+                        aggregated_metrics[public_address] = [data[metric]]
 
             if MEDIAN_ABSOLUTE_DEVIATION:
                 # Use Median Absolute Deviation for outlier detection
                 values = [np.median(vals) for vals in aggregated_metrics.values()]
                 median = np.median(values)
                 deviation = median_abs_deviation(values, scale='normal')
-                is_outlier = {addr: abs(np.median(vals) - median) / deviation > OUTLIER_THRESHOLD 
-                            for addr, vals in aggregated_metrics.items()}
+                is_outlier = {}
+                for addr, vals in aggregated_metrics.items():
+                    try:
+                        is_outlier[addr] = (abs(np.median(vals) - median) / deviation) > OUTLIER_THRESHOLD
+                    except:
+                        is_outlier[addr] = True
+                    
             else:
                 # Use Mean and Standard Deviation for outlier detection
                 average_metrics = {addr: np.nanmean(vals) for addr, vals in aggregated_metrics.items()}
