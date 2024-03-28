@@ -165,6 +165,7 @@ class StreamingDataset(IterableDataset):
 
 # prepare a dataset for use with training
 dataset = StreamingDataModule(tokenizer, dataset_config)
+print('This is working')
 
 
 # wrap the LightningModule in a custom class
