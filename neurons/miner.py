@@ -1,3 +1,4 @@
+import mlflow
 import argparse
 import ipaddress
 import logging
@@ -40,6 +41,7 @@ logger = logging.getLogger("lightning.pytorch")
 
 args = Configurator.combine_configs()
 
+mlflow.set_tracking_uri(uri=args.mlflow_server)   
 
 def flatten_list(nested_list):
     """Flatten a nested list."""
@@ -476,6 +478,8 @@ class ValidationCommunicator(Callback):
                 message, signature, public_address = self.create_signed_message(timestamp)
 
                 self.last_report_time = current_time
+
+                mlflow.log_metric("loss",outputs["loss"].item(), step=self.step )
                 for url in self.validator_urls:
                     try:
                         response = requests.post(
