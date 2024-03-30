@@ -58,15 +58,15 @@ def flatten_list(nested_list):
 
 
 # set some basic configuration values
-# inital_peers_request = requests.get(args.miner.bootstrapping_server)
-# initial_peers = inital_peers_request.json()["initial_peers"]
-# assert not (initial_peers is None)
-initial_peers = flatten_list(args.initial_peers)
+inital_peers_request = requests.get(args.miner.bootstrapping_server)
+initial_peers = inital_peers_request.json()["initial_peers"]
+assert not (initial_peers is None)
+# initial_peers = flatten_list(args.initial_peers)
 batch_size = args.batch_size
 save_every = args.save_every
-block_size = 20
+block_size = 512
 num_steps = 100_000_000_000 #infinite training
-target_batch_size = 1024 #when to average all weights.
+target_batch_size = 81920 #when to average all weights.
 
 dataset_config = {
     "dataset": dataset_name,
