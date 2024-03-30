@@ -41,7 +41,13 @@ logger = logging.getLogger("lightning.pytorch")
 
 args = Configurator.combine_configs()
 
-mlflow.set_tracking_uri(uri=args.mlflow_server)   
+mlflow.set_tracking_uri(uri=args.mlflow_server)   # ```mlflow ui``` defaults to port 5000
+mlflow.start_run(run_name="HiveMind Trainer")  # Names the Training instead of random name.
+
+# Here's the MLflow dataset grabber
+dataset_name = "tiiuae/falcon-refinedweb" # defines dataset name in parameters
+mlflow.log_param("dataset", dataset_name) # defines dataset name in parameters
+
 
 def flatten_list(nested_list):
     """Flatten a nested list."""
@@ -55,7 +61,7 @@ def flatten_list(nested_list):
 inital_peers_request = requests.get(args.miner.bootstrapping_server)
 initial_peers = inital_peers_request.json()["initial_peers"]
 assert not (initial_peers is None)
-#initial_peers = flatten_list(args.initial_peers)
+# initial_peers = flatten_list(args.initial_peers)
 batch_size = args.batch_size
 save_every = args.save_every
 block_size = 512
@@ -63,7 +69,7 @@ num_steps = 100_000_000_000 #infinite training
 target_batch_size = 81920 #when to average all weights.
 
 dataset_config = {
-    "dataset": "tiiuae/falcon-refinedweb",
+    "dataset": dataset_name,
     "key": "content",
     "split": "train",
     "block_size": block_size,
@@ -479,7 +485,7 @@ class ValidationCommunicator(Callback):
 
                 self.last_report_time = current_time
 
-                mlflow.log_metric("loss",outputs["loss"].item(), step=self.step )
+                mlflow.log_metric("loss",outputs["loss"].item(), step=self.step )   # Logs the loss metrics from training  <--step=batch- not global step.
                 for url in self.validator_urls:
                     try:
                         response = requests.post(
