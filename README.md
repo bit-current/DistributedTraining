@@ -62,8 +62,6 @@ sudo apt update && sudo apt install jq && sudo apt install npm && sudo npm insta
 On macOS:
 brew update && brew install jq && brew install npm && sudo npm install pm2 -g && pm2 update
 
-Wandb Login: You need a Weights & Biases account for tracking runs. If you don't have one, sign up at https://wandb.ai/site and use your API key to log in.
-wandb login <your_wandb_api_key>
 
 Register on Subnet 25: To register, execute the following command:
 btcli subnet register --netuid 25 --subtensor.network test --wallet.name miner --wallet.hotkey hotkey
