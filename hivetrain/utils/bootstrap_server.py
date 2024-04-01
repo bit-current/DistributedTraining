@@ -60,8 +60,10 @@ def check_and_manage_dhts():
         logger.info(f"Replacing {10 - len(dht_list)} DHTs")
         for _ in range(10 - len(dht_list)):
             new_dht = hivemind.DHT(
-                host_maddrs=[f"/ip4/{args.host_address}/tcp/0", f"/ip4/{args.host_address}/udp/0/quic"],
-                #announce_maddrs=[f"/ip4/{args.host_address}", f"/ip4/{args.host_address}"],
+                host_maddrs=[f"/ip4/{args.host_address}/tcp/{args.dht_tcp_port}", f"/ip4/{args.host_address}/udp/{args.dht_udp_port}/quic"],
+                use_relay=False,
+                announce_maddrs=[f"/ip4/{args.external_address}/tcp/{args.dht_tcp_port}", f"/ip4/{args.external_address}/udp/{args.dht_udp_port}"],
+                #identity_path=args.local_DHT_file
                 initial_peers=initial_peers,
                 start=True
             )
@@ -71,7 +73,7 @@ def check_and_manage_dhts():
     # Update the last checked timestamp
     last_checked = time.time()
 
-
+    
 @app.before_request
 def before_request():
     global last_checked
@@ -98,6 +100,8 @@ def return_dht_address():
             logger.info("Initializing 1st DHT")
             new_dht = hivemind.DHT(
                 host_maddrs=[f"/ip4/{args.host_address}/tcp/0", f"/ip4/{args.host_address}/udp/0/quic"],
+                use_relay=False,
+                announce_maddrs=[f"/ip4/{args.external_address}/tcp/{args.dht_tcp_port}", f"/ip4/{args.external_address}/udp/{args.dht_udp_port}"],
                 #announce_maddrs=[f"/ip4/{args.host_address}"],
                 start=True
             )
@@ -110,6 +114,9 @@ if __name__ == '__main__':
     parser.add_argument('--host_address', type=str, default="0.0.0.0", help='Machine\'s internal IP')
     parser.add_argument('--host_port', type=int, default=5000, help='Port number (default: 5000)')
     parser.add_argument('--external_address', type=str, default="20.20.20.20", help='Machine\'s external IP')
+    parser.add_argument('--dht_tcp_port', type=int, help='Machine\'s external IP')
+    parser.add_argument('--dht_udp_port', type=int, help='Machine\'s external IP')
+
     args = parser.parse_args()
     #app.run(host=args.host_address, port=args.host_port,threaded=True)
     serve(app, host=args.host_address, port=args.host_port)
