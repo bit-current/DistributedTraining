@@ -1,12 +1,13 @@
 
+![Subnet25](https://github.com/HeliosPrimeOne/DistributedTraining/assets/89754687/9c2c5413-e07b-4ef0-8891-815429be032e)
 
 ## There is no passion to be found playing small - in settling for a life that is less than the one you are capable of living. Nelson Mandela.
 
 
+## Welcome to Subnet 25
 
-Subnet25
 
-## Exploring New Frontiers : א・hivemind・25
+
 ## Essential Guide for Bittensor Enthusiasts:
 Beginners to Bittensor are encouraged to start with the basics by visiting the Bittensor official site. This foundational step is crucial for understanding the innovative landscape Bittensor is shaping.
 
@@ -16,7 +17,8 @@ Our ambition is to train the largest ever Large Language Model (LLM), harnessing
 ## The Significance of Our Endeavor:
 An overview of the "LMSYS Chatbot Arena Leaderboard" highlights the predominance of proprietary models. Our endeavor seeks to challenge this norm, ushering in a new phase of open and inclusive AI development practices.
 
-Subnet25
+![Screenshot from 2024-03-31 23-58-53](https://github.com/HeliosPrimeOne/DistributedTraining/assets/89754687/70c204a4-98ef-46d8-bda1-fc4b1aac7dd8)
+
 
 ## What we’ve done
 After a period of intense experimentation and evaluation, we have successfully trained our inaugural model (tinygpt2), marking the first ever incentivized distributed training over the internet (incentivized with TAO).
