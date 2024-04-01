@@ -23,19 +23,10 @@ After a period of intense experimentation and evaluation, we have successfully t
 
 We are currently in our next project phase (training a slightly larger GPT2 model - 677m params), and we invite you to join our mission by dedicating your computational resources towards this training run. All you have to do is run a miner, and it may just change the world.
 
-## Live Status
-Done : Train TINYGPT
-In Progress : GPT2 Training Run - 667m Params
-Roadmap (Dropping 16 Feb 2024)
-Office Hours (Timing TBC - Dropping 16 Feb 2024)
-Step-by-Step Guide to Mining on Hivemind (Dropping 16 Feb 2024)
-## Known Issues (fix in progress)
-load_state_from_peers errors
-⁠All_reduce errors
-Timeout errors
-suddenly diminishing miner incentive
+
 ## New Bounties
--- Improving our validation mechanism is key, take a look at it and make a propposal (@bitcurrent on discord) - if accepted you can execute. 5t reward upon exection. Please propose before execution!
+-- Improving our validation mechanism is key, reach out if you want to tackle a bounty so we are aligned on terms and timelines.  (@bitcurrent on discord) - if accepted you can execute. Please propose before execution!
+
 ## Frequently Asked Questions
 -- What are the minimum requirements to run a validator? A GPU with a minimum of 16GB RAM e.g. RTX A4000
 -- What are the minimum requirements to run a miner? A GPU with a minimum of 16GB RAM e.g. RTX A4000
