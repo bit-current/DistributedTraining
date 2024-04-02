@@ -26,14 +26,15 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
+from hivemind import DHT
 from hivetrain.btt_connector import (
     BittensorNetwork,
     # get_validator_uids_and_addresses,
     serve_axon,
 )
+from hivetrain.chain_manager import ChainMultiAddressStore
 from hivetrain.config import Configurator
 from hivetrain import __spec_version__
-import logging
 
 logging.getLogger("lightning.pytorch").setLevel(logging.INFO)
 logger = logging.getLogger("lightning.pytorch")
@@ -57,6 +58,8 @@ BittensorNetwork.initialize(args)
 hotkey = BittensorNetwork.wallet.hotkey.ss58_address
 my_uid = BittensorNetwork.hotkeys.index(hotkey)
 
+address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, BittensorNetwork.wallet, args.netuid)
+
 multi_addresses = []
 for uid, hotkey in enumerate(BittensorNetwork.hotkeys):
     
@@ -67,14 +70,40 @@ for uid, hotkey in enumerate(BittensorNetwork.hotkeys):
 
     multi_addresses.append(retrieved_multiaddress)
 
+tested_initial_peers = []
+for multiaddress in multi_addresses:
+
+    try:
+        # Attempt to connect to the DHT by creating a new disposable DHT
+        logger.info("Is DHT Alive")
+        test_dht = hivemind.DHT(initial_peers=[multiaddress], start=True)
+        test_dht.shutdown()
+        logger.info("DHT Alive")
+        tested_initial_peers.append(multiaddress)
+    except Exception as e:
+        logger.info(f"DHT failed.")
+        # If the connection fails, mark the DHT as non-responsive
+
+my_dht = DHT(
+    initial_peers = tested_initial_peers,
+    start=True,
+    host_maddrs=[f"/ip4/{args.miner.dht_host_address}/tcp/{args.miner.dht_tcp_port}", f"/ip4/{args.miner.dht_host_address}/udp/{args.miner.dht_udp_port}"],
+    announce_maddrs=[f"/ip4/{args.miner.dht_external_ip}/tcp/{args.miner.dht_tcp_port}", f"/ip4/{args.miner.dht_external_ip}/udp/{args.miner.dht_udp_port}"],
+    use_ipfs=False,
+    use_relay=False, 
+    use_auto_relay=False, 
+    ensure_bootstrap_success=True,
+    wait_timeout=180,
+    bootstrap_timeout=135
+)
 
 
-address_store = ChainMultiAddressStore(subtensor, wallet, net_uid)
-
+my_multiaddress = my_dht.get_visible_maddrs()[0]
+multi_addresses[my_uid] = my_multiaddress
 
 
 # Store the multiaddress on chain.
-address_store.store_multiaddress(hotkey, multiaddress)
+address_store.store_multiaddress(hotkey, my_multiaddress)
 
 
 #initial_peers = flatten_list(args.initial_peers)
@@ -90,6 +119,8 @@ dataset_config = {
     "split": "train",
     "block_size": block_size,
 }
+
+    
 
 # initialized and load the model
 config = AutoConfig.from_pretrained(
@@ -256,13 +287,13 @@ strategy = HivemindStrategy(
     run_id=f"hiveminer_{str(__spec_version__)}",
     batch_size=batch_size,
     target_batch_size=target_batch_size,
-    initial_peers=initial_peers,
-    use_ipfs=False,
-    use_relay=True, ##FIXME Remove me and add a port for dht :(
-    use_auto_relay=True, ##FIXME Remove me too :'(
+    #initial_peers=initial_peers,
+    # use_ipfs=False,
+    # use_relay=True, ##FIXME Remove me and add a port for dht :(
+    # use_auto_relay=True, ##FIXME Remove me too :'(
     verbose=False,
-    wait_timeout=180,
-    bootstrap_timeout=135,
+    #wait_timeout=180,
+    #bootstrap_timeout=135,
     matchmaking_time=360.0,
     averaging_timeout=600.0,
     delay_state_averaging=True,
@@ -270,6 +301,7 @@ strategy = HivemindStrategy(
     delay_optimizer_step=True,
     offload_optimizer=True,
     reuse_grad_buffers=False,
+    dht=my_dht
     # grad_compression=Float16Compression(),
     # state_averaging_compression=Float16Compression(),
     # load_state_compression=NoCompression(),
