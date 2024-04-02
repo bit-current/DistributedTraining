@@ -49,10 +49,34 @@ def flatten_list(nested_list):
     return nested_list
 
 
-# set some basic configuration values
-inital_peers_request = requests.get(args.miner.bootstrapping_server)
-initial_peers = inital_peers_request.json()["initial_peers"]
-assert not (initial_peers is None)
+# # set some basic configuration values
+# inital_peers_request = requests.get(args.miner.bootstrapping_server)
+# initial_peers = inital_peers_request.json()["initial_peers"]
+# assert not (initial_peers is None)
+BittensorNetwork.initialize(args)
+hotkey = BittensorNetwork.wallet.hotkey.ss58_address
+my_uid = BittensorNetwork.hotkeys.index(hotkey)
+
+multi_addresses = []
+for uid, hotkey in enumerate(BittensorNetwork.hotkeys):
+    
+    if uid == my_uid:
+        retrieved_multiaddress = None
+    else:
+        retrieved_multiaddress = address_store.retrieve_multiaddress(hotkey)
+
+    multi_addresses.append(retrieved_multiaddress)
+
+
+
+address_store = ChainMultiAddressStore(subtensor, wallet, net_uid)
+
+
+
+# Store the multiaddress on chain.
+address_store.store_multiaddress(hotkey, multiaddress)
+
+
 #initial_peers = flatten_list(args.initial_peers)
 batch_size = args.batch_size
 save_every = args.save_every
@@ -408,7 +432,7 @@ class ValidationCommunicator(Callback):
     def __init__(self, args, sync_interval=600, batch_to_send = 20):
         super().__init__()
 
-        BittensorNetwork.initialize(args)
+        
 
         # Now you can access wallet, subtensor, and metagraph like this:
         self.wallet = BittensorNetwork.wallet
