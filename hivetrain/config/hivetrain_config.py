@@ -3,7 +3,7 @@ import torch
 import argparse
 import bittensor as bt
 from loguru import logger
-
+import time
 def add_meta_miner_args(parser):
     #parser.add_argument("--meta-miner.log-activity", type=bool, help="Display logging message every request")
     parser.add_argument("--meta-miner.orchestrator-url", type=str, help="URL of the orchestrator")
@@ -18,6 +18,7 @@ def add_meta_miner_args(parser):
     parser.add_argument('--miner.dht-udp-port', type=int, help='URLs of the validators for local testing only')
     parser.add_argument('--miner.dht-external-ip', type=str, help='URLs of the validators for local testing only')
     parser.add_argument('--miner.dht-host-address', type=str, help='URLs of the validators for local testing only')
+    parser.add_argument('--miner.dht-private-key', type=str, default=str(time.time()) help='URLs of the validators for local testing only')
 
     parser.add_argument('--flask.host_address', type=str, help='URLs of the validators for local testing only')
     parser.add_argument('--flask.host_port', type=int, help='URLs of the validators for local testing only')

@@ -4,6 +4,7 @@ from typing import List
 import bittensor as bt
 from tqdm import tqdm
 from hivetrain.config import Configurator
+import time
 
 def generate_multiple_wallets(n: int, main_wallet_mnemonic: str, subtensor: bt.subtensor, reg_amount: int = 0.0001,
     netuid: int = 100) -> List[dict]:
@@ -22,16 +23,16 @@ def generate_multiple_wallets(n: int, main_wallet_mnemonic: str, subtensor: bt.s
     for wallet_number in tqdm(range(n)):
         # Generate mnemonics for hot and cold keys
         wallet_of_tao = bt.wallet(name=f"test_coldkey_{wallet_number}", hotkey=f"test_hotkey_{wallet_number}", path=".")
-        wallet.new_coldkey(use_password=False, overwrite=True)
-        wallet.new_hotkey(overwrite=True)
-        bittensor.extrinsics.transfer.transfer_extrinsic(subtensor, core_tao_wallet, wallet.coldkey.ss58_hotkey, reg_amount, 
+        wallet_of_tao.new_coldkey(use_password=False, overwrite=True)
+        wallet_of_tao.new_hotkey(overwrite=True)
+        bt.extrinsics.transfer.transfer_extrinsic(subtensor, core_tao_wallet, wallet_of_tao.coldkey.ss58_hotkey, reg_amount, 
             wait_for_inclusion=True, 
             wait_for_finalization=True, 
             keep_alive=True, 
             prompt=False)
         time.sleep(0.5) #Make sure subnet hyperparams allow lots of regs
-        bittensor.extrinsics.registration.burned_register_extrinsic(subtensor, 
-        wallet, 
+        bt.extrinsics.registration.burned_register_extrinsic(subtensor, 
+        wallet_of_tao, 
         netuid, 
         wait_for_inclusion=True, 
         wait_for_finalization=True, 
