@@ -18,7 +18,7 @@ def add_meta_miner_args(parser):
     parser.add_argument('--miner.dht-udp-port', type=int, help='URLs of the validators for local testing only')
     parser.add_argument('--miner.dht-external-ip', type=str, help='URLs of the validators for local testing only')
     parser.add_argument('--miner.dht-host-address', type=str, help='URLs of the validators for local testing only')
-    parser.add_argument('--miner.dht-private-key', type=str, default=str(time.time()) help='URLs of the validators for local testing only')
+    parser.add_argument('--miner.dht-private-key', type=str, default=str(time.time()), help='URLs of the validators for local testing only')
 
     parser.add_argument('--flask.host_address', type=str, help='URLs of the validators for local testing only')
     parser.add_argument('--flask.host_port', type=int, help='URLs of the validators for local testing only')
