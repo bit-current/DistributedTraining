@@ -3,6 +3,7 @@ from substrateinterface import Keypair
 from typing import List
 import bittensor as bt
 from tqdm import tqdm
+from hivetrain.config import Configurator
 
 def generate_multiple_wallets(n: int, main_wallet_mnemonic: str, subtensor: bt.subtensor, reg_amount: int = 0.0001,
     netuid: int = 100) -> List[dict]:
@@ -41,14 +42,10 @@ def generate_multiple_wallets(n: int, main_wallet_mnemonic: str, subtensor: bt.s
 
 if __name__ == '__main__':
     # Example: Generate 3 wallets
-    wallets = generate_multiple_wallets(3)
-    for wallet in wallets:
-        print(wallet)
+    config = Configurator.combine_configs()
+    MAIN_WALLET_MNEMONIC = "ENTER THE MNEMONIC HERE"
+    wallets = generate_multiple_wallets(3, MAIN_WALLET_MNEMONIC, config.subtensor, 0.00000001)
+
 
         
-        bittensor.extrinsics.registration.burned_register_extrinsic(subtensor, 
-        wallet, 
-        netuid, 
-        wait_for_inclusion=False, 
-        wait_for_finalization=True, 
-        prompt=False)
+        
