@@ -55,13 +55,13 @@ def flatten_list(nested_list):
 # initial_peers = inital_peers_request.json()["initial_peers"]
 # assert not (initial_peers is None)
 BittensorNetwork.initialize(args)
-hotkey = BittensorNetwork.wallet.hotkey.ss58_address
-my_uid = BittensorNetwork.hotkeys.index(hotkey)
+my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
+my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
-address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, BittensorNetwork.wallet, args.netuid)
+address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
 
 multi_addresses = []
-for uid, hotkey in enumerate(BittensorNetwork.hotkeys):
+for uid, hotkey in enumerate(BittensorNetwork.metagraph.hotkeys):
     
     if uid == my_uid:
         retrieved_multiaddress = None
@@ -85,7 +85,7 @@ for multiaddress in multi_addresses:
         # If the connection fails, mark the DHT as non-responsive
 
 my_dht = DHT(
-    initial_peers = tested_initial_peers,
+    initial_peers = tested_initial_peers if len(tested_initial_peers)>0 else None,
     start=True,
     host_maddrs=[f"/ip4/{args.miner.dht_host_address}/tcp/{args.miner.dht_tcp_port}", f"/ip4/{args.miner.dht_host_address}/udp/{args.miner.dht_udp_port}"],
     announce_maddrs=[f"/ip4/{args.miner.dht_external_ip}/tcp/{args.miner.dht_tcp_port}", f"/ip4/{args.miner.dht_external_ip}/udp/{args.miner.dht_udp_port}"],
@@ -94,17 +94,17 @@ my_dht = DHT(
     use_auto_relay=False, 
     ensure_bootstrap_success=True,
     wait_timeout=180,
-    bootstrap_timeout=135
+    bootstrap_timeout=135,
+    identity_path = args.miner.dht_private_key
 )
 
 
-my_multiaddress = my_dht.get_visible_maddrs()[0]
+my_multiaddress = str(my_dht.get_visible_maddrs()[0])
 multi_addresses[my_uid] = my_multiaddress
 
 
 # Store the multiaddress on chain.
-address_store.store_multiaddress(hotkey, my_multiaddress)
-
+address_store.store_multiaddress(my_hotkey, my_multiaddress)
 
 #initial_peers = flatten_list(args.initial_peers)
 batch_size = args.batch_size

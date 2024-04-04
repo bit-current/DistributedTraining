@@ -1,11 +1,19 @@
-
+import multiprocessing
 import functools
 import bittensor as bt
 import os
 import lzma
 import base64
-from typing import Optional
+import multiprocessing
+from typing import Optional, Any
 
+def _wrapped_func(func: functools.partial, queue: multiprocessing.Queue):
+    try:
+        result = func()
+        queue.put(result)
+    except (Exception, BaseException) as e:
+        # Catch exceptions here to add them to the queue.
+        queue.put(e)
 
 def run_in_subprocess(func: functools.partial, ttl: int, mode="fork") -> Any:
     """Runs the provided function on a subprocess with 'ttl' seconds to complete.
@@ -48,8 +56,9 @@ class ChainMultiAddressStore:
     def __init__(
         self,
         subtensor: bt.subtensor,
-        wallet: Optional[bt.wallet] = None,
         subnet_uid: int,
+        wallet: Optional[bt.wallet] = None,
+        
     ):
         self.subtensor = subtensor
         self.wallet = wallet
@@ -61,15 +70,13 @@ class ChainMultiAddressStore:
             raise ValueError("No wallet available to write to the chain.")
 
         # Compress the multiaddress
-        compressed_address = lzma.compress(multiaddress.encode())
-        encoded_address = base64.b64encode(compressed_address).decode()
 
         # Wrap calls to the subtensor in a subprocess with a timeout to handle potential hangs.
         partial = functools.partial(
             self.subtensor.commit,
             self.wallet,
             self.subnet_uid,
-            encoded_address,
+            multiaddress,
         )
         run_in_subprocess(partial, 60)
 
@@ -87,11 +94,9 @@ class ChainMultiAddressStore:
 
         commitment = metadata["info"]["fields"][0]
         hex_data = commitment[list(commitment.keys())[0]][2:]
-        encoded_address = bytes.fromhex(hex_data).decode()
+        multiaddress = bytes.fromhex(hex_data).decode()
 
         try:
-            compressed_address = base64.b64decode(encoded_address)
-            multiaddress = lzma.decompress(compressed_address).decode()
             return multiaddress
         except:
             # If the data format is not correct or decompression fails, return None.
