@@ -18,21 +18,20 @@ def generate_multiple_wallets(n: int, main_wallet_mnemonic: str, subtensor: bt.s
     - List[dict]: A list of dictionaries, each containing the mnemonic, hotkey, and coldkey for each wallet.
     """
     wallets = []
-    core_tao_wallet = bt.wallet(name="faucet_source", hotkey="faucet_hot", path=".")
+    core_tao_wallet = bt.wallet(name="faucet_source", hotkey="faucet_hot")
     core_tao_wallet.regen_coldkey(use_password=False, overwrite=True, mnemonic=main_wallet_mnemonic)
     for wallet_number in tqdm(range(n)):
         # Generate mnemonics for hot and cold keys
-        wallet_of_tao = bt.wallet(name=f"test_coldkey_{wallet_number}", hotkey=f"test_hotkey_{wallet_number}", path=".")
+        wallet_of_tao = bt.wallet(name=f"test_coldkey_{wallet_number}", hotkey=f"test_hotkey_{wallet_number}")
         wallet_of_tao.new_coldkey(use_password=False, overwrite=True)
         wallet_of_tao.new_hotkey(overwrite=True)
-        bt.extrinsics.transfer.transfer_extrinsic(subtensor, core_tao_wallet, wallet_of_tao.coldkey.ss58_address, reg_amount, 
+        subtensor.transfer(core_tao_wallet, wallet_of_tao.coldkey.ss58_address, reg_amount, 
             wait_for_inclusion=True, 
             wait_for_finalization=True, 
             keep_alive=True, 
             prompt=False)
         time.sleep(0.5) #Make sure subnet hyperparams allow lots of regs
-        bt.extrinsics.registration.burned_register_extrinsic(subtensor, 
-        wallet_of_tao, 
+        subtensor.register(wallet_of_tao, 
         netuid, 
         wait_for_inclusion=True, 
         wait_for_finalization=True, 
