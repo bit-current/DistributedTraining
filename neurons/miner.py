@@ -76,6 +76,7 @@ for multiaddress in multi_addresses:
     try:
         # Attempt to connect to the DHT by creating a new disposable DHT
         logger.info("Is DHT Alive")
+        logger.info(multiaddress)
         test_dht = hivemind.DHT(initial_peers=[multiaddress], start=True)
         test_dht.shutdown()
         logger.info("DHT Alive")
@@ -84,6 +85,7 @@ for multiaddress in multi_addresses:
         logger.info(f"DHT failed.")
         # If the connection fails, mark the DHT as non-responsive
 
+logger.info(tested_initial_peers)
 my_dht = DHT(
     initial_peers = tested_initial_peers if len(tested_initial_peers)>0 else None,
     start=True,
