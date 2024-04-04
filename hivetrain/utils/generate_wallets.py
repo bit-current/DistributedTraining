@@ -25,7 +25,7 @@ def generate_multiple_wallets(n: int, main_wallet_mnemonic: str, subtensor: bt.s
         wallet_of_tao = bt.wallet(name=f"test_coldkey_{wallet_number}", hotkey=f"test_hotkey_{wallet_number}", path=".")
         wallet_of_tao.new_coldkey(use_password=False, overwrite=True)
         wallet_of_tao.new_hotkey(overwrite=True)
-        bt.extrinsics.transfer.transfer_extrinsic(subtensor, core_tao_wallet, wallet_of_tao.coldkey.ss58_hotkey, reg_amount, 
+        bt.extrinsics.transfer.transfer_extrinsic(subtensor, core_tao_wallet, wallet_of_tao.coldkey.ss58_address, reg_amount, 
             wait_for_inclusion=True, 
             wait_for_finalization=True, 
             keep_alive=True, 
