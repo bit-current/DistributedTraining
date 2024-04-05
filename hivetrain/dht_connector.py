@@ -16,6 +16,8 @@ class DHTManager:
         self.logger = logging.getLogger(__name__)
         self.my_hotkey = None  # Set this appropriately based on your context
         self.tested_initial_peers = []
+        self.check_interval = 1200
+        self.storage_successful = False
 
     def retrieve_multi_addresses(self):
         multi_addresses = []
@@ -65,14 +67,6 @@ class DHTManager:
         )
         return my_dht
 
-    def update_and_store_my_multiaddress(self, my_dht):
-        my_multiaddress = str(my_dht.get_visible_maddrs()[0])
-        try:
-            self.address_store.store_multiaddress(self.my_hotkey, my_multiaddress)
-            self.logger.info(f"Multiaddress {my_multiaddress} stored successfully.")
-        except Exception as e:
-            self.logger.error(f"Failed to store multiaddress: {e}")
-
     def is_multiaddress_changed(self, new_multiaddress):
         # Retrieve the current multiaddress for my_uid
         current_multiaddress = self.address_store.retrieve_multiaddress(self.my_hotkey)
@@ -98,6 +92,8 @@ class DHTManager:
                 self.logger.info("Attempting to update and store multiaddress due to previous failure.")
                 my_dht = self.initialize_my_dht()
                 self.update_and_store_my_multiaddress(my_dht)
+            else:
+                return
 
     def manage_dht(self):
         multi_addresses = self.retrieve_multi_addresses()

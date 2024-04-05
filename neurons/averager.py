@@ -28,56 +28,44 @@ dht_manager = DHTManager(
 # Use the DHTManager to manage DHT interactions
 dht_manager.manage_dht()
 
-def deserialize_gradients(serialized_gradients):
-    buffer = io.BytesIO(serialized_gradients)
-    buffer.seek(0)
-    return torch.load(buffer)
 
-# Hypothetical function to send gradients
-def receive_gradients(aggregated_gradients, storage_dht = dht_manager.my_dht, hotkey = my_hotkey):
-    # Hypothetical sending function
-    serialized_gradients = storage_dht.get(hotkey)
-    aggregated_gradients = deserialize_gradients(serialized_gradients)
-    
-    return aggregated_gradients
-    # Implement sending logic here
 
-def average_gradients(scored_gradients):
-    total_score = sum(score for _, score in scored_gradients.values())
-    averaged_gradients = {name: torch.zeros_like(grad) for name, (grad, _) in scored_gradients.items()[0][1][0].items()}
+# def average_gradients(scored_gradients):
+#     total_score = sum(score for _, score in scored_gradients.values())
+#     averaged_gradients = {name: torch.zeros_like(grad) for name, (grad, _) in scored_gradients.items()[0][1][0].items()}
     
-    if total_score > 0:
-        for key, (gradients, score) in scored_gradients.items():
-            weight = score / total_score
-            for name, grad in gradients.items():
-                averaged_gradients[name] += grad * weight
+#     if total_score > 0:
+#         for key, (gradients, score) in scored_gradients.items():
+#             weight = score / total_score
+#             for name, grad in gradients.items():
+#                 averaged_gradients[name] += grad * weight
     
-    return averaged_gradients
+#     return averaged_gradients
 
-def apply_averaged_gradients(model, averaged_gradients):
-    with torch.no_grad():
-        for name, param in model.named_parameters():
-            if name in averaged_gradients:
-                param -= averaged_gradients[name]
+# def apply_averaged_gradients(model, averaged_gradients):
+#     with torch.no_grad():
+#         for name, param in model.named_parameters():
+#             if name in averaged_gradients:
+#                 param -= averaged_gradients[name]
 
-def push_to_hf_hub(local_dir, repo_id, hf_token=None, commit_message="Pushing model to Hub"):
-    if hf_token is not None:  # Optionally save token programmatically
-        HfFolder.save_token(hf_token)
+# def push_to_hf_hub(local_dir, repo_id, hf_token=None, commit_message="Pushing model to Hub"):
+#     if hf_token is not None:  # Optionally save token programmatically
+#         HfFolder.save_token(hf_token)
     
-    repo = Repository(local_dir=local_dir, repo_id=repo_id, clone_from=f"https://huggingface.co/{repo_id}")
-    repo.push_to_hub(commit_message=commit_message)
+#     repo = Repository(local_dir=local_dir, repo_id=repo_id, clone_from=f"https://huggingface.co/{repo_id}")
+#     repo.push_to_hub(commit_message=commit_message)
 
 # Example Usage:
 
-scored_gradients = {}
-for key, score in scores.items():
-    serialized_gradients = get_weights(key)
+# scored_gradients = {}
+# for key, score in scores.items():
+#     serialized_gradients = get_weights(key)
     
-    total_score = score['loss_score'] + score['perplexity_score']
-    scored_gradients[key] = (gradients, total_score)
+#     total_score = score['loss_score'] + score['perplexity_score']
+#     scored_gradients[key] = (gradients, total_score)
 
-averaged_gradients = average_gradients(scored_gradients)
-apply_averaged_gradients(model, averaged_gradients)
+# averaged_gradients = average_gradients(scored_gradients)
+# apply_averaged_gradients(model, averaged_gradients)
 
 # Define your model's local directory and repository ID
 local_dir = args.averager.save_directory #TODO add me to config :)

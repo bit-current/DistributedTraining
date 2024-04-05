@@ -3,31 +3,73 @@ import torch
 import random
 import math
 import copy
+import torch
+from huggingface_hub import Repository, HfFolder
+from copy import deepcopy 
+from hivemind.btt_connector import BittensorNetwork, sync
+import io
 
 class Averager:
-    def __init__(self, model, local_dir, repo_id, hf_token=None):
+    def __init__(self, model, local_dir, repo_id,dht,bittensor_network, hf_token=None):
         self.model = model
         self.local_dir = local_dir
         self.repo_id = repo_id
         self.hf_token = hf_token
+        self.scored_gradients = None
+        self.last_sync_time = 0
+        self.bittensor_network = bittensor_network
+        self.dht = dht
 
-    def average_gradients(self, scored_gradients):
-        total_score = sum(score for _, score in scored_gradients.values())
-        averaged_gradients = {name: torch.zeros_like(grad) for name, (grad, _) in scored_gradients.items()[0][1][0].items()}
+    @staticmethod
+    def deserialize_gradients(serialized_gradients):
+        buffer = io.BytesIO(serialized_gradients)
+        buffer.seek(0)
+        return torch.load(buffer)
 
-        if total_score > 0:
-            for key, (gradients, score) in scored_gradients.items():
-                weight = score / total_score
-                for name, grad in gradients.items():
-                    averaged_gradients[name] += grad * weight
+    @staticmethod
+    def receive_gradients(storage_dht = dht_manager.my_dht, hotkey = my_hotkey):
+        serialized_gradients = storage_dht.get(hotkey)
+        aggregated_gradients = deserialize_gradients(serialized_gradients)
+        
+        return aggregated_gradients
+    
+    def receive_and_score_gradients(self):
+        # Get validators uids
+        if time.time() - self.last_sync_time > self.sync_interval:
+            sync(self.last_sync_time, self.sync_interval, BittensorNetwork.config)#scope issue FIXME?
+            self.last_sync_time = time.time()
+
+        validator_uids = self.bittensor_network.get_validator_uids()
+        validator_combined_weights = torch.mean(self.bittensor_network.metagraph.W[validator_uids, :],axis=0)
+        # Get average of validator weights weighted by their stake?
+        self.miner_gradients = []
+        self.miner_weights = []
+        self.miner_hotkeys = []
+        for uid, hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
+            if uid not in validator_uids:
+                try:
+                    gradient = receive_gradients(self.dht, hotkey)
+                    miner_gradients.append(miner_gradients)
+                except:
+                    self.miner_gradients.append(None)
+                    self.miner_weights.append(0.0)
+                    self.miner_hotkeys.append(hotkey)
+        
+
+    def average_gradients(self, beta=1.0):
+        averaged_gradients = {name:torch.zeros_like(grad) for name, grad in self.miner_gradients.items()}
+
+        for score, gradients in zip(self.miner_scores, self.miner_gradients):
+            for name, grad in gradients.items():
+                averaged_gradients[name] += grad * score * beta
 
         return averaged_gradients
 
-    def apply_averaged_gradients(self, averaged_gradients):
+    def apply_averaged_gradients(self, averaged_gradients, alpha=0.00001):
         with torch.no_grad():
             for name, param in self.model.named_parameters():
                 if name in averaged_gradients:
-                    param -= averaged_gradients[name]
+                    param -= alpha * averaged_gradients[name]
 
     def save_model(self):
         self.model.save_pretrained(self.local_dir)
@@ -42,6 +84,7 @@ class Averager:
     def run_periodic_averaging(self, t, scored_gradients):
         while True:
             start_time = time.time()
+            receive_and_score_gradients
             averaged_gradients = self.average_gradients(scored_gradients)
             self.apply_averaged_gradients(averaged_gradients)
             self.save_model()
@@ -53,10 +96,8 @@ class Averager:
 
 ##FIXME where does it get its scored_gradients
 class RankedAverager(Averager):
-    def __init__(self, model, local_dir, repo_id, hf_token=None, population_size=10, generations=5, mutation_rate=0.1):
+    def __init__(self, model, local_dir, repo_id, hf_token=None, validator=None, population_size=10, generations=5, mutation_rate=0.1, top_k=20):
         super().__init__(model, local_dir, repo_id, hf_token)
-        self.population_size = population_size
-        self.generations = generations
         self.population_size = population_size
         self.generations = generations
         self.top_k = top_k  # Number of top performing gradients to consider
@@ -79,7 +120,7 @@ class RankedAverager(Averager):
                     combined_gradient[name] = grad.clone()  # Use clone to ensure no inplace operation
                 else:
                     if random.random() < 0.5:
-                        combined_gradient[name] += grad
+                        combined_gradient[name] = combined_gradient[name] + grad
         return combined_gradient
 
     def evaluate_individual(self, individual):
@@ -111,3 +152,15 @@ class RankedAverager(Averager):
         # Returning the best gradients after final generation
         best_gradients = self.rank_selection(population)[0]
         return best_gradients
+
+    def run_periodic_averaging(self, t, scored_gradients):
+        while True:
+            start_time = time.time()
+            receive_and_score_gradients
+            averaged_gradients = self.average_gradients(scored_gradients)
+            self.apply_averaged_gradients(averaged_gradients)
+            self.save_model()
+            self.push_to_hf_hub(commit_message="Updated model with new gradients")
+            elapsed_time = time.time() - start_time
+            time_to_wait = max(0, t - elapsed_time)
+            time.sleep(time_to_wait)

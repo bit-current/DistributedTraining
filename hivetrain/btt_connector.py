@@ -36,24 +36,24 @@ def check_registered(netuid):
         print(f"Wallet: {wallet} is not registered on netuid {netuid}. Please register the hotkey before trying again")
         exit()
 
-def resync_metagraph():
+def resync_metagraph(lite):
     global metagraph, config, subtensor
     # Fetch the latest state of the metagraph from the Bittensor network
     print("Resynchronizing metagraph...")
         # Update the metagraph with the latest information from the network
-    metagraph = BittensorNetwork.subtensor.metagraph(BittensorNetwork.config.netuid)
+    metagraph = BittensorNetwork.subtensor.metagraph(BittensorNetwork.config.netuid, lite=lite)
     print("Metagraph resynchronization complete.")
 
 def should_sync_metagraph(last_sync_time,sync_interval):
     current_time = time.time()
     return (current_time - last_sync_time) > sync_interval
 
-def sync(last_sync_time, sync_interval, config):
+def sync(last_sync_time, sync_interval, config, lite=False):
     if should_sync_metagraph(last_sync_time,sync_interval):
         # Assuming resync_metagraph is a method to update the metagraph with the latest state from the network.
         # This method would need to be defined or adapted from the BaseNeuron implementation.
         try:
-            resync_metagraph()
+            resync_metagraph(lite)
             last_sync_time = time.time()
         except Exception as e:
             logger.warn(f"Failed to resync metagraph: {e}")
@@ -351,6 +351,30 @@ class BittensorNetwork:
             )
         except Exception as e:
             logger.info(f"Error setting weights: {e}")
+
+    @classmethod
+    def get_validator_uids(
+        cls, vpermit_tao_limit: int = 1024
+    ):
+        """
+        Check availability of all UIDs in a given subnet, returning their IP, port numbers, and hotkeys
+        if they are serving and have at least vpermit_tao_limit stake, along with a list of strings
+        formatted as 'ip:port' for each validator.
+
+        Args:
+            metagraph (bt.metagraph.Metagraph): Metagraph object.
+            vpermit_tao_limit (int): Validator permit tao limit.
+
+        Returns:
+            Tuple[List[dict], List[str]]: A tuple where the first element is a list of dicts with details
+                                            of available UIDs, including their IP, port, and hotkeys, and the
+                                            second element is a list of strings formatted as 'ip:port'.
+        """
+        validator_uids = []  # List to hold 'ip:port' strings
+        for uid in range(len(cls.metagraph.S)):
+            if cls.metagraph.S[uid] >= vpermit_tao_limit:
+                validator_uids.append(uid)
+        return validator_uids
 
     @classmethod
     def should_set_weights(cls) -> bool:

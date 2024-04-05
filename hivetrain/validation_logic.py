@@ -1,5 +1,9 @@
+import io
+import math 
+import threading
+
 class ModelValidator:
-    def __init__(self, model, data_loader, criterion, interval=3600):
+    def __init__(self, model, data_loader, criterion, bittensor_network = None, interval=3600):
         self.model = model
         self.data_loader = data_loader
         self.criterion = criterion
@@ -7,11 +11,37 @@ class ModelValidator:
         self.original_state_dict = model.state_dict()
         self.base_loss, self.base_perplexity = self.evaluate_model()
         self.scores = {}
+        self.bittensor_network = bittensor_network
 
-    def deserialize_gradients(self, serialized_gradients):
+    @staticmethod
+    def deserialize_gradients(serialized_gradients):
         buffer = io.BytesIO(serialized_gradients)
         buffer.seek(0)
         return torch.load(buffer)
+
+    @staticmethod
+    def receive_gradients(storage_dht = dht_manager.my_dht, hotkey = my_hotkey):
+        serialized_gradients = storage_dht.get(hotkey)
+        aggregated_gradients = deserialize_gradients(serialized_gradients)
+        
+        return aggregated_gradients
+
+    def receive_gradients(self):
+        # Get validators uids
+        if time.time() - self.last_sync_time > self.sync_interval:
+            sync(self.last_sync_time, self.sync_interval, BittensorNetwork.config)#scope issue FIXME?
+            self.last_sync_time = time.time()
+
+        validator_uids = self.bittensor_network.get_validator_uids()
+        # Get average of validator weights weighted by their stake?
+        self.miner_gradients = []
+        for uid, hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
+            if uid not in validator_uids:
+                try:
+                    gradient = receive_gradients(self.dht, hotkey)
+                    miner_gradients.append(miner_gradients)
+                except:
+                    self.miner_gradients.append(None)
 
     def update_model_weights(self, gradients):
         with torch.no_grad():
@@ -20,6 +50,9 @@ class ModelValidator:
                     param -= gradients[name]
 
     def evaluate_model(self, metric='loss'):
+        #WARNING: # 2. The evaluate_model method incorrectly uses the criterion on outputs directly. 
+        # If the model's outputs are logits, and the criterion expects logits and labels, this might be correct, 
+        # but typically, a transformation is applied to outputs before calculating loss (e.g., softmax for cross-entropy loss).
         self.model.eval()
         total_loss = 0
         total_samples = 0
@@ -37,7 +70,7 @@ class ModelValidator:
 
     def validate_and_score(self):
         
-        for hotkey_address in BittensorNetwork.metagraph.hotkeys:
+        for hotkey_address in self.bittensor_network.metagraph.hotkeys:
             gradients = receive_gradients(hotkey_address)
             
             self.update_model_weights(gradients)
