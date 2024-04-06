@@ -1,17 +1,31 @@
+import torch
+import time
 import io
 import math 
 import threading
+from bittensor import logging
+from copy import deepcopy
+from hivetrain.btt_connector import (
+    BittensorNetwork,
+    # get_validator_uids_and_addresses,
+    serve_axon,
+)
+
+from torch.optim import AdamW
+from torch.utils.data import DataLoader, Dataset, IterableDataset
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 class ModelValidator:
-    def __init__(self, model, data_loader, criterion, bittensor_network = None, interval=3600):
+    def __init__(self, model, optimizer, data_loader, dht, bittensor_network = None, interval=3600):
         self.model = model
+        self.optimizer = optimizer
         self.data_loader = data_loader
-        self.criterion = criterion
         self.interval = interval  # Validation interval in seconds
-        self.original_state_dict = model.state_dict()
+        self.original_state_dict = deepcopy(model.state_dict())
         self.base_loss, self.base_perplexity = self.evaluate_model()
         self.scores = {}
         self.bittensor_network = bittensor_network
+        self.dht = dht
 
     @staticmethod
     def deserialize_gradients(serialized_gradients):
@@ -19,35 +33,37 @@ class ModelValidator:
         buffer.seek(0)
         return torch.load(buffer)
 
-    @staticmethod
-    def receive_gradients(storage_dht = dht_manager.my_dht, hotkey = my_hotkey):
-        serialized_gradients = storage_dht.get(hotkey)
-        aggregated_gradients = deserialize_gradients(serialized_gradients)
+    def receive_gradients(self, storage_dht = None, hotkey = None):
+        try:
+            serialized_gradients = storage_dht.get(hotkey).value
+            aggregated_gradients = self.deserialize_gradients(serialized_gradients)
+        except:
+            return None
         
         return aggregated_gradients
 
-    def receive_gradients(self):
-        # Get validators uids
-        if time.time() - self.last_sync_time > self.sync_interval:
-            sync(self.last_sync_time, self.sync_interval, BittensorNetwork.config)#scope issue FIXME?
-            self.last_sync_time = time.time()
+    # def receive_gradients_from_chain(self):
+    #     # Get validators uids
+    #     if time.time() - self.last_sync_time > self.sync_interval:
+    #         sync(self.last_sync_time, self.sync_interval, BittensorNetwork.config)#scope issue FIXME?
+    #         self.last_sync_time = time.time()
 
-        validator_uids = self.bittensor_network.get_validator_uids()
-        # Get average of validator weights weighted by their stake?
-        self.miner_gradients = []
-        for uid, hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
-            if uid not in validator_uids:
-                try:
-                    gradient = receive_gradients(self.dht, hotkey)
-                    miner_gradients.append(miner_gradients)
-                except:
-                    self.miner_gradients.append(None)
+    #     validator_uids = self.bittensor_network.get_validator_uids()
+    #     # Get average of validator weights weighted by their stake?
+    #     self.miner_gradients = []
+    #     for uid, hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
+    #         if uid not in validator_uids:
+    #             try:
+    #                 gradient = receive_gradients(self.dht, hotkey)
+    #                 self.miner_gradients.append(gradient)
+    #             except:
+    #                 self.miner_gradients.append(None)
 
-    def update_model_weights(self, gradients):
+    def update_model_weights(self, gradients, alpha=0.00001):
         with torch.no_grad():
             for name, param in self.model.named_parameters():
                 if name in gradients:
-                    param -= gradients[name]
+                    param -= gradients[name] * alpha
 
     def evaluate_model(self, metric='loss'):
         #WARNING: # 2. The evaluate_model method incorrectly uses the criterion on outputs directly. 
@@ -58,36 +74,43 @@ class ModelValidator:
         total_samples = 0
         with torch.no_grad():
             for batch in self.data_loader:
-                outputs = self.model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'])
-                labels = batch['input_ids']
-                loss = self.criterion(outputs, labels)
-                total_loss += loss.item() * labels.size(0)
-                total_samples += labels.size(0)
+                outputs = self.model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch["labels"])
+                loss = outputs.loss
+                total_loss += loss.item() * batch['input_ids'].size(0)
+                total_samples += batch['input_ids'].size(0)
 
         average_loss = total_loss / total_samples
         perplexity = math.exp(average_loss) if metric == 'perplexity' else None
         return average_loss, perplexity
 
     def validate_and_score(self):
-        
+
+        logging.info("Receiving Gradients from chain")
+        breakpoint()
         for hotkey_address in self.bittensor_network.metagraph.hotkeys:
-            gradients = receive_gradients(hotkey_address)
-            
-            self.update_model_weights(gradients)
+            logging.info(f"Receiving Gradients from: {hotkey_address}")
+            gradients = self.receive_gradients(self.dht, hotkey_address)
+            logging.info(f"Updating Model Weights")
+            if gradients is not None:
+                self.update_model_weights(gradients)
+            logging.info(f"Evaluating model")
             loss, perplexity = self.evaluate_model()
             loss_score = max(0, self.base_loss - loss)
             perplexity_score = max(0, self.base_perplexity - perplexity) if perplexity else 0
+            logging.info(f"Scoring")
             self.scores[hotkey_address] = perplexity_score
 
             # Reset the model to its original state
+            logging.info("Reverting to base model")
             self.model.load_state_dict(self.original_state_dict)
             
-            print(f"Loss Score: {loss_score}, Perplexity Score: {perplexity_score}")
+            logging.info(f"Loss Score: {loss_score}, Perplexity Score: {perplexity_score}")
+            time.sleep(0.1)
 
     def start_periodic_validation(self):
-        def run():
-            while True:
-                self.validate_and_score()
-                time.sleep(self.interval)
+        #def run():
+        while True:
+            self.validate_and_score()
+            time.sleep(self.interval)
         
-        threading.Thread(target=run, daemon=True).start()
+        #threading.Thread(target=run, daemon=True).start()

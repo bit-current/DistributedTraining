@@ -1,8 +1,10 @@
 import hivemind
-import logging
+import bittensor as bt
+import threading
+import time
 
 class DHTManager:
-    def __init__(self, address_store, bittensor_network, my_uid, dht_host_address, 
+    def __init__(self, address_store, bittensor_network, my_uid,my_hotkey, dht_host_address, 
         dht_tcp_port, dht_udp_port, dht_external_ip, dht_private_key):
 
         self.address_store = address_store
@@ -13,8 +15,8 @@ class DHTManager:
         self.dht_udp_port = dht_udp_port
         self.dht_external_ip = dht_external_ip
         self.dht_private_key = dht_private_key
-        self.logger = logging.getLogger(__name__)
-        self.my_hotkey = None  # Set this appropriately based on your context
+        self.logger = bt.logging
+        self.my_hotkey = my_hotkey  # Set this appropriately based on your context
         self.tested_initial_peers = []
         self.check_interval = 1200
         self.storage_successful = False
@@ -63,7 +65,7 @@ class DHTManager:
             wait_timeout=180,
             bootstrap_timeout=135,
             identity_path=self.dht_private_key,
-            num_replicas=0
+            num_replicas=1
         )
         return my_dht
 

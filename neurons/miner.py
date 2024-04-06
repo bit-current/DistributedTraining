@@ -28,6 +28,8 @@ from hivetrain.btt_connector import (
 )
 from hivetrain.chain_manager import ChainMultiAddressStore
 from hivetrain.config import Configurator
+from hivetrain.dht_connector import DHTManager
+
 from hivetrain import __spec_version__
 #from loguru import logger
 from bittensor.btlogging import logging
@@ -36,7 +38,6 @@ import time
 import torch
 from torch.utils.data import DataLoader
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
-
 
 logger = logging
 #logger = logging.getLogger()
@@ -72,19 +73,21 @@ dht_manager = DHTManager(
     dht_tcp_port=args.miner.dht_tcp_port,
     dht_udp_port=args.miner.dht_udp_port,
     dht_external_ip=args.miner.dht_external_ip,
-    dht_private_key=args.miner.dht_private_key
+    dht_private_key=args.miner.dht_private_key, 
+    my_hotkey=my_hotkey,
 )
 
 # Use the DHTManager to manage DHT interactions
 dht_manager.manage_dht()
-
+dht_addresses = test = " --- ".join([str(multi) for multi in dht_manager.my_dht.get_visible_maddrs()])
+logger.info(f"DHT address at:{dht_addresses}")
 
 # Parameters
 model_name = "mekaneeky/tiny-random-gpt2"
 batch_size = 30
-epochs = 30
+epochs = 30_000_000_000_000_000
 learning_rate = 5e-5
-send_interval = 5   # Every 5 minutes
+send_interval = 60   # Every 60 seconds 
 
 # Load model and tokenizer
 model = AutoModelForCausalLM.from_pretrained(model_name)
@@ -131,8 +134,9 @@ def serialize_gradients(aggregated_gradients):
 # Hypothetical function to send gradients
 def send_gradients(aggregated_gradients, storage_dht = dht_manager.my_dht, hotkey = my_hotkey):
     # Hypothetical sending function
+    logging.info("Uploading gradients to DHT.")
     serialized_gradients = serialize_gradients(aggregated_gradients)
-    storage_dht.store(hotkey, serialized_gradients, time.time()+600)
+    storage_dht.store(hotkey, serialized_gradients, time.time()+3600)
     # Implement sending logic here
 
 # Initialize aggregated gradients
@@ -142,7 +146,6 @@ aggregated_gradients = {name: torch.zeros_like(param) for name, param in model.n
 last_send_time = time.time()
 optimizer.zero_grad()
 for epoch in range(epochs):
-    print(f"Epoch {epoch+1}/{epochs}")
     for step, batch in enumerate(data_loader):
         outputs = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch['input_ids'])
         loss = outputs.loss
@@ -154,12 +157,16 @@ for epoch in range(epochs):
                 aggregated_gradients[name] += param.grad
                 
         # Zero gradients for the next accumulation
+        optimizer.step()
         optimizer.zero_grad()
 
         # Check if it's time to send the gradients
         current_time = time.time() ##time.time()%sth works better
         if current_time - last_send_time >= send_interval:
-            send_gradients(aggregated_gradients)
+            try:
+                send_gradients(aggregated_gradients, dht_manager.my_dht, my_hotkey)
+            except:
+                continue
             last_send_time = current_time
             # Reset aggregated gradients
             aggregated_gradients = {name: torch.zeros_like(param) for name, param in model.named_parameters() if param.requires_grad}
