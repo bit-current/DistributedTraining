@@ -121,8 +121,8 @@ def check_and_manage_dhts():
                 announce_maddrs=[f"/ip4/{args.external_address}/tcp/{tcp_port}", f"/ip4/{args.external_address}/udp/{udp_port}"],
                 #identity_path=args.local_DHT_file
                 initial_peers=initial_peers,
-                num_replicas=0,
-                cache_nearest=False,
+                num_replicas=1,
+                #cache_nearest=False,
                 start=True
             )
             new_dht.wait_until_ready()
@@ -164,8 +164,8 @@ def return_dht_address():
                 host_maddrs=[f"/ip4/{args.host_address}/tcp/{tcp_port}", f"/ip4/{args.host_address}/udp/{udp_port}/quic"],
                 use_relay=False,
                 use_auto_relay=False,
-                num_replicas=0,
-                cache_nearest=False,
+                num_replicas=1,
+                #cache_nearest=False,
                 announce_maddrs=[f"/ip4/{args.external_address}/tcp/{tcp_port}", f"/ip4/{args.external_address}/udp/{udp_port}"],
                 #announce_maddrs=[f"/ip4/{args.host_address}"],
                 start=True
