@@ -6,8 +6,10 @@ import copy
 import torch
 from huggingface_hub import Repository, HfFolder
 from copy import deepcopy 
-from hivemind.btt_connector import BittensorNetwork, sync
+from hivetrain.btt_connector import BittensorNetwork, sync
+#from hivetrain.dht_connector import DHTManager
 import io
+from bittensor import logging
 
 class Averager:
     def __init__(self, model, local_dir, repo_id,dht,bittensor_network, hf_token=None):
@@ -27,7 +29,7 @@ class Averager:
         return torch.load(buffer)
 
     @staticmethod
-    def receive_gradients(storage_dht = dht_manager.my_dht, hotkey = my_hotkey):
+    def receive_gradients(storage_dht = None, hotkey = None):
         serialized_gradients = storage_dht.get(hotkey)
         aggregated_gradients = deserialize_gradients(serialized_gradients)
         
@@ -35,10 +37,8 @@ class Averager:
     
     def receive_and_score_gradients(self):
         # Get validators uids
-        if time.time() - self.last_sync_time > self.sync_interval:
-            sync(self.last_sync_time, self.sync_interval, BittensorNetwork.config)#scope issue FIXME?
-            self.last_sync_time = time.time()
-
+        self.bittensor_network.sync(lite=False)#scope issue FIXME?
+            
         validator_uids = self.bittensor_network.get_validator_uids()
         validator_combined_weights = torch.mean(self.bittensor_network.metagraph.W[validator_uids, :],axis=0)
         # Get average of validator weights weighted by their stake?
@@ -83,16 +83,17 @@ class Averager:
 
     def run_periodic_averaging(self, t, scored_gradients):
         while True:
+            logging.info("Averaging Beggining")
             start_time = time.time()
-            receive_and_score_gradients
-            averaged_gradients = self.average_gradients(scored_gradients)
+            self.receive_and_score_gradients()
+            averaged_gradients = self.average_gradients()
             self.apply_averaged_gradients(averaged_gradients)
             self.save_model()
             self.push_to_hf_hub(commit_message="Updated model with new gradients")
             elapsed_time = time.time() - start_time
             time_to_wait = max(0, t - elapsed_time)
             time.sleep(time_to_wait)
-
+            logging.info("Averaging Done")
 
 ##FIXME where does it get its scored_gradients
 class RankedAverager(Averager):
@@ -155,11 +156,13 @@ class RankedAverager(Averager):
 
     def run_periodic_averaging(self, t, scored_gradients):
         while True:
+            logging.info("Averaging Beggining")
             start_time = time.time()
             receive_and_score_gradients
-            averaged_gradients = self.average_gradients(scored_gradients)
+            averaged_gradients = self.average_gradients(self.miner_gradients, self.miner_scores)
             self.apply_averaged_gradients(averaged_gradients)
             self.save_model()
+            logging.info("Pushing to HF")
             self.push_to_hf_hub(commit_message="Updated model with new gradients")
             elapsed_time = time.time() - start_time
             time_to_wait = max(0, t - elapsed_time)

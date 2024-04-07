@@ -271,8 +271,8 @@ class BittensorNetwork:
     model_checksums = {}
     request_counts = {}  # Track request counts
     blacklisted_addresses = {}  # Track blacklisted addresses
-
-    
+    last_sync_time = 0
+    sync_interval = 600
 
 
     def __new__(cls):
@@ -475,3 +475,29 @@ class BittensorNetwork:
                 return False  # Too many requests, added to blacklist
 
             return True  # Request allowed
+    @classmethod
+    def resync_metagraph(cls,lite=True):
+        
+        # Fetch the latest state of the metagraph from the Bittensor network
+        print("Resynchronizing metagraph...")
+        # Update the metagraph with the latest information from the network
+        metagraph = cls.subtensor.metagraph(cls.config.netuid, lite=lite)
+        print("Metagraph resynchronization complete.")
+
+    @staticmethod
+    def should_sync_metagraph(last_sync_time,sync_interval):
+        current_time = time.time()
+        return (current_time - last_sync_time) > sync_interval
+
+    @classmethod
+    def sync(cls, lite=True):
+        if cls.should_sync_metagraph(cls.last_sync_time,cls.sync_interval):
+            # Assuming resync_metagraph is a method to update the metagraph with the latest state from the network.
+            # This method would need to be defined or adapted from the BaseNeuron implementation.
+            try:
+                cls.resync_metagraph(lite)
+                cls.last_sync_time = time.time()
+            except Exception as e:
+                logger.warn(f"Failed to resync metagraph: {e}")
+        else:
+            logger.info("Metagraph Sync Interval not yet passed")

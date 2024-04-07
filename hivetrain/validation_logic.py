@@ -9,6 +9,7 @@ from hivetrain.btt_connector import (
     BittensorNetwork,
     # get_validator_uids_and_addresses,
     serve_axon,
+    sync
 )
 
 from torch.optim import AdamW
@@ -23,7 +24,7 @@ class ModelValidator:
         self.interval = interval  # Validation interval in seconds
         self.original_state_dict = deepcopy(model.state_dict())
         self.base_loss, self.base_perplexity = self.evaluate_model()
-        self.scores = {}
+        self.scores = []
         self.bittensor_network = bittensor_network
         self.dht = dht
 
@@ -84,10 +85,12 @@ class ModelValidator:
         return average_loss, perplexity
 
     def validate_and_score(self):
-
+        ## Check if the model is changed on HF
+            ## Check if HF commit hash is updated?
+            ## If true pull please
+            
         logging.info("Receiving Gradients from chain")
-        breakpoint()
-        for hotkey_address in self.bittensor_network.metagraph.hotkeys:
+        for uid,hotkey_address in enumerate(self.bittensor_network.metagraph.hotkeys):
             logging.info(f"Receiving Gradients from: {hotkey_address}")
             gradients = self.receive_gradients(self.dht, hotkey_address)
             logging.info(f"Updating Model Weights")
@@ -98,7 +101,7 @@ class ModelValidator:
             loss_score = max(0, self.base_loss - loss)
             perplexity_score = max(0, self.base_perplexity - perplexity) if perplexity else 0
             logging.info(f"Scoring")
-            self.scores[hotkey_address] = perplexity_score
+            self.scores[uid] = perplexity_score
 
             # Reset the model to its original state
             logging.info("Reverting to base model")
@@ -106,6 +109,11 @@ class ModelValidator:
             
             logging.info(f"Loss Score: {loss_score}, Perplexity Score: {perplexity_score}")
             time.sleep(0.1)
+
+            self.bittensor_network.sync(lite=False)#FIXME too prone to issues 
+
+            if self.bittensor_network.should_set_weights():    
+                self.bittensor_network.set_weights(scores)
 
     def start_periodic_validation(self):
         #def run():

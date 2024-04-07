@@ -7,3 +7,4 @@ from . import dht_connector
 from . import auth
 from . import chain_manager
 from . import validation_logic
+from . import averaging_logic
