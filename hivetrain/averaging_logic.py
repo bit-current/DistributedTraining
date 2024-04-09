@@ -10,9 +10,11 @@ from hivetrain.btt_connector import BittensorNetwork, sync
 #from hivetrain.dht_connector import DHTManager
 import io
 from bittensor import logging
+import os 
+from transformers import TrainingArguments, Trainer
 
 class Averager:
-    def __init__(self, model, local_dir, repo_id,dht,bittensor_network, hf_token=None):
+    def __init__(self, model, local_dir, repo_id,dht,bittensor_network, hf_token=os.environ.get("HF_TOKEN")):
         self.model = model
         self.local_dir = local_dir
         self.repo_id = repo_id
@@ -28,10 +30,9 @@ class Averager:
         buffer.seek(0)
         return torch.load(buffer)
 
-    @staticmethod
-    def receive_gradients(storage_dht = None, hotkey = None):
-        serialized_gradients = storage_dht.get(hotkey)
-        aggregated_gradients = deserialize_gradients(serialized_gradients)
+    def receive_gradients(self,storage_dht = None, hotkey = None):
+        serialized_gradients = storage_dht.get(hotkey).value
+        aggregated_gradients = self.deserialize_gradients(serialized_gradients)
         
         return aggregated_gradients
     
@@ -39,27 +40,34 @@ class Averager:
         # Get validators uids
         self.bittensor_network.sync(lite=False)#scope issue FIXME?
             
-        validator_uids = self.bittensor_network.get_validator_uids()
-        validator_combined_weights = torch.mean(self.bittensor_network.metagraph.W[validator_uids, :],axis=0)
+        validator_uids = self.bittensor_network.get_validator_uids(vpermit_tao_limit=1024)
+        #breakpoint()
+        #validator_combined_weights = torch.mean(self.bittensor_network.metagraph.W[validator_uids, :],axis=0)
+        n = len(self.bittensor_network.metagraph.hotkeys) #FIXME I am only for testing NOPROD
+        self.validator_combined_weights = torch.full((n,1), 1/n, dtype=torch.float32) #FIXME I am only for testing NOPROD
         # Get average of validator weights weighted by their stake?
         self.miner_gradients = []
         self.miner_weights = []
         self.miner_hotkeys = []
         for uid, hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
-            if uid not in validator_uids:
-                try:
-                    gradient = receive_gradients(self.dht, hotkey)
-                    miner_gradients.append(miner_gradients)
-                except:
-                    self.miner_gradients.append(None)
-                    self.miner_weights.append(0.0)
-                    self.miner_hotkeys.append(hotkey)
+            try:
+                gradient = self.receive_gradients(self.dht, hotkey)
+                self.miner_gradients.append(gradient)
+            except Exception as e:
+                logging.debug(f"Receiving gradients failed due to: {e}")
+                self.miner_gradients.append(None)
+                self.miner_weights.append(0.0)
+                self.miner_hotkeys.append(hotkey)
         
 
     def average_gradients(self, beta=1.0):
-        averaged_gradients = {name:torch.zeros_like(grad) for name, grad in self.miner_gradients.items()}
 
-        for score, gradients in zip(self.miner_scores, self.miner_gradients):
+        self.miner_gradients = [gradients for gradients in self.miner_gradients if gradients is not None]
+        assert len(self.miner_gradients) > 0
+        averaged_gradients = {name: torch.zeros_like(grad) for name, grad in self.miner_gradients[0].items()}
+
+        for score, gradients in zip(self.validator_combined_weights, self.miner_gradients):
+            logging.info("Averaging Gradient")
             for name, grad in gradients.items():
                 averaged_gradients[name] += grad * score * beta
 
@@ -75,13 +83,26 @@ class Averager:
         self.model.save_pretrained(self.local_dir)
 
     def push_to_hf_hub(self, commit_message="Pushing model to Hub"):
-        if self.hf_token is not None:
-            HfFolder.save_token(self.hf_token)
-        
-        repo = Repository(local_dir=self.local_dir, repo_id=self.repo_id, clone_from=f"https://huggingface.co/{self.repo_id}")
-        repo.push_to_hub(commit_message=commit_message)
+        training_args = TrainingArguments(
+        output_dir=self.local_dir,  # Local directory to save the model
+        per_device_train_batch_size=1,  # Dummy argument, won't actually be used for training here
+        per_device_eval_batch_size=1,   # Dummy argument, necessary to specify but won't be used
+        push_to_hub=True,               # Enable pushing to hub
+        push_to_hub_model_id=self.repo_id,  # Repository ID on the Hugging Face Hub
+        push_to_hub_organization=None,  # Specify organization name here if applicable
+        push_to_hub_token=self.hf_token,  # Hugging Face authentication token
+        )
 
-    def run_periodic_averaging(self, t, scored_gradients):
+        # Initialize the Trainer
+        trainer = Trainer(
+            model=self.model,  # Your PyTorch model
+            args=training_args,
+        )
+
+        # Push the model to the Hugging Face Hub
+        trainer.push_to_hub(commit_message=commit_message)
+
+    def run_periodic_averaging(self, t):
         while True:
             logging.info("Averaging Beggining")
             start_time = time.time()

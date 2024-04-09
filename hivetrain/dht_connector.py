@@ -5,7 +5,7 @@ import time
 
 class DHTManager:
     def __init__(self, address_store, bittensor_network, my_uid,my_hotkey, dht_host_address, 
-        dht_tcp_port, dht_udp_port, dht_external_ip, dht_private_key):
+        dht_tcp_port, dht_udp_port, dht_external_ip, dht_private_key, store):
 
         self.address_store = address_store
         self.bittensor_network = bittensor_network
@@ -20,6 +20,7 @@ class DHTManager:
         self.tested_initial_peers = []
         self.check_interval = 1200
         self.storage_successful = False
+        self.store = store
 
     def retrieve_multi_addresses(self):
         multi_addresses = []
@@ -101,5 +102,6 @@ class DHTManager:
         multi_addresses = self.retrieve_multi_addresses()
         self.test_multi_addresses(multi_addresses)
         self.my_dht = self.initialize_my_dht()
-        self.update_and_store_my_multiaddress(self.my_dht)
-        threading.Thread(target=self.periodic_storage_check, daemon=True).start()
+        if self.store:
+            self.update_and_store_my_multiaddress(self.my_dht)
+            threading.Thread(target=self.periodic_storage_check, daemon=True).start()

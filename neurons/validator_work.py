@@ -43,7 +43,8 @@ dht_manager = DHTManager(
     dht_tcp_port=args.miner.dht_tcp_port,
     dht_udp_port=args.miner.dht_udp_port,
     dht_external_ip=args.miner.dht_external_ip,
-    dht_private_key=args.miner.dht_private_key
+    dht_private_key=args.miner.dht_private_key,
+    store=False
 )
 
 # Use the DHTManager to manage DHT interactions

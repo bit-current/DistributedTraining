@@ -24,8 +24,8 @@ class ModelValidator:
         self.interval = interval  # Validation interval in seconds
         self.original_state_dict = deepcopy(model.state_dict())
         self.base_loss, self.base_perplexity = self.evaluate_model()
-        self.scores = []
         self.bittensor_network = bittensor_network
+        self.scores = [0 for _ in range(len(self.bittensor_network.metagraph.hotkeys))]
         self.dht = dht
 
     @staticmethod
@@ -38,7 +38,8 @@ class ModelValidator:
         try:
             serialized_gradients = storage_dht.get(hotkey).value
             aggregated_gradients = self.deserialize_gradients(serialized_gradients)
-        except:
+        except Exception as e:
+            logging.debug(f"Error: {e}")
             return None
         
         return aggregated_gradients
@@ -100,20 +101,19 @@ class ModelValidator:
             loss, perplexity = self.evaluate_model()
             loss_score = max(0, self.base_loss - loss)
             perplexity_score = max(0, self.base_perplexity - perplexity) if perplexity else 0
-            logging.info(f"Scoring")
             self.scores[uid] = perplexity_score
 
             # Reset the model to its original state
-            logging.info("Reverting to base model")
-            self.model.load_state_dict(self.original_state_dict)
             
-            logging.info(f"Loss Score: {loss_score}, Perplexity Score: {perplexity_score}")
+            self.model.load_state_dict(self.original_state_dict)
+            if gradients is not None:
+                logging.info(f"Loss Score: {loss_score}, Perplexity Score: {perplexity_score}")
             time.sleep(0.1)
 
             self.bittensor_network.sync(lite=False)#FIXME too prone to issues 
 
             if self.bittensor_network.should_set_weights():    
-                self.bittensor_network.set_weights(scores)
+                self.bittensor_network.set_weights(self.scores)
 
     def start_periodic_validation(self):
         #def run():

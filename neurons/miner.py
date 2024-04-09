@@ -75,6 +75,7 @@ dht_manager = DHTManager(
     dht_external_ip=args.miner.dht_external_ip,
     dht_private_key=args.miner.dht_private_key, 
     my_hotkey=my_hotkey,
+    store=True
 )
 
 # Use the DHTManager to manage DHT interactions
@@ -136,7 +137,9 @@ def send_gradients(aggregated_gradients, storage_dht = dht_manager.my_dht, hotke
     # Hypothetical sending function
     logging.info("Uploading gradients to DHT.")
     serialized_gradients = serialize_gradients(aggregated_gradients)
-    storage_dht.store(hotkey, serialized_gradients, time.time()+3600)
+    stored = storage_dht.store(hotkey, serialized_gradients, time.time()+3600)
+    if not stored:
+        logging.warning(f"DHT storage failed for hotkey: {hotkey}")
     # Implement sending logic here
 
 # Initialize aggregated gradients
