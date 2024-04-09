@@ -17,12 +17,11 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
-from hivetrain.chain_manager import ChainMultiAddressStore
+from hivetrain.chain_manager import LocalAddressStore
 from hivetrain.config import Configurator
 from hivetrain import __spec_version__
-#from loguru import logger
 from bittensor.btlogging import logging
-from hivetrain.validation_logic import ModelValidator
+from hivetrain.validation_logic import LocalValidator
 from hivetrain.dht_connector import DHTManager
 
 args = Configurator.combine_configs()
@@ -31,24 +30,9 @@ BittensorNetwork.initialize(args)
 my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
 my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
-address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
-
-# Create an instance of DHTManager
-dht_manager = DHTManager(
-    address_store=address_store,
-    bittensor_network=BittensorNetwork,
-    my_hotkey=my_hotkey,
-    my_uid=my_uid,
-    dht_host_address=args.miner.dht_host_address,
-    dht_tcp_port=args.miner.dht_tcp_port,
-    dht_udp_port=args.miner.dht_udp_port,
-    dht_external_ip=args.miner.dht_external_ip,
-    dht_private_key=args.miner.dht_private_key,
-    store=False
-)
+address_store = LocalAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
 
 # Use the DHTManager to manage DHT interactions
-dht_manager.manage_dht()
 
 #FIXME you should be getting from HF
 model_name = "mekaneeky/tiny-random-gpt2"
@@ -94,5 +78,5 @@ optimizer = AdamW(model.parameters(), lr=learning_rate)
 
 # Load your model and other necessary components here
 
-validator = ModelValidator(model=model,optimizer=optimizer, data_loader=data_loader,bittensor_network=BittensorNetwork , interval=120, dht=dht_manager.my_dht)
+validator = ModelValidator(model=model,optimizer=optimizer, data_loader=data_loader,bittensor_network=BittensorNetwork , interval=120, chain_manager=address_store)
 validator.start_periodic_validation()

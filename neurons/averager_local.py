@@ -22,10 +22,10 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from huggingface_hub import Repository, HfFolder
-from hivetrain.averaging_logic import Averager
+from hivetrain.averaging_logic import LocalAverager
 from hivetrain.btt_connector import BittensorNetwork
 from hivetrain.config import Configurator
-from hivetrain.chain_manager import ChainMultiAddressStore
+from hivetrain.chain_manager import LocalAddressStore
 from hivetrain.dht_connector import DHTManager
 # Assuming `model` is your PyTorch model, `scores` contain your keys and their respective scores,
 # and `get_weights(key)` is a function to retrieve serialized gradients
@@ -37,7 +37,7 @@ BittensorNetwork.initialize(args)
 my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
 my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
-address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
+address_store = LocalAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
 
 # Create an instance of DHTManager
 dht_manager = DHTManager(

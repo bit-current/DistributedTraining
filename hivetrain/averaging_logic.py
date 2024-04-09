@@ -13,8 +13,9 @@ from bittensor import logging
 import os 
 from transformers import TrainingArguments, Trainer
 
+
 class Averager:
-    def __init__(self, model, local_dir, repo_id,dht,bittensor_network, hf_token=os.environ.get("HF_TOKEN")):
+    def __init__(self, model, local_dir, repo_id,chain_manager,bittensor_network, hf_token=os.environ.get("HF_TOKEN")):
         self.model = model
         self.local_dir = local_dir
         self.repo_id = repo_id
@@ -22,19 +23,20 @@ class Averager:
         self.scored_gradients = None
         self.last_sync_time = 0
         self.bittensor_network = bittensor_network
-        self.dht = dht
+        self.chain_manager = chain_manager
 
-    @staticmethod
-    def deserialize_gradients(serialized_gradients):
-        buffer = io.BytesIO(serialized_gradients)
-        buffer.seek(0)
-        return torch.load(buffer)
+    def receive_gradients(self, repo_id="your_username/your_repo_name", gradient_file_name="gradients.pt"):
+        try:
+            # Download the gradients file from Hugging Face Hub
+            gradient_file_path = hf_hub_download(repo_id=repo_id, filename=gradient_file_name, use_auth_token=True)
 
-    def receive_gradients(self,storage_dht = None, hotkey = None):
-        serialized_gradients = storage_dht.get(hotkey).value
-        aggregated_gradients = self.deserialize_gradients(serialized_gradients)
-        
-        return aggregated_gradients
+            # Load the gradients directly using torch.load
+            aggregated_gradients = torch.load(gradient_file_path)
+                
+            return aggregated_gradients
+        except Exception as e:
+            logging.debug(f"Error receiving gradients from Hugging Face: {e}")
+            return None
     
     def receive_and_score_gradients(self):
         # Get validators uids
@@ -51,7 +53,8 @@ class Averager:
         self.miner_hotkeys = []
         for uid, hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
             try:
-                gradient = self.receive_gradients(self.dht, hotkey)
+                repo_id = self.chain_manager.retrieve_hf_repo(hotkey)
+                gradient = self.receive_gradients(repo_id=repo_id)
                 self.miner_gradients.append(gradient)
             except Exception as e:
                 logging.debug(f"Receiving gradients failed due to: {e}")
@@ -115,6 +118,54 @@ class Averager:
             time_to_wait = max(0, t - elapsed_time)
             time.sleep(time_to_wait)
             logging.info("Averaging Done")
+
+
+
+
+class LocalAverager(Averager):
+    def __init__(self, model, local_dir, dht=None, bittensor_network=None):
+        super().__init__(model, local_dir, repo_id=None, dht=dht, bittensor_network=bittensor_network)
+        # No need for repo_id or hf_token in the local version
+
+    def receive_gradients(self, repo_id=None, gradient_file_name="gradients.pt"):
+        """
+        Overrides the receive_gradients method to fetch gradients from a local directory.
+        """
+        try:
+            gradient_file_path = os.path.join(self.local_gradient_dir, gradient_file_name)
+            if not os.path.exists(gradient_file_path):
+                logging.warning(f"Gradient file not found: {gradient_file_path}")
+                return None
+
+            # Load the gradients directly using torch.load
+            aggregated_gradients = torch.load(gradient_file_path)
+            return aggregated_gradients
+        except Exception as e:
+            logging.error(f"Error receiving gradients locally: {e}")
+            return None
+
+    def push_to_hf_hub(self, commit_message="Pushing model to Hub"):
+        """
+        Overrides the push_to_hf_hub method to simply save the model locally.
+        """
+        self.save_model()
+        logging.info(f"Model saved locally in {self.local_dir} instead of pushing to Hugging Face Hub.")
+    
+    def save_model(self):
+        """
+        Saves the model to the specified local directory.
+        """
+        model_save_path = os.path.join(self.local_dir, "saved_model")
+        os.makedirs(model_save_path, exist_ok=True)
+        self.model.save_pretrained(model_save_path)
+        logging.info(f"Model saved locally at {model_save_path}.")
+
+# Example usage
+if __name__ == "__main__":
+    # Assuming model, local_dir, dht, and bittensor_network are defined
+    local_averager = LocalAverager(model=model, local_dir="./local_models")
+    # You can now use local_averager for operations like receive_gradients and apply_averaged_gradients
+
 
 ##FIXME where does it get its scored_gradients
 class RankedAverager(Averager):

@@ -20,7 +20,6 @@ import os
 import torch
 import argparse
 import bittensor as bt
-from loguru import logger
 
 
 def check_config(config: "bt.Config"):

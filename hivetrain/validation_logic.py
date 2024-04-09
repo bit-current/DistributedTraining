@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 class ModelValidator:
-    def __init__(self, model, optimizer, data_loader, dht, bittensor_network = None, interval=3600):
+    def __init__(self, model, optimizer, data_loader, bittensor_network = None, chain_manager= None, interval=3600):
         self.model = model
         self.optimizer = optimizer
         self.data_loader = data_loader
@@ -26,40 +26,20 @@ class ModelValidator:
         self.base_loss, self.base_perplexity = self.evaluate_model()
         self.bittensor_network = bittensor_network
         self.scores = [0 for _ in range(len(self.bittensor_network.metagraph.hotkeys))]
-        self.dht = dht
+        self.chain_manager = chain_manager
 
-    @staticmethod
-    def deserialize_gradients(serialized_gradients):
-        buffer = io.BytesIO(serialized_gradients)
-        buffer.seek(0)
-        return torch.load(buffer)
-
-    def receive_gradients(self, storage_dht = None, hotkey = None):
+    def receive_gradients(self, repo_id="your_username/your_repo_name", gradient_file_name="gradients.pt"):
         try:
-            serialized_gradients = storage_dht.get(hotkey).value
-            aggregated_gradients = self.deserialize_gradients(serialized_gradients)
+            # Download the gradients file from Hugging Face Hub
+            gradient_file_path = hf_hub_download(repo_id=repo_id, filename=gradient_file_name, use_auth_token=True)
+
+            # Load the gradients directly using torch.load
+            aggregated_gradients = torch.load(gradient_file_path)
+                
+            return aggregated_gradients
         except Exception as e:
-            logging.debug(f"Error: {e}")
+            logging.debug(f"Error receiving gradients from Hugging Face: {e}")
             return None
-        
-        return aggregated_gradients
-
-    # def receive_gradients_from_chain(self):
-    #     # Get validators uids
-    #     if time.time() - self.last_sync_time > self.sync_interval:
-    #         sync(self.last_sync_time, self.sync_interval, BittensorNetwork.config)#scope issue FIXME?
-    #         self.last_sync_time = time.time()
-
-    #     validator_uids = self.bittensor_network.get_validator_uids()
-    #     # Get average of validator weights weighted by their stake?
-    #     self.miner_gradients = []
-    #     for uid, hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
-    #         if uid not in validator_uids:
-    #             try:
-    #                 gradient = receive_gradients(self.dht, hotkey)
-    #                 self.miner_gradients.append(gradient)
-    #             except:
-    #                 self.miner_gradients.append(None)
 
     def update_model_weights(self, gradients, alpha=0.00001):
         with torch.no_grad():
@@ -91,9 +71,13 @@ class ModelValidator:
             ## If true pull please
             
         logging.info("Receiving Gradients from chain")
+        self.bittensor_network.sync(lite=True)#FIXME too prone to issues 
+
         for uid,hotkey_address in enumerate(self.bittensor_network.metagraph.hotkeys):
+
             logging.info(f"Receiving Gradients from: {hotkey_address}")
-            gradients = self.receive_gradients(self.dht, hotkey_address)
+            hf_repo = self.chain_manager.retreive_hf_repo(hotkey_address)
+            gradients = self.receive_gradients(hf_repo)
             logging.info(f"Updating Model Weights")
             if gradients is not None:
                 self.update_model_weights(gradients)
@@ -110,7 +94,6 @@ class ModelValidator:
                 logging.info(f"Loss Score: {loss_score}, Perplexity Score: {perplexity_score}")
             time.sleep(0.1)
 
-            self.bittensor_network.sync(lite=False)#FIXME too prone to issues 
 
             if self.bittensor_network.should_set_weights():    
                 self.bittensor_network.set_weights(self.scores)
@@ -122,3 +105,27 @@ class ModelValidator:
             time.sleep(self.interval)
         
         #threading.Thread(target=run, daemon=True).start()
+
+class LocalValidator(ModelValidator):
+    def __init__(self, model, optimizer, data_loader, bittensor_network=None, chain_manager=None, interval=3600, local_gradient_dir="local_gradients"):
+        super().__init__(model, optimizer, data_loader, bittensor_network, chain_manager, interval)
+        self.local_gradient_dir = local_gradient_dir
+        # Ensure the local directory exists
+        os.makedirs(self.local_gradient_dir, exist_ok=True)
+
+    def receive_gradients(self, repo_id=None, gradient_file_name="gradients.pt"):
+        """
+        Overrides the receive_gradients method to fetch gradients from a local directory.
+        """
+        try:
+            gradient_file_path = os.path.join(self.local_gradient_dir, gradient_file_name)
+            if not os.path.exists(gradient_file_path):
+                logging.warning(f"Gradient file not found: {gradient_file_path}")
+                return None
+
+            # Load the gradients directly using torch.load
+            aggregated_gradients = torch.load(gradient_file_path)
+            return aggregated_gradients
+        except Exception as e:
+            logging.error(f"Error receiving gradients locally: {e}")
+            return None

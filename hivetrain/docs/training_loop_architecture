@@ -1,0 +1,15 @@
+// Architectural Diagram
+digraph {
+	A [label=TrainingLoop]
+	B [label=LocalTrainingLoop]
+	C [label=torch]
+	D [label=transformers]
+	E [label=huggingface_hub]
+	F [label=time]
+	A -> B
+	A -> C
+	A -> D
+	A -> E
+	A -> F
+	B -> C [constraint=false]
+}

@@ -1,7 +1,6 @@
 import random
 
 import torch
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from hivemind import DHT
 from hivetrain.btt_connector import (
@@ -9,9 +8,9 @@ from hivetrain.btt_connector import (
     # get_validator_uids_and_addresses,
     serve_axon,
 )
-from hivetrain.chain_manager import ChainMultiAddressStore
+from hivetrain.chain_manager import LocalAddressStore
 from hivetrain.config import Configurator
-from hivetrain.hf_manager import HFManager
+from hivetrain.hf_manager import LocalHFManager
 
 from hivetrain import __spec_version__
 from bittensor.btlogging import logging
@@ -19,6 +18,7 @@ from bittensor.btlogging import logging
 import torch
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
+
 
 
 logging.info("Starting !")
@@ -42,7 +42,7 @@ BittensorNetwork.initialize(args)
 my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
 my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
-address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
+address_store = LocalAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
 address_store.store_hf_repo(args.hf_gradient_repo)
 
 # Parameters
@@ -98,6 +98,6 @@ optimizer = AdamW(model.parameters(), lr=learning_rate)
 aggregated_gradients = {name: torch.zeros_like(param) for name, param in model.named_parameters() if param.requires_grad}
 
 # Training loop
-hf_manager = HFManager(repo_id="mekaneeky/test_me")
+hf_manager = LocalHFManager(repo_id="mekaneeky/test_me")
 training_loop = TrainingLoop(model_name="mekaneeky/tiny-random-gpt2", data_loader=data_loader)
 training_loop.train(epochs=3, hf_manager=hf_manager)

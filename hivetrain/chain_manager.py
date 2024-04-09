@@ -1,3 +1,5 @@
+#Thanks SN9
+
 import multiprocessing
 import functools
 import bittensor as bt
@@ -66,7 +68,7 @@ class ChainMultiAddressStore:
         self.wallet = wallet
         self.subnet_uid = subnet_uid
 
-    def store_multiaddress(self, hotkey: str, multiaddress: str):
+    def store_hf_repo(self, hf_repo: str):
         """Stores compressed multiaddress on this subnet for a specific wallet."""
         if self.wallet is None:
             raise ValueError("No wallet available to write to the chain.")
@@ -82,7 +84,7 @@ class ChainMultiAddressStore:
         )
         run_in_subprocess(partial, 60)
 
-    def retrieve_multiaddress(self, hotkey: str) -> Optional[str]:
+    def retreive_hf_repo(self, hotkey: str) -> Optional[str]:
         """Retrieves and decompresses multiaddress on this subnet for specific hotkey"""
         # Wrap calls to the subtensor in a subprocess with a timeout to handle potential hangs.
         partial = functools.partial(
@@ -113,6 +115,37 @@ class ChainMultiAddressStore:
             return None
 
 # Synchronous test cases for ChainMultiAddressStore
+
+
+class LocalAddressStore:
+    """Simulated local storage for storing and retrieving multiaddresses."""
+    
+    def __init__(self, subtensor:None = None,
+        subnet_uid: None = None,
+        wallet: Optional[str] = None):
+        # Using a simple dictionary to simulate storage
+        self.storage = {}
+        self.wallet = wallet
+
+    def store_hf_repo(self, hf_repo: str):
+        """Stores the Hugging Face repository link for a specific wallet."""
+        if self.wallet is None:
+            raise ValueError("No wallet available to write to the storage.")
+        
+        # Store the HF repository link in the simulated local storage
+        self.storage[self.wallet.hotkey.ss58_address] = hf_repo
+        print(f"Stored {hf_repo} for wallet {self.wallet}")
+
+    def retrieve_hf_repo(self, hotkey: str) -> Optional[str]:
+        """Retrieves the Hugging Face repository link for a specific wallet."""
+        # Retrieve the HF repository link from the simulated local storage
+        hf_repo = self.storage.get(hotkey)
+        if hf_repo:
+            print(f"Retrieved {hf_repo} for wallet {wallet}")
+            return hf_repo
+        else:
+            logging.warning(f"Failed to retrieve repository for: {wallet}")
+            return None
 
 def test_store_multiaddress():
     """Verifies that the ChainMultiAddressStore can store data on the chain."""

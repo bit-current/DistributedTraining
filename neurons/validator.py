@@ -1,138 +1,82 @@
-import threading
-import bittensor as bt
-import argparse
-from flask import Flask, request, jsonify
-import numpy as np
-import time
-from hivetrain.auth import authenticate_request_with_bittensor
-from hivetrain.config import Configurator
-from hivetrain.btt_connector import sync, BittensorNetwork, serve_axon
-from hivetrain import __spec_version__
 import torch
-import logging
+import io
+import os
+import re
+import time
+import bittensor as bt
 
-logger = logging.getLogger('waitress')
-logger.setLevel(logging.DEBUG)
+from torch.utils.data import DataLoader, Dataset, IterableDataset
 
-from waitress import serve
+from hivetrain.btt_connector import (
+    BittensorNetwork,
+    # get_validator_uids_and_addresses,
+    serve_axon,
+)
 
+from torch.optim import AdamW
+from torch.utils.data import DataLoader, Dataset, IterableDataset
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
-app = Flask(__name__)
+from hivetrain.chain_manager import ChainMultiAddressStore
+from hivetrain.config import Configurator
+from hivetrain import __spec_version__
+from bittensor.btlogging import logging
+from hivetrain.validation_logic import ModelValidator
+from hivetrain.dht_connector import DHTManager
 
-#model_checksums = {}
-#metrics_data = {}
+args = Configurator.combine_configs()
 
-last_evaluation_time = time.time()
-evaluation_interval = 300
-sync_interval = 600  # Synchronization interval in seconds
-last_sync_time = time.time()
-last_update = 0
+BittensorNetwork.initialize(args)
+my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
+my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
-config = Configurator.combine_configs()
+address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
 
-BittensorNetwork.initialize(config)
-wallet = BittensorNetwork.wallet
-subtensor = BittensorNetwork.subtensor
-metagraph = BittensorNetwork.metagraph
+# Use the DHTManager to manage DHT interactions
 
-model_checksums_lock = threading.Lock()
-metrics_data_lock = threading.Lock()
-evaluation_time_lock = threading.Lock()
-sync_time_lock = threading.Lock()
+#FIXME you should be getting from HF
+model_name = "mekaneeky/tiny-random-gpt2"
+batch_size = 30
+epochs = 30_000_000_000_000_000
+learning_rate = 5e-5
+send_interval = 60   # Every 60 seconds 
 
+# Load model and tokenizer
+model = AutoModelForCausalLM.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+model.resize_token_embeddings(len(tokenizer))
+model.train()
 
-# def verify_model_checksum(public_address, checksum):
-#     global model_checksums
-#     with model_checksums_lock:
-#         model_checksums[public_address] = checksum
+# Custom Dataset
+class MyDataset(Dataset):
+    def __init__(self, texts, tokenizer):
+        self.tokenizer = tokenizer
+        self.texts = texts
 
-# def detect_metric_anomaly(metric="loss", OUTLIER_THRESHOLD=2):
-#     global metrics_data
-#         # Check if metrics_data is empty
-#     if not metrics_data:
-#         return {}
+    def __len__(self):
+        return len(self.texts)
 
-#     # Initialize a dictionary to aggregate metrics by public_address
-#     aggregated_metrics = {}
+    def __getitem__(self, idx):
+        encoding = self.tokenizer(self.texts[idx], return_tensors="pt", padding='max_length', truncation=True, max_length=512)
+        return {key: val.squeeze() for key, val in encoding.items()}  # Remove batch dimension
 
-#     # Aggregate metric values by public_address
-#     for public_address, data in metrics_data.items():
-#         if metric in data:
-#             if public_address in aggregated_metrics:
-#                 aggregated_metrics[public_address].append(data[metric])
-#             else:
-#                 aggregated_metrics[public_address] = [data[metric]]
+# Custom collate function (might be optional if __getitem__ returns the correct format)
+def custom_collate_fn(batch):
+    input_ids = torch.stack([item['input_ids'] for item in batch])
+    attention_mask = torch.stack([item['attention_mask'] for item in batch])
+    labels = input_ids.clone()  # Adjust this based on your specific needs
+    return {'input_ids': input_ids, 'attention_mask': attention_mask, 'labels': labels}
 
-#     # Calculate average and standard deviation of the metric for each public_address
-#     average_metrics = {
-#     addr: np.nanmean([val for val in vals if isinstance(val, (int, float, np.float32, np.float64))])
-#     for addr, vals in aggregated_metrics.items()
-#     }
-#     losses = np.array(list(average_metrics.values()))
-#     mean_loss = np.mean(losses)
-#     std_loss = np.std(losses)
+# Dataset & DataLoader
+dataset_texts = ["Sample text 1", "Sample text 2", "Sample text 3"]  # example dataset
+dataset = MyDataset(dataset_texts, tokenizer)
+data_loader = DataLoader(dataset, batch_size=batch_size, collate_fn=custom_collate_fn)
 
-#     # Determine outliers based on the OUTLIER_THRESHOLD
-#     is_outlier = {}
-#     for addr, avg_loss in average_metrics.items():
-#         z_score = abs((avg_loss - mean_loss) / std_loss) if std_loss > 0 else 0
-#         is_outlier[addr] = z_score > OUTLIER_THRESHOLD
+# Optimizer
+optimizer = AdamW(model.parameters(), lr=learning_rate)
 
-#     scores = {}
-#     for i, (public_address, _) in enumerate(average_metrics.items()):
-#         score = 0 if is_outlier[public_address] else 1
-#         scores[public_address]({'public_address': public_address, 'score': score})
-    
-#     for score_data in scores:
-#         print(f"Public Key: {score_data['public_address']}, Score: {score_data['score']}")
-    
-#     return scores
+# Load your model and other necessary components here
 
-
-
-
-@app.before_request
-def before_request():
-
-    with evaluation_time_lock:
-        global last_evaluation_time, config
-        current_time = time.time()
-        if current_time - last_evaluation_time > evaluation_interval:
-            BittensorNetwork.run_evaluation()
-            last_evaluation_time = current_time
-
-    global last_sync_time, sync_interval
-    # Existing before_request code...
-    with sync_time_lock:
-        last_sync_time = sync(last_sync_time,sync_interval, config)  # Ensure the validator is synchronized with the network state before processing any request.
-
-
-@app.route('/validate_model', methods=['POST'])
-@authenticate_request_with_bittensor
-def validate_model():
-    data = request.get_json()
-    verify_model_checksum(data['public_address'], data['checksum'])
-    logging.info(f"Received model validation data from {data['public_address']}")
-    return jsonify({"message": "Model checksum received and verified"})
-
-@app.route('/validate_metrics', methods=['POST'])
-@authenticate_request_with_bittensor
-def validate_metrics():
-    data = request.get_json()
-    #data['rank'] = int(data['rank'])
-    with metrics_data_lock:
-        if data['public_address'] not in BittensorNetwork.metrics_data:
-            BittensorNetwork.metrics_data[data['public_address']] = {"loss":[]}
-        try:
-            BittensorNetwork.metrics_data[data['public_address']]['loss'].append(data['metrics']['loss'])
-        except Exception as e:
-            logger.warning(f"Failed to add data from {data['public_address']} due to {e}")
-            #BittensorNetwork.metrics_data[data['public_address']]['loss'] = [data['metrics']['loss']]
-    logger.info(f"Received model metrics data from {data['public_address']}")
-    return jsonify({"message": "Metrics received"})
-
-if __name__ == "__main__":
-    #breakpoint()
-    axon = bt.axon(wallet=wallet, config=config)
-    axon.serve(netuid=config.netuid, subtensor=subtensor)    
-    serve(app, host=config.flask.host_address, port=config.flask.host_port)
+validator = ModelValidator(model=model,optimizer=optimizer, data_loader=data_loader,bittensor_network=BittensorNetwork , interval=120, chain_manager=address_store)
+validator.start_periodic_validation()

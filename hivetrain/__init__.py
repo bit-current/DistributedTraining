@@ -8,3 +8,5 @@ from . import auth
 from . import chain_manager
 from . import validation_logic
 from . import averaging_logic
+from . import hf_manager
+from . import training_manager
