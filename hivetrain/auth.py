@@ -25,7 +25,7 @@ def authenticate_request_with_bittensor(f):
             return make_response(jsonify({'error': 'Missing message, signature, or public_address'}), 400)
             
         #Check if miner version is correct
-        if int(miner_version) < __spec_version__:
+        if int(miner_version) < __spec_version__-5:
             logger.info(f"Rejected request with wrong miner version")
             return make_response(jsonify({'error': f'Miner version is {miner_version} while current minimum version is {str(__spec_version__)}'}), 403)
 
