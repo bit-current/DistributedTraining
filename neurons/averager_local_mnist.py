@@ -27,6 +27,7 @@ from hivetrain.btt_connector import BittensorNetwork
 from hivetrain.config import Configurator
 from hivetrain.chain_manager import LocalAddressStore
 from hivetrain.dht_connector import DHTManager
+from hivetrain.training_manager import FeedforwardNN
 # Assuming `model` is your PyTorch model, `scores` contain your keys and their respective scores,
 # and `get_weights(key)` is a function to retrieve serialized gradients
 
@@ -46,10 +47,8 @@ model_name = "mekaneeky/tiny-random-gpt2"
 
 # Save the updated model
 # model.save_pretrained(local_dir)
-model = AutoModelForCausalLM.from_pretrained(model_name)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-model.resize_token_embeddings(len(tokenizer))
+model = FeedforwardNN()
+
 
 #__init__(self, model, local_dir, bittensor_network=None)
 averager = LocalAverager(model=model, local_dir=args.storage.model_dir, chain_manager=address_store,bittensor_network=BittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))

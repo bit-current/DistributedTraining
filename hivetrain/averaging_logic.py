@@ -120,19 +120,19 @@ class Averager:
             logging.info("Averaging Done")
 
 
-
-
 class LocalAverager(Averager):
-    def __init__(self, model, local_dir, dht=None, bittensor_network=None):
-        super().__init__(model, local_dir, repo_id=None, dht=dht, bittensor_network=bittensor_network)
+    def __init__(self, model, local_dir, chain_manager, bittensor_network=None, hf_token=None):
+        super().__init__(model, local_dir, chain_manager=chain_manager,repo_id=None, bittensor_network=bittensor_network, hf_token=hf_token)
         # No need for repo_id or hf_token in the local version
 
     def receive_gradients(self, repo_id=None, gradient_file_name="gradients.pt"):
         """
         Overrides the receive_gradients method to fetch gradients from a local directory.
         """
+        if repo_id is None:
+            return None
         try:
-            gradient_file_path = os.path.join(self.local_gradient_dir, gradient_file_name)
+            gradient_file_path = os.path.join(repo_id, gradient_file_name)
             if not os.path.exists(gradient_file_path):
                 logging.warning(f"Gradient file not found: {gradient_file_path}")
                 return None
@@ -155,10 +155,11 @@ class LocalAverager(Averager):
         """
         Saves the model to the specified local directory.
         """
-        model_save_path = os.path.join(self.local_dir, "saved_model")
-        os.makedirs(model_save_path, exist_ok=True)
-        self.model.save_pretrained(model_save_path)
+        os.makedirs(self.local_dir, exist_ok=True)
+        model_save_path = os.path.join(self.local_dir, "averaged_model.pt")
+        torch.save(self.model.state_dict(), model_save_path)
         logging.info(f"Model saved locally at {model_save_path}.")
+
 
 # Example usage
 if __name__ == "__main__":

@@ -22,49 +22,66 @@ class HFManager:
             return True
         return False
 
-    def update_model(self, model_name):
-        """Updates the model from the Hugging Face repository."""
-        model = AutoModelForCausalLM.from_pretrained(model_name)
-        model.train()
-        return model
+    def update_model(self, model, model_path):
+        """Updates an existing model's state dict from a .pt file."""
+        model_file_path = os.path.join(self.local_dir, model_path)
+        if os.path.exists(model_file_path):
+            model_state_dict = torch.load(model_file_path)
+            model.load_state_dict(model_state_dict)
+            model.train()  # Or model.eval(), depending on your use case
+            print(f"Model updated from local path: {model_file_path}")
+        else:
+            print(f"Model file not found: {model_file_path}")
 
 
 import os
 import torch
 
+import os
+import torch
+
+import os
+import hashlib
+
 class LocalHFManager:
     def __init__(self, repo_id="local_models"):
-        self.local_dir = repo_id
-        self.model_version_file = os.path.join(self.local_dir, "latest_version.txt")
-        self.last_known_version = self.get_latest_version()
+        self.repo_id = repo_id
+        # Ensure the local directory exists
+        os.makedirs(self.repo_id, exist_ok=True)
+        self.model_hash_file = os.path.join(self.repo_id, "model_hash.txt")
+        # Initialize model hash value
+        self.last_known_hash = None
 
-    def get_latest_version(self):
-        """Fetches the latest model version from a local file."""
-        try:
-            with open(self.model_version_file, "r") as file:
-                latest_version = file.read().strip()
-            return latest_version
-        except FileNotFoundError:
-            print("Version file not found. Please ensure the version file exists.")
-            return None
+    def set_model_hash(self, hash_value):
+        """Sets and saves the latest model hash to the hash file."""
+        with open(self.model_hash_file, "w") as file:
+            file.write(hash_value)
+        print(f"Set latest model hash to: {hash_value}")
 
     def check_for_new_submissions(self):
-        """Checks if there's a new model version available locally."""
-        current_version = self.get_latest_version()
-        if current_version != self.last_known_version:
-            print("New model version found. Updating model...")
-            self.last_known_version = current_version
+        """Checks if a new or updated model is available."""
+        model_file_path = os.path.join(self.repo_id, "averaged_model.pt")
+        if not os.path.exists(model_file_path):
+            print("No model available.")
+            return False
+
+        with open(model_file_path, "rb") as file:
+            file_hash = hashlib.sha256(file.read()).hexdigest()
+            
+        if self.last_known_hash is None or self.last_known_hash != file_hash:
+            print("New or updated model found. Updating model...")
+            self.last_known_hash = file_hash
             return True
         return False
 
-    def update_model(self, model_path):
-        """Loads a new model version from a local directory."""
-        model_file_path = os.path.join(self.local_dir, model_path)
+    def update_model(self, model):
+        """Updates an existing model's state dict from a .pt file."""
+        model_file_path = os.path.join(self.repo_id, "averaged_model.pt")
         if os.path.exists(model_file_path):
-            model = torch.load(model_file_path)
-            model.train()
-            print(f"Model updated from local path: {model_file_path}")
+            model_state_dict = torch.load(model_file_path)
+            model.load_state_dict(model_state_dict)
+            model.train()  # Or model.eval(), depending on your use case
             return model
+            print(f"Model updated from local path: {model_file_path}")
         else:
             print(f"Model file not found: {model_file_path}")
-            return None
