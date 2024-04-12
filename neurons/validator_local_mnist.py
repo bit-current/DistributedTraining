@@ -59,6 +59,6 @@ optimizer = AdamW(model.parameters(),lr = 5e-5)
 #    def __init__(self, model, optimizer, data_loader, bittensor_network=None, chain_manager=None, interval=3600, local_gradient_dir="local_gradients"):
 hf_manager = LocalHFManager(repo_id=args.storage.model_dir)
 validator = MNISTValidator(model=model,optimizer=optimizer, data_loader=test_loader,
-    bittensor_network=BittensorNetwork ,hf_manager=hf_manager, interval=30, chain_manager=address_store,local_gradient_dir=args.storage.gradient_dir,
+    bittensor_network=BittensorNetwork ,hf_manager=hf_manager, interval=1, chain_manager=address_store,local_gradient_dir=args.storage.gradient_dir,
     )
 validator.start_periodic_validation()

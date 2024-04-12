@@ -17,10 +17,12 @@ from hivetrain import __spec_version__
 from bittensor.btlogging import logging
 
 import torch
+import matplotlib.pyplot as plt
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
+from tqdm import tqdm
 
 logging.info("Starting !")
 
@@ -62,10 +64,56 @@ transform = transforms.Compose([
 train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
+test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
 
 # Training loop
 hf_manager = LocalHFManager(repo_id=args.storage.model_dir)
 #def __init__(self, model_name, data_loader,gradients_dir, learning_rate=5e-5, send_interval=30):
 
-training_loop = MNISTTrain(None, train_loader, args.storage.gradient_dir, send_interval=args.miner.send_interval)
-training_loop.train(epochs=30_000_000_000_000_000, hf_manager=hf_manager)
+training_loop = MNISTTrain(None, train_loader, args.storage.gradient_dir,test_loader=test_loader, send_interval=args.miner.send_interval)
+#training_loop.train(epochs=1, hf_manager=hf_manager)
+training_loop.save_model()
+steps = [i for i in range(1,10002,100)]
+
+for step in tqdm(steps):
+    training_loop.train(epochs=30_000_000_000_000_000, hf_manager=hf_manager, n_steps = step) 
+
+
+
+# Assuming `steps` and `losses` are defined as you described
+training_losses = [loss[0] for loss in training_loop]  # Extract training losses
+test_losses = [loss[1] for loss in training_loop]      # Extract test losses
+test_accuracy = [loss[2] for loss in training_loop]      # Extract test losses
+
+# Plotting Training Loss over Steps
+plt.figure(figsize=(10, 5))
+plt.plot(steps, training_losses, label='Training Loss', color='blue')
+plt.xlabel('Step')
+plt.ylabel('Training Loss')
+plt.title('Training Loss over Steps')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Plotting Test Loss over Steps
+plt.figure(figsize=(10, 5))
+plt.plot(steps, test_losses, label='Test Loss', color='red')
+plt.xlabel('Step')
+plt.ylabel('Test Loss')
+plt.title('Test Loss over Steps')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# Plotting Test Loss over Steps
+plt.figure(figsize=(10, 5))
+plt.plot(steps, test_accuray, label='Test Accuracy', color='red')
+plt.xlabel('Step')
+plt.ylabel('Test Loss')
+plt.title('Test Loss over Steps')
+plt.legend()
+plt.grid(True)
+plt.show()

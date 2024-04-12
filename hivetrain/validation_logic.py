@@ -26,7 +26,6 @@ class ModelValidator:
         self.optimizer = optimizer
         self.data_loader = data_loader
         self.interval = interval  # Validation interval in seconds
-        self.original_state_dict = deepcopy(model.state_dict())
         self.base_loss, self.base_perplexity = self.evaluate_model()
         self.bittensor_network = bittensor_network
         self.scores = [0 for _ in range(len(self.bittensor_network.metagraph.hotkeys))]
@@ -51,7 +50,7 @@ class ModelValidator:
         with torch.no_grad():
             for name, param in self.model.named_parameters():
                 if name in gradients:
-                    param -= gradients[name] * alpha
+                    param += (gradients[name] * alpha)
 
     def evaluate_model(self, metric='perplexity'):
         self.model.eval()
@@ -80,6 +79,8 @@ class ModelValidator:
             logging.info("Model updated from Hugging Face. Continuing training with new model...")
             self.model = self.hf_manager.update_model(self.model)
             self.optimizer = AdamW(self.model.parameters(), lr=5e-5)  # Reinitialize the optimizer
+
+        self.original_state_dict = deepcopy(self.model.state_dict())
 
         for uid,hotkey_address in enumerate(self.bittensor_network.metagraph.hotkeys):
             hf_repo = self.chain_manager.retrieve_hf_repo(hotkey_address)
@@ -159,10 +160,11 @@ class MNISTValidator(LocalValidator):
 
         with torch.no_grad():
             for batch in self.data_loader:
+
                 images, labels = batch
                 outputs = self.model(images)
                 loss = F.cross_entropy(outputs, labels)
-                total_loss += loss.item() * images.size(0)
+                total_loss += loss.item() 
                 _, predicted = torch.max(outputs.data, 1)
                 correct_predictions += (predicted == labels).sum().item()
                 total_samples += labels.size(0)
