@@ -75,17 +75,19 @@ hf_manager = LocalHFManager(repo_id=args.storage.model_dir)
 training_loop = MNISTTrain(None, train_loader, args.storage.gradient_dir,test_loader=test_loader, send_interval=args.miner.send_interval)
 #training_loop.train(epochs=1, hf_manager=hf_manager)
 training_loop.save_model()
-steps = [i for i in range(1,10002,100)]
+steps = [i for i in range(1000,10002,1000)]
 
+losses = []
 for step in tqdm(steps):
-    training_loop.train(epochs=30_000_000_000_000_000, hf_manager=hf_manager, n_steps = step) 
+    losses.append(training_loop.train(epochs=30_000_000_000_000_000, hf_manager=hf_manager, n_steps = step) )
 
 
 
-# Assuming `steps` and `losses` are defined as you described
-training_losses = [loss[0] for loss in training_loop]  # Extract training losses
-test_losses = [loss[1] for loss in training_loop]      # Extract test losses
-test_accuracy = [loss[2] for loss in training_loop]      # Extract test losses
+# # Assuming `steps` and `losses` are defined as you described
+training_losses = [loss[0] for loss in losses]  # Extract training losses
+test_losses = [loss[1] for loss in losses]      # Extract test losses
+test_accuracy = [loss[2] for loss in losses]      # Extract test losses
+
 
 # Plotting Training Loss over Steps
 plt.figure(figsize=(10, 5))
@@ -95,7 +97,8 @@ plt.ylabel('Training Loss')
 plt.title('Training Loss over Steps')
 plt.legend()
 plt.grid(True)
-plt.show()
+plt.savefig('training_loss.png')  # Save the plot instead of showing it
+plt.close()  # Close the figure to free up memory
 
 # Plotting Test Loss over Steps
 plt.figure(figsize=(10, 5))
@@ -105,15 +108,16 @@ plt.ylabel('Test Loss')
 plt.title('Test Loss over Steps')
 plt.legend()
 plt.grid(True)
-plt.show()
-
+plt.savefig('test_loss.png')  # Save the plot instead of showing it
+plt.close()  # Close the figure to free up memory
 
 # Plotting Test Loss over Steps
 plt.figure(figsize=(10, 5))
-plt.plot(steps, test_accuray, label='Test Accuracy', color='red')
+plt.plot(steps, test_accuracy, label='Test Accuracy', color='red')
 plt.xlabel('Step')
 plt.ylabel('Test Loss')
 plt.title('Test Loss over Steps')
 plt.legend()
 plt.grid(True)
-plt.show()
+plt.savefig('test_acc.png')  # Save the plot instead of showing it
+plt.close()  # Close the figure to free up memory

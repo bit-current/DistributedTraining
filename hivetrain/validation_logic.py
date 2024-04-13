@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 import torch.nn as nn
 import torch.nn.functional as F
-
+import hashlib
 
 class ModelValidator:
     def __init__(self, model, optimizer, data_loader, bittensor_network = None, chain_manager= None,hf_manager=None, interval=300):
@@ -50,7 +50,7 @@ class ModelValidator:
         with torch.no_grad():
             for name, param in self.model.named_parameters():
                 if name in gradients:
-                    param += (gradients[name] * alpha)
+                    param -= (gradients[name] * alpha)
 
     def evaluate_model(self, metric='perplexity'):
         self.model.eval()
@@ -89,6 +89,7 @@ class ModelValidator:
                 logging.info(f"Receiving Gradients from: {hotkey_address}")
                 logging.info(f"Updating Model Weights")
                 self.update_model_weights(gradients)
+                logging.info(f"The model hash: {self.calculate_model_hash()}")
             else:
                 loss = 0
                 perplexity = 0
@@ -96,13 +97,13 @@ class ModelValidator:
             logging.info(f"Evaluating model")
             loss, perplexity = self.evaluate_model()
             loss_score = max(0, self.base_loss - loss)
-            perplexity_score = max(0, self.base_perplexity - perplexity) if perplexity else 0
+            perplexity_score = max(0,  perplexity - self.base_perplexity) if perplexity else 0
             self.scores[uid] = perplexity_score
 
             # Reset the model to its original state
             
             self.model.load_state_dict(self.original_state_dict)
-            logging.info(f"Loss: {loss}, Perplexity: {perplexity_score}")
+            logging.info(f"Loss: {loss}, Perplexity: {perplexity}")
             logging.info(f"Loss Score: {loss_score}, Perplexity Score: {perplexity_score}")
             time.sleep(0.1)
 
@@ -112,12 +113,22 @@ class ModelValidator:
 
     def start_periodic_validation(self):
         #def run():
+        
         while True:
             self.validate_and_score()
             logging.info(f"One round done sleeping for: {self.interval}")
             time.sleep(self.interval)
         
         #threading.Thread(target=run, daemon=True).start()
+
+    def calculate_model_hash(self):
+        
+        
+        model_hash = hashlib.sha256()
+        for name, param in self.model.named_parameters():
+            model_hash.update(name.encode('utf-8'))
+            model_hash.update(param.data.cpu().numpy().tobytes())
+        return model_hash.hexdigest()
 
 class LocalValidator(ModelValidator):
     def __init__(self, model, optimizer, data_loader, bittensor_network=None, chain_manager=None,hf_manager=None, interval=3600, local_gradient_dir="local_gradients"):
@@ -172,3 +183,11 @@ class MNISTValidator(LocalValidator):
         average_loss = total_loss / total_samples
         accuracy = correct_predictions / total_samples
         return average_loss, accuracy
+
+class MNISTDeltaValidator(MNISTValidator):
+
+    def update_model_weights(self, weight_deltas, alpha=5e-4):
+        with torch.no_grad():
+            for name, param in self.model.named_parameters():
+                if name in weight_deltas:
+                    param.data = weight_deltas[name] + param.data

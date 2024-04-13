@@ -9,6 +9,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import SGD
 import os
+import hashlib
+
 
 class TrainingLoop:
     def __init__(self, model_name, data_loader,gradients_dir, learning_rate=5e-5, send_interval=30, averaging_dir = "averaged_model"):
@@ -53,7 +55,7 @@ class TrainingLoop:
             if hf_manager.check_for_new_submissions():
                 logging.info("Model updated from Hugging Face. Continuing training with new model...")
                 self.model = hf_manager.update_model(self.model)
-                self.optimizer = AdamW(self.model.parameters(), lr=5e-5)  # Reinitialize the optimizer
+                self.optimizer = SGD(self.model.parameters(), lr=5e-5)  # Reinitialize the optimizer
 
             for step, batch in enumerate(self.data_loader):
                 outputs = self.model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch['input_ids'])
@@ -99,7 +101,6 @@ class LocalTrainingLoop(TrainingLoop):
         """
         Saves gradients to a file in a specified local directory.
         """
-        import os
         # Ensure the local directory exists
         os.makedirs(local_dir, exist_ok=True)
         
@@ -109,6 +110,7 @@ class LocalTrainingLoop(TrainingLoop):
         # Save gradients to the file
         torch.save(aggregated_gradients, gradient_file_path)
         print(f"Gradients saved locally at: {gradient_file_path}")
+
 
 
 class FeedforwardNN(nn.Module):
@@ -154,40 +156,99 @@ class MNISTTrain(LocalTrainingLoop):
         torch.save(self.model.state_dict(), model_save_path)
         logging.info(f"Model saved locally at {model_save_path}.")
 
+    @staticmethod
+    def normalize_gradients(parameter, threshold=1.0):
+        """
+        Normalize the gradients to avoid exploding or vanishing gradients.
+        
+        Args:
+        parameters (iterable): Iterable of model parameters (typically model.parameters() in PyTorch).
+        threshold (float): The maximum norm value for gradients. Defaults to 1.0.
+        """
+        param_norm = parameter.norm(2)
+        
+        # Normalize if the total norm exceeds the threshold
+        if param_norm > threshold:
+            return parameter.data.mul_(threshold / param_norm)
+        else:
+            return parameter
+
     
     def train(self, epochs, hf_manager, n_steps):
         last_send_time = time.time()
         step_counter = 0  # Initialize step counter that persists across epochs
-
+        test_counter = 0
+        test_losses = []
+        test_accuracies = []
+        training_losses = []
+        logging.info("Model updated from Hugging Face. Continuing training with new model...")
+        #self.model = hf_manager.update_model(self.model)
+        self.model = FeedforwardNN()
+        
+        
+        self.optimizer = SGD(self.model.parameters(), lr=0.1)  # Reinitialize the optimizer
+        self.optimizer.zero_grad()  # Ensure gradients are reset after model update
+        self.aggregated_gradients = {}  # Initialize an empty dictionary for storing aggregated gradients
+        for name, param in self.model.named_parameters():  # Iterate over all parameters of the model
+            if param.requires_grad:  # Check if the parameter requires gradients and has gradients computed
+                self.aggregated_gradients[name] = torch.zeros_like(param)  # Create a zero tensor with the same shape as the parameter        
+        
+        
         for epoch in range(epochs):
             logging.info(f"Starting Epoch: {epoch}")
             total_loss = 0
             total_examples = 0
+            
+            
 
-            if hf_manager.check_for_new_submissions():
-                logging.info("Model updated from Hugging Face. Continuing training with new model...")
-                self.model = hf_manager.update_model(self.model)
-                self.optimizer = AdamW(self.model.parameters(), lr=5e-5)  # Reinitialize the optimizer
-                self.optimizer.zero_grad()  # Ensure gradients are reset after model update
+            # if hf_manager.check_for_new_submissions():
+            #     logging.info("Model updated from Hugging Face. Continuing training with new model...")
+            #     self.model = hf_manager.update_model(self.model)
+            #     self.optimizer = SGD(self.model.parameters(), lr=5e-5)  # Reinitialize the optimizer
+            #     self.optimizer.zero_grad()  # Ensure gradients are reset after model update
 
             for batch_idx, (data, target) in enumerate(self.data_loader):
                 output = self.model(data)
                 loss = F.cross_entropy(output, target)
                 loss.backward()
 
+                for name, param in self.model.named_parameters():
+                    if param.grad is not None and param.requires_grad:
+                        self.aggregated_gradients[name] += self.normalize_gradients(param.grad, threshold=0.1)
+
+                self.optimizer.zero_grad()
+
                 total_loss += loss.item()
                 total_examples += len(data)
 
+                average_loss = total_loss / total_examples
+                #logging.info(f"Epoch: {epoch}, Batch: {batch_idx}, Loss: {average_loss:.4f}")
+                
+
                 # Check if it's time to step the optimizer and reset gradients
                 if (step_counter + 1) % n_steps == 0:
-                    self.optimizer.step()  # Update model parameters
-                    self.optimizer.zero_grad()  # Reset gradients
+                    test_counter += 1
+                    
+                    # for param in self.model.parameters():
+                    #     if param.grad is not None:
+                    #         param.grad /= (n_steps//10)
+                    self.optimizer.zero_grad()
+
+                    for name, param in self.model.named_parameters():
+                        if param.grad is not None:
+                            param.grad = self.aggregated_gradients[name]
+                    
+                    self.optimizer.step()
+
                     test_loss, test_accuracy = self.test()
+                    #test_losses.append(test_loss)
+                    #test_accuracies.append(test_accuracy)
                     train_loss = total_loss / total_examples
+                    #training_losses.append(train_loss)
                     logging.info(f"Train Loss: {train_loss} At {step_counter} accumulated gradients")
                     logging.info(f"Test Loss: {test_loss} At {step_counter} accumulated gradients")
                     logging.info(f"Test Accuracy: {test_accuracy} At {step_counter} accumulated gradients")
-
+                    
                     return train_loss, test_loss, test_accuracy
 
 
@@ -203,6 +264,157 @@ class MNISTTrain(LocalTrainingLoop):
                     # Logic to send aggregated gradients
                     self.aggregated_gradients = {name: param.grad.clone() for name, param in self.model.named_parameters() if param.requires_grad and param.grad is not None}
                     self.store_gradients(self.aggregated_gradients, self.gradients_dir)
+
+                    last_send_time = time.time()
+                    #total_loss = 0
+                    #total_examples = 0  # Reset for the next interval
+
+    
+    def test(self):
+        self.model.eval()
+        test_loss = 0
+        correct_predictions = 0
+        total_test_samples = 0
+
+        with torch.no_grad():
+            for batch in self.test_loader:
+
+                images, labels = batch
+                outputs = self.model(images)
+                loss = F.cross_entropy(outputs, labels)
+                test_loss += loss.item() 
+                _, predicted = torch.max(outputs.data, 1)
+                correct_predictions += (predicted == labels).sum().item()
+                total_test_samples += labels.size(0)
+
+        average_test_loss = test_loss / total_test_samples
+        accuracy = correct_predictions / total_test_samples
+        return average_test_loss, accuracy
+
+
+class MNISTDeltaTrain(LocalTrainingLoop):
+    
+    def __init__(self, model_name, data_loader,gradients_dir, test_loader, averaging_dir="averaged_model", learning_rate=5e-5, send_interval=30):
+        
+        self.model = FeedforwardNN() 
+        self.model.train()
+
+        self.data_loader = data_loader
+        self.test_loader = test_loader
+
+        self.optimizer = SGD(self.model.parameters(), lr=learning_rate)
+        self.send_interval = send_interval
+        self.gradients_dir = gradients_dir
+        self.averaging_dir = averaging_dir
+
+    def save_model(self):
+        """
+        Saves the model to the specified local directory.
+        """
+        os.makedirs(self.averaging_dir, exist_ok=True)
+        model_save_path = os.path.join(self.averaging_dir, "averaged_model.pt")
+        torch.save(self.model.state_dict(), model_save_path)
+        logging.info(f"Model saved locally at {model_save_path}.")
+
+    @staticmethod
+    def normalize_gradients(parameter, threshold=1.0):
+        """
+        Normalize the gradients to avoid exploding or vanishing gradients.
+        
+        Args:
+        parameters (iterable): Iterable of model parameters (typically model.parameters() in PyTorch).
+        threshold (float): The maximum norm value for gradients. Defaults to 1.0.
+        """
+        param_norm = parameter.norm(2)
+        
+        # Normalize if the total norm exceeds the threshold
+        if param_norm > threshold:
+            return parameter.data.mul_(threshold / param_norm)
+        else:
+            return parameter
+
+    def calculate_model_hash(self):
+        
+        
+        model_hash = hashlib.sha256()
+        for name, param in self.model.named_parameters():
+            model_hash.update(name.encode('utf-8'))
+            model_hash.update(param.data.cpu().numpy().tobytes())
+        return model_hash.hexdigest()
+
+    
+    def train(self, epochs, hf_manager, n_steps):
+        last_send_time = time.time()
+        step_counter = 0  # Initialize step counter that persists across epochs
+        test_counter = 0
+        test_losses = []
+        test_accuracies = []
+        training_losses = []
+        logging.info("Model updated from Hugging Face. Continuing training with new model...")
+        #self.model = hf_manager.update_model(self.model)
+        self.model = FeedforwardNN()
+        
+        
+        self.optimizer = SGD(self.model.parameters(), lr=0.1)  # Reinitialize the optimizer
+        self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()}        
+        
+        for epoch in range(epochs):
+            logging.info(f"Starting Epoch: {epoch}")
+            total_loss = 0
+            total_examples = 0
+
+            if hf_manager.check_for_new_submissions():
+                logging.info("Model updated from Hugging Face. Continuing training with new model...")
+                self.model = hf_manager.update_model(self.model)
+                self.optimizer = SGD(self.model.parameters(), lr=0.1)  # Reinitialize the optimizer
+                self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()}
+                #self.optimizer.zero_grad()  # Ensure gradients are reset after model update
+
+            for batch_idx, (data, target) in enumerate(self.data_loader):
+                output = self.model(data)
+                loss = F.cross_entropy(output, target)
+                loss.backward()
+
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+
+                total_loss += loss.item()
+                total_examples += len(data)
+
+                average_loss = total_loss / total_examples
+                #logging.info(f"Epoch: {epoch}, Batch: {batch_idx}, Loss: {average_loss:.4f}")
+                
+
+                # Check if it's time to step the optimizer and reset gradients
+                if (step_counter + 1) % n_steps == 0:
+                    test_counter += 1                    
+                    
+                    test_loss, test_accuracy = self.test()
+                    #test_losses.append(test_loss)
+                    #test_accuracies.append(test_accuracy)
+                    train_loss = total_loss / total_examples
+                    #training_losses.append(train_loss)
+                    logging.info(f"Train Loss: {train_loss} At {step_counter} accumulated gradients")
+                    logging.info(f"Test Loss: {test_loss} At {step_counter} accumulated gradients")
+                    logging.info(f"Test Accuracy: {test_accuracy} At {step_counter} accumulated gradients")
+                    
+                    #return train_loss, test_loss, test_accuracy
+
+                    self.model.train()
+                    
+                step_counter += 1  # Increment step counter after processing each batch
+
+                # Periodic actions such as logging and sending gradients
+                if time.time() - last_send_time >= self.send_interval:
+                    average_loss = total_loss / total_examples
+                    logging.info(f"Epoch: {epoch}, Batch: {batch_idx}, Loss: {average_loss:.4f}")
+
+                    # Logic to send aggregated gradients
+                    self.weight_diffs = {name:  param.data - self.base_weights[name] for name, param in self.model.named_parameters() if param.requires_grad}
+                    self.store_gradients(self.weight_diffs, self.gradients_dir)
+
+
+                    logging.info(f"Model hash is: {self.calculate_model_hash()}")
 
                     last_send_time = time.time()
                     #total_loss = 0
