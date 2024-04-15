@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='hivetrain',
-    version='0.2.7',
+    version='0.3.2',
     author='Hivetrain',
     author_email='test@test.com',
     description='A short description of your project',
