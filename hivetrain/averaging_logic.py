@@ -32,6 +32,9 @@ class Averager:
 
             # Load the gradients directly using torch.load
             aggregated_gradients = torch.load(gradient_file_path)
+
+            if self.have_nans(aggregated_gradients):
+                return None
                 
             return aggregated_gradients
         except Exception as e:
@@ -43,10 +46,21 @@ class Averager:
         self.bittensor_network.sync(lite=False)#scope issue FIXME?
             
         validator_uids = self.bittensor_network.get_validator_uids(vpermit_tao_limit=1024)
-        #breakpoint()
-        #validator_combined_weights = torch.mean(self.bittensor_network.metagraph.W[validator_uids, :],axis=0)
-        n = len(self.bittensor_network.metagraph.hotkeys) #FIXME I am only for testing NOPROD
-        self.validator_combined_weights = torch.full((n,1), 1/n, dtype=torch.float32) #FIXME I am only for testing NOPROD
+
+        if isinstance(self.bittensor_network.metagraph.W, list):
+            self.validator_combined_weights = []
+            weights_list = []
+            for validator_uid in validator_uids:
+                weights = self.bittensor_network.metagraph.W[validator_uid]
+                if sum(weights)==0:
+                    continue
+                else:
+                    weights_list.append(weights)
+            self.validator_combined_weights = torch.mean(torch.tensor(weights_list), axis=0)
+        else:
+            self.validator_combined_weights = torch.mean(self.bittensor_network.metagraph.W[validator_uids, :], axis=0)
+        #n = len(self.bittensor_network.metagraph.hotkeys) #FIXME I am only for testing NOPROD
+        #self.validator_combined_weights = torch.full((n,1), 1/n, dtype=torch.float32) #FIXME I am only for testing NOPROD
         # Get average of validator weights weighted by their stake?
         self.miner_gradients = []
         self.miner_weights = []
@@ -61,7 +75,14 @@ class Averager:
                 self.miner_gradients.append(None)
                 self.miner_weights.append(0.0)
                 self.miner_hotkeys.append(hotkey)
-        
+
+    @staticmethod
+    def have_nans(aggregated_gradients):
+        for tensor in aggregated_gradients.values():
+            if torch.isnan(tensor).any():
+                logging.debug("NaN values detected in the aggregated gradients.")
+                return True
+        return False
 
     def average_gradients(self, beta=1.0):
 
@@ -119,8 +140,53 @@ class Averager:
             time.sleep(time_to_wait)
             logging.info("Averaging Done")
 
+class DeltaAverager(Averager):
+    def __init__(self, model, local_dir, repo_id,chain_manager,bittensor_network, hf_token=os.environ.get("HF_TOKEN")):
+        self.model = model
+        self.local_dir = local_dir
+        self.repo_id = repo_id
+        self.hf_token = hf_token
+        self.scored_gradients = None
+        self.last_sync_time = 0
+        self.bittensor_network = bittensor_network
+        self.chain_manager = chain_manager
 
-class LocalAverager(Averager):
+    def average_gradients(self, beta=1.0):
+
+        self.non_none_miner_gradients = [gradients for gradients in self.miner_gradients if gradients is not None]
+        assert len(self.non_none_miner_gradients) > 0
+        averaged_gradients = {name: torch.zeros_like(grad) for name, grad in self.non_none_miner_gradients[0].items()}
+
+        for score, gradients in zip(self.validator_combined_weights, self.miner_gradients):
+            logging.info("Averaging Gradient")
+            if gradients is not None:
+                for (name, grad), (param_name, param) in zip(gradients.items(), self.model.named_parameters()):
+                    averaged_gradients[name] += (param + grad) * score * beta
+        
+        return averaged_gradients
+
+    def apply_averaged_gradients(self, averaged_gradients, alpha=0.00001):
+        
+        with torch.no_grad():
+            for name, param in self.model.named_parameters():
+                if name in averaged_gradients:
+                    param = averaged_gradients[name]
+
+    def run_periodic_averaging(self, t):
+        while True:
+            logging.info("Averaging Beggining")
+            start_time = time.time()
+            self.receive_and_score_gradients()
+            averaged_weights = self.average_gradients()
+            self.apply_averaged_gradients(averaged_weights)
+            self.save_model()
+            self.push_to_hf_hub(commit_message="Updated model with new gradients")
+            elapsed_time = time.time() - start_time
+            time_to_wait = max(0, t - elapsed_time)
+            time.sleep(time_to_wait)
+            logging.info("Averaging Done")
+
+class LocalAverager(DeltaAverager):
     def __init__(self, model, local_dir, chain_manager, bittensor_network=None, hf_token=None):
         super().__init__(model, local_dir, chain_manager=chain_manager,repo_id=None, bittensor_network=bittensor_network, hf_token=hf_token)
         # No need for repo_id or hf_token in the local version
@@ -139,6 +205,10 @@ class LocalAverager(Averager):
 
             # Load the gradients directly using torch.load
             aggregated_gradients = torch.load(gradient_file_path)
+            
+            if self.have_nans(aggregated_gradients):
+                return None
+
             return aggregated_gradients
         except Exception as e:
             logging.error(f"Error receiving gradients locally: {e}")

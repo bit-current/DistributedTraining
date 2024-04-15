@@ -501,3 +501,173 @@ class BittensorNetwork:
                 logger.warn(f"Failed to resync metagraph: {e}")
         else:
             logger.info("Metagraph Sync Interval not yet passed")
+
+
+import json
+import os
+import threading
+import time
+
+class LocalMetagraph:
+    def __init__(self):
+        self._hotkeys = []
+        self._network_state = 'initial'
+        self._weights = []
+        
+
+class Wallet:
+    def __init__(self, hotkey):
+        self.hotkey = hotkey
+
+class Hotkey:
+    def __init__(self, ss58_address):
+        self.ss58_address = ss58_address
+
+
+class LocalBittensorNetwork:
+    _instance = None
+    _lock = threading.Lock()
+    _weights_lock = threading.Lock()
+    _anomaly_lock = threading.Lock()
+    _config_lock = threading.Lock()
+    _rate_limit_lock = threading.Lock()
+    _data_directory = 'bittensor_network'
+    _metagraph_file = os.path.join(_data_directory, 'metagraph.json')
+    _weights_file = os.path.join(_data_directory, 'weights.json')
+    _metagraph = None
+    metrics_data = {}
+    model_checksums = {}
+    request_counts = {}
+    blacklisted_addresses = {}
+    last_sync_time = 0
+    sync_interval = 600
+    subtensor=None
+    wallet=None
+    last_update = 0
+    update_interval = 600
+
+    def __new__(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(BittensorNetwork, cls).__new__(cls)
+        return cls._instance
+
+    @classmethod
+    def _load_data(cls, filepath):
+        if os.path.exists(filepath):
+            with open(filepath, 'r') as file:
+                return json.load(file)
+        else:
+            return None
+
+    @classmethod
+    def _save_data(cls, data, filepath):
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, 'w') as file:
+            json.dump(data, file, indent=4)
+
+    @classmethod
+    def initialize(cls, config):
+        cls.config = config
+        cls.sync_interval = config.get('sync_interval', 600)  # Example of using config to set sync interval
+
+        cls._wallet_file = os.path.join(cls._data_directory, f'wallet_{config.wallet.hotkey}.json')
+
+        wallet_data = cls._load_data(cls._wallet_file)
+        metagraph_data = cls._load_data(cls._metagraph_file)
+
+        if not wallet_data or not metagraph_data:
+            print("Data files not found, initializing new simulation.")
+            wallet_data = {'hotkey': config.wallet.hotkey}
+            metagraph_data = {'hotkeys': [], 'network_state': 'initial', 'weights': [], "stake": []}
+
+            for i in range(100):
+                hotkey = f'simulated_hotkey_{i}'
+                metagraph_data['hotkeys'].append(hotkey)
+                metagraph_data["weights"].append([0 for _ in range(100)])
+                if i > 90:
+                    metagraph_data["stake"].append(10000)
+                else:
+                    metagraph_data["stake"].append(10)
+
+
+
+            cls._save_data(wallet_data, cls._wallet_file)
+            cls._save_data(metagraph_data, cls._metagraph_file)
+
+        cls.metagraph = LocalMetagraph()
+        cls.metagraph.hotkeys = metagraph_data['hotkeys']
+        cls.metagraph.network_state = metagraph_data['network_state']
+        cls.metagraph.weights = metagraph_data['weights']
+        cls.metagraph.W = metagraph_data['weights']
+        cls.wallet=Wallet(hotkey=Hotkey(ss58_address=cls.config.wallet.hotkey))
+
+    @classmethod
+    def set_weights(cls, scores):
+        # Simulated set_weights method
+        assert len(scores) == len(cls.metagraph.weights)
+        normalized_scores = (torch.tensor(scores) / sum(scores)).numpy().tolist()
+
+        # Loop over the normalized tensor elements
+        #for uid, score in enumerate(normalized_scores):
+        my_hotkey = cls.wallet.hotkey.ss58_address
+        my_uid = cls.metagraph.hotkeys.index(my_hotkey)
+
+        cls.metagraph.weights[my_uid] = normalized_scores
+
+        # Save the updated metagraph data
+        metagraph_data = {
+            'hotkeys': cls.metagraph.hotkeys,
+            'network_state': cls.metagraph.network_state,
+            'weights': cls.metagraph.weights
+        }
+        cls._save_data(metagraph_data, cls._metagraph_file)
+        cls.last_update = time.time()
+
+    @staticmethod
+    def should_sync_metagraph(last_sync_time,sync_interval):
+        current_time = time.time()
+        return (current_time - last_sync_time) > sync_interval
+
+    @classmethod
+    def should_set_weights(cls) -> bool:
+            return (time.time() - cls.last_sync_time) > cls.update_interval
+
+    @classmethod
+    def sync(cls, lite=True):
+
+        if cls.should_sync_metagraph(cls.last_sync_time, cls.sync_interval ):
+            print("Syncing metagraph...")
+            metagraph_data = cls._load_data(cls._metagraph_file)
+
+            if metagraph_data:
+                print("Metagraph synced:", metagraph_data)
+                cls.metagraph.hotkeys = metagraph_data['hotkeys']
+                cls.metagraph.network_state = metagraph_data['network_state']
+                cls.metagraph.weights = metagraph_data['weights']
+            else:
+                print("Failed to load metagraph data.")
+
+        cls.last_sync_time = time.time()
+
+
+    @classmethod
+    def run_evaluation(cls):
+        if LocalBittensorNetwork.should_sync_metagraph():
+            LocalBittensorNetwork.sync()
+
+        with cls._weights_lock:
+            print("Evaluating miners...")
+
+    @classmethod
+    def get_validator_uids(
+        cls, vpermit_tao_limit: int = 1024
+    ):
+        
+        
+        return [i for i in range(91,100)]
+    
+
+    # @property
+    # def metagraph(self):
+    #     return self._metagraph

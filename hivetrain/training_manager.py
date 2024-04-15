@@ -42,7 +42,7 @@ class TrainingLoop:
         repo.git_push()
 
     def train(self, epochs, hf_manager):
-        last_send_time = time.time()
+        self.last_send_time = time.time()
         self.optimizer.zero_grad()
         self.aggregated_gradients = {name: torch.zeros_like(param) for name, param in self.model.named_parameters() if param.requires_grad}
         for epoch in range(epochs):
@@ -75,7 +75,7 @@ class TrainingLoop:
 
                 # Example of a condition to periodically send gradients
                 current_time = time.time() ##time.time()%sth works better
-                if current_time - last_send_time >= self.send_interval:
+                if current_time - self.last_send_time >= self.send_interval:
                     
                     average_loss = total_loss / total_examples
                     perplexity = math.exp(average_loss)
@@ -88,7 +88,7 @@ class TrainingLoop:
                     except Exception as e:
                         logging.warning(f"Sending gradients failed: {e}")
                         continue
-                    last_send_time = current_time
+                    self.last_send_time = current_time
                     # Reset aggregated gradients
                     #self.aggregated_gradients = {name: torch.zeros_like(param) for name, param in self.model.named_parameters() if param.requires_grad}
 
@@ -175,7 +175,7 @@ class MNISTTrain(LocalTrainingLoop):
 
     
     def train(self, epochs, hf_manager, n_steps):
-        last_send_time = time.time()
+        self.last_send_time = time.time()
         step_counter = 0  # Initialize step counter that persists across epochs
         test_counter = 0
         test_losses = []
@@ -257,7 +257,7 @@ class MNISTTrain(LocalTrainingLoop):
                 step_counter += 1  # Increment step counter after processing each batch
 
                 # Periodic actions such as logging and sending gradients
-                if time.time() - last_send_time >= self.send_interval:
+                if time.time() - self.last_send_time >= self.send_interval:
                     average_loss = total_loss / total_examples
                     logging.info(f"Epoch: {epoch}, Batch: {batch_idx}, Loss: {average_loss:.4f}")
 
@@ -265,7 +265,7 @@ class MNISTTrain(LocalTrainingLoop):
                     self.aggregated_gradients = {name: param.grad.clone() for name, param in self.model.named_parameters() if param.requires_grad and param.grad is not None}
                     self.store_gradients(self.aggregated_gradients, self.gradients_dir)
 
-                    last_send_time = time.time()
+                    self.last_send_time = time.time()
                     #total_loss = 0
                     #total_examples = 0  # Reset for the next interval
 
@@ -307,6 +307,8 @@ class MNISTDeltaTrain(LocalTrainingLoop):
         self.gradients_dir = gradients_dir
         self.averaging_dir = averaging_dir
 
+        self.last_send_time = time.time()
+
     def save_model(self):
         """
         Saves the model to the specified local directory.
@@ -344,7 +346,6 @@ class MNISTDeltaTrain(LocalTrainingLoop):
 
     
     def train(self, epochs, hf_manager, n_steps):
-        last_send_time = time.time()
         step_counter = 0  # Initialize step counter that persists across epochs
         test_counter = 0
         test_losses = []
@@ -363,14 +364,17 @@ class MNISTDeltaTrain(LocalTrainingLoop):
             total_loss = 0
             total_examples = 0
 
-            if hf_manager.check_for_new_submissions():
-                logging.info("Model updated from Hugging Face. Continuing training with new model...")
-                self.model = hf_manager.update_model(self.model)
-                self.optimizer = SGD(self.model.parameters(), lr=0.1)  # Reinitialize the optimizer
-                self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()}
-                #self.optimizer.zero_grad()  # Ensure gradients are reset after model update
+            
 
             for batch_idx, (data, target) in enumerate(self.data_loader):
+
+                if hf_manager.check_for_new_submissions():#FIXME add this in other training manager classes
+                    logging.info("Model updated from Hugging Face. Continuing training with new model...")
+                    self.model = hf_manager.update_model(self.model)
+                    self.optimizer = SGD(self.model.parameters(), lr=0.001)  # Reinitialize the optimizer
+                    self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()}
+                    #self.optimizer.zero_grad()  # Ensure gradients are reset after model update
+                    
                 output = self.model(data)
                 loss = F.cross_entropy(output, target)
                 loss.backward()
@@ -405,7 +409,7 @@ class MNISTDeltaTrain(LocalTrainingLoop):
                 step_counter += 1  # Increment step counter after processing each batch
 
                 # Periodic actions such as logging and sending gradients
-                if time.time() - last_send_time >= self.send_interval:
+                if time.time() - self.last_send_time >= self.send_interval:
                     average_loss = total_loss / total_examples
                     logging.info(f"Epoch: {epoch}, Batch: {batch_idx}, Loss: {average_loss:.4f}")
 
@@ -413,10 +417,9 @@ class MNISTDeltaTrain(LocalTrainingLoop):
                     self.weight_diffs = {name:  param.data - self.base_weights[name] for name, param in self.model.named_parameters() if param.requires_grad}
                     self.store_gradients(self.weight_diffs, self.gradients_dir)
 
-
                     logging.info(f"Model hash is: {self.calculate_model_hash()}")
 
-                    last_send_time = time.time()
+                    self.last_send_time = time.time()
                     #total_loss = 0
                     #total_examples = 0  # Reset for the next interval
 

@@ -4,7 +4,7 @@ import torch
 
 from hivemind import DHT
 from hivetrain.btt_connector import (
-    BittensorNetwork,
+    LocalBittensorNetwork,
     # get_validator_uids_and_addresses,
     serve_axon,
 )
@@ -41,11 +41,11 @@ def flatten_list(nested_list):
 # assert not (initial_peers is None)
 args = Configurator.combine_configs()
 
-BittensorNetwork.initialize(args)
-my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
-my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
+LocalBittensorNetwork.initialize(args)
+my_hotkey = args.wallet.hotkey#LocalBittensorNetwork.wallet.hotkey.ss58_address
+my_uid = LocalBittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
-address_store = LocalAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
+address_store = LocalAddressStore(LocalBittensorNetwork.subtensor, args.netuid,LocalBittensorNetwork.wallet)
 address_store.store_hf_repo(args.storage.gradient_dir)
 
 # Parameters
@@ -53,7 +53,7 @@ address_store.store_hf_repo(args.storage.gradient_dir)
 batch_size = args.batch_size
 epochs = 10  # Adjust epochs for MNIST training, 30_000_000_000_000_000 is unrealistic
 learning_rate = 5e-5
-send_interval = 60  # Every 60 seconds
+send_interval = 90  # Every 60 seconds
 
 # Load the MNIST dataset
 transform = transforms.Compose([

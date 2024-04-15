@@ -91,13 +91,13 @@ class ModelValidator:
                 self.update_model_weights(gradients)
                 logging.info(f"The model hash: {self.calculate_model_hash()}")
             else:
-                loss = 0
-                perplexity = 0
+                loss = 99999999
+                perplexity = -99999999
                 continue
             logging.info(f"Evaluating model")
             loss, perplexity = self.evaluate_model()
             loss_score = max(0, self.base_loss - loss)
-            perplexity_score = max(0,  perplexity - self.base_perplexity) if perplexity else 0
+            perplexity_score = max(0,  perplexity - self.base_perplexity) if perplexity else 0 #FIXME accuracy here need to flip for perplexity
             self.scores[uid] = perplexity_score
 
             # Reset the model to its original state
@@ -108,8 +108,8 @@ class ModelValidator:
             time.sleep(0.1)
 
 
-            if self.bittensor_network.should_set_weights():    
-                self.bittensor_network.set_weights(self.scores)
+            #if self.bittensor_network.should_set_weights():    
+            self.bittensor_network.set_weights(self.scores)
 
     def start_periodic_validation(self):
         #def run():

@@ -8,7 +8,7 @@ import bittensor as bt
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 from hivetrain.btt_connector import (
-    BittensorNetwork,
+    LocalBittensorNetwork,
     # get_validator_uids_and_addresses,
     serve_axon,
 )
@@ -30,17 +30,17 @@ from hivetrain.training_manager import FeedforwardNN
 
 args = Configurator.combine_configs()
 
-BittensorNetwork.initialize(args)
-my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
-my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
+LocalBittensorNetwork.initialize(args)
+my_hotkey = LocalBittensorNetwork.wallet.hotkey.ss58_address
+my_uid = LocalBittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
-address_store = LocalAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
+address_store = LocalAddressStore(LocalBittensorNetwork.subtensor, args.netuid,LocalBittensorNetwork.wallet)
 
 
 batch_size = args.batch_size
 epochs = 10  # Adjust epochs for MNIST training, 30_000_000_000_000_000 is unrealistic
 learning_rate = 5e-5
-receive_interval = 1  # Every 60 seconds
+receive_interval = 30  # Every 60 seconds
 
 # Load the MNIST dataset
 transform = transforms.Compose([
@@ -59,6 +59,6 @@ optimizer = SGD(model.parameters(),lr = 0.1)
 #    def __init__(self, model, optimizer, data_loader, bittensor_network=None, chain_manager=None, interval=3600, local_gradient_dir="local_gradients"):
 hf_manager = LocalHFManager(repo_id=args.storage.model_dir)
 validator = MNISTDeltaValidator(model=model,optimizer=optimizer, data_loader=test_loader,
-    bittensor_network=BittensorNetwork ,hf_manager=hf_manager, interval=receive_interval, chain_manager=address_store,local_gradient_dir=args.storage.gradient_dir,
+    bittensor_network=LocalBittensorNetwork ,hf_manager=hf_manager, interval=receive_interval, chain_manager=address_store,local_gradient_dir=args.storage.gradient_dir,
     )
 validator.start_periodic_validation()
