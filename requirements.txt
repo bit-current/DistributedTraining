@@ -1,12 +1,7 @@
 bittensor
-flask
 requests
 substrate-interface
 torch
 torchvision
-hivemind
-lightning>=2.1.0
 datasets
 transformers
-lightning-hivemind @ git+https://github.com/bit-current/lightning-Hivemind
-waitress
