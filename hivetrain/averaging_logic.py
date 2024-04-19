@@ -3,7 +3,7 @@ import torch
 import random
 import math
 import copy
-import torch
+
 from huggingface_hub import Repository, HfFolder
 from copy import deepcopy 
 from hivetrain.btt_connector import BittensorNetwork, sync
@@ -15,6 +15,7 @@ from transformers import TrainingArguments, Trainer
 
 from torch import nn, optim
 import torch.nn.functional as F
+import numpy as np
 
 from tqdm import tqdm
 
@@ -248,95 +249,9 @@ class LocalAverager(DeltaAverager):
         logging.info(f"Model saved locally at {model_save_path}.")
 
 
-# class ParameterizedAveraging(nn.Module):
-#     def __init__(self, model_paths):
-#         super(ParameterizedAveraging, self).__init__()
-#         self.model_paths = model_paths
-#         self.num_models = len(model_paths)
-#         averaging_model = ParameterizedAveraging(base_models).to(device)
-
-#         self.weights = nn.Parameter(torch.ones(self.num_models) / self.num_models)
-
-#     def forward(self, x):
-#         averaged_params = self.get_averaged_params()
-#         output = self.forward_with_averaged_params(x, averaged_params)
-#         return output
-
-#     def get_averaged_params(self):
-#         for params in self.lazy_load_params():
-#             weighted_average = torch.zeros_like(params[0])
-#             for param, weight in zip(params, self.weights):
-#                 weighted_average += param * weight
-#             yield weighted_average
-
-#     def lazy_load_params(self):
-#         for model_path in self.model_paths:
-#             model = torch.load(model_path, map_location='cpu')
-#             yield model.parameters()
-
-#     def forward_with_averaged_params(self, x, averaged_params):
-#         model = torch.load(self.model_paths[0], map_location='cpu')
-#         for param, averaged_param in zip(model.parameters(), averaged_params):
-#             param.data = averaged_param.data
-#         model.to(x.device)
-#         return model(x)
-
-# class LocalParameterizedAverager(LocalAverager):
-#     def meta_learning(model_paths, train_loader, val_loader, meta_epochs, inner_epochs, device):
-#         cpu_device = torch.device("cpu")
-#         for uid, hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
-#             try:
-#                 repo_id = self.chain_manager.retrieve_hf_repo(hotkey)
-#                 gradient = self.receive_gradients(repo_id=repo_id)
-                
-#             except Exception as e:
-#                 logging.debug(f"Receiving gradients failed due to: {e}")
-
-#         averaging_model = ParameterizedAveraging(model_paths).to(device)
-#         meta_optimizer = optim.SGD(averaging_model.parameters(), lr=0.1)
-#         criterion = nn.CrossEntropyLoss()
-
-#         for epoch in range(meta_epochs):
-            
-#             # Outer loop: Update averaging weights
-#             meta_optimizer.zero_grad()
-            
-#             # Perform averaging step on CPU
-#             averaging_model.to(cpu_device)
-#             averaged_params = list(averaging_model.get_averaged_params())
-#             averaging_model.to(device)
-
-#             val_loss = evaluate_model(averaging_model, val_loader, criterion, device)
-#             val_loss.backward()
-#             meta_optimizer.step()
-
-#             print(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss:.4f}")
-
-#         # Move averaging model back to CPU before returning
-#         averaging_model.to(cpu_device)
-#         return averaging_model
-
-#     def run_periodic_averaging(self, t):
-#         while True:
-#             logging.info("Averaging Beggining")
-#             start_time = time.time()
-#             #self.receive_and_score_gradients()
-#             averaged_weights = self.average_gradients()
-#             self.apply_averaged_gradients(averaged_weights)
-#             self.save_model()
-#             self.push_to_hf_hub(commit_message="Updated model with new gradients")
-#             elapsed_time = time.time() - start_time
-#             time_to_wait = max(0, t - elapsed_time)
-#             time.sleep(time_to_wait)
-#             logging.info("Averaging Done")
-
-class LocalParameterizedAverager(nn.Module, LocalAverager):
+class LocalParameterizedAverager(LocalAverager):
     def __init__(self, model,local_dir, device,hf_manager, chain_manager=None,bittensor_network=None, hf_token=os.environ.get("HF_TOKEN") ):
-        nn.Module.__init__(self)
         LocalAverager.__init__(self,model, local_dir,hf_manager=hf_manager, chain_manager=chain_manager, bittensor_network=bittensor_network, hf_token=hf_token)
-        #self.get_model_paths()
-        #self.num_models = len(self.model_paths)
-        #self.weights = nn.Parameter(torch.ones(self.num_models, device=device) / self.num_models)
         self.device = device
 
     def get_model_paths(self, gradient_file_name="gradients.pt"):
@@ -351,10 +266,12 @@ class LocalParameterizedAverager(nn.Module, LocalAverager):
                 logging.debug(f"Receiving gradients failed due to: {e}")
 
     def get_averaged_params(self):
+        if self.weights is None:
+            self.weights = nn.functional.softmax(torch.ones((self.num_models,len(list(self.model.parameters()))), device=self.device),dim=0)
         averaged_gradients = {name: torch.zeros_like(grad) for name, grad in self.model.named_parameters()}
         for params, weight in zip(self.lazy_load_params(), self.weights):
-            for (name_weight_delta, param_weight_delta),(name_base_model, param_base_model) in zip(params.items(),self.model.named_parameters()):
-                averaged_gradients[name_base_model] += (param_weight_delta + param_base_model) * weight #FIXME make weights per param
+            for j, (name_reconstructed_model, param_reconstructed_model) in enumerate(params.items()):
+                averaged_gradients[name_reconstructed_model] += (param_reconstructed_model * weight[j]) #FIXME make weights per param
 
         return averaged_gradients
 
@@ -364,13 +281,15 @@ class LocalParameterizedAverager(nn.Module, LocalAverager):
                 yield None
             else:
                 weight_delta = torch.load(os.path.join(model_path,"gradients.pt"), map_location='cpu')
+                base_model = self.model.state_dict()
+                for name, delta_param in weight_delta.items():
+                    weight_delta[name] = weight_delta[name] + base_model[name]
                 yield weight_delta
 
     def get_averaged_model(self):
-        #model = torch.load(self.model_paths[0], map_location='cpu')
         averaged_params = self.get_averaged_params()
         for param, averaged_param in zip(self.model.parameters(), averaged_params.values()):
-            param.data.copy_(averaged_param.data/self.num_models)  
+            param.data.copy_(averaged_param.data)  
         self.model.to(self.device)
         return self.model
 
@@ -386,8 +305,8 @@ class LocalParameterizedAverager(nn.Module, LocalAverager):
     def meta_learning(self, val_loader, meta_epochs, lr):
         
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.SGD([self.weights], lr=lr)
-
+        #optimizer = optim.SGD([self.weights], lr=lr)
+        self.weights = None#nn.Parameter(nn.functional.softmax(torch.ones(self.num_models, device=self.device), dim=0))
         for epoch in range(meta_epochs):
             # Outer loop: Update averaging weights
             
@@ -395,13 +314,14 @@ class LocalParameterizedAverager(nn.Module, LocalAverager):
             #val_loss = evaluate_model(averaged_model, val_loader, criterion, self.device)
 
             #self.model.eval()
-            total_loss = 0
-            correct_predictions = 0
-            total_samples = 0
-
             
             for epoch in range(meta_epochs):
-                for batch in val_loader:
+                total_loss = 0
+                correct_predictions = 0
+                total_samples = 0
+
+
+                for batch_count, batch in enumerate(val_loader):
                     averaged_model = self.get_averaged_model()
 
                     images, labels = batch
@@ -412,25 +332,34 @@ class LocalParameterizedAverager(nn.Module, LocalAverager):
                     correct_predictions += (predicted == labels).sum().item()
                     total_samples += labels.size(0)
 
-                    optimizer.zero_grad()
                     val_loss.backward()
-                    optimizer.step()
-                    logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss:.4f}, Weights: {self.weights}")
+                    with torch.no_grad():
+                        grad_weights = torch.zeros_like(self.weights)
+
+                        # for main_param in averaged_model.parameters():
+                        #     if main_param.grad is not None:
+                        #         main_param.grad = torch.clamp(main_param.grad,min=-0.1,max=0.1)
+
+                        for i, model in enumerate(self.lazy_load_params()):
+                            for j, (model_param, main_param) in enumerate(zip(model.values(), averaged_model.parameters())):
+                                if main_param.grad is not None:
+                                    grad_weights[i,j] += torch.sum(main_param.grad * (model_param - main_param))
+
+                        for main_param in averaged_model.parameters():
+                            main_param.grad.zero_()
+                        
+                        grad_weights = torch.clamp(grad_weights,min=-1,max=1)
+                        self.weights.data -= (lr * grad_weights)
+                        #if (batch_count * epoch+1) % 100:
+                        #    logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss.item():.4f}, Weights: {self.weights}")
 
                 average_loss = total_loss / total_samples
                 accuracy = correct_predictions / total_samples
-            
+                logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {average_loss:.4f},Accuracy: {accuracy}, Weights: {self.weights}")
                 
-            
-
-            # with torch.no_grad():
-            #     self.weights /= self.weights.sum()
-
-            
-
         return self.get_averaged_model()
 
-    def run_periodic_averaging(self, val_loader,meta_epochs, t):
+    def run_periodic_averaging(self, val_loader,meta_epochs, lr, t):
         while True:
             logging.info("Averaging Beginning")
             start_time = time.time()
@@ -441,9 +370,9 @@ class LocalParameterizedAverager(nn.Module, LocalAverager):
 
             self.get_model_paths()
             self.num_models = len(self.model_paths)
-            self.weights = nn.Parameter(nn.functional.softmax(torch.ones(self.num_models, device=self.device), dim=0))
+            
 
-            self.final_averaged_model = self.meta_learning(val_loader, meta_epochs, 0.001)
+            self.final_averaged_model = self.meta_learning(val_loader, meta_epochs, lr)
             #self.apply_averaged_gradients(averaged_weights)
             self.save_model()
             self.push_to_hf_hub(commit_message="Updated model with new gradients")
@@ -454,14 +383,10 @@ class LocalParameterizedAverager(nn.Module, LocalAverager):
 
             logging.info("Averaging Done")
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import os
-import random
-import numpy as np
 
-class LocalParameterizedAverager(nn.Module):
+
+
+class GeneticAverager(nn.Module):
     def __init__(self, model, local_dir, device, hf_manager, chain_manager=None, bittensor_network=None, hf_token=os.environ.get("HF_TOKEN")):
         super(LocalParameterizedAverager, self).__init__()
         self.model = model
@@ -572,75 +497,3 @@ class LocalParameterizedAverager(nn.Module):
             logging.info("Averaging Done")
         
 
-##FIXME where does it get its scored_gradients
-class RankedAverager(Averager):
-    def __init__(self, model, local_dir, repo_id, hf_token=None, validator=None, population_size=10, generations=5, mutation_rate=0.1, top_k=20):
-        super().__init__(model, local_dir, repo_id, hf_token)
-        self.population_size = population_size
-        self.generations = generations
-        self.top_k = top_k  # Number of top performing gradients to consider
-
-    def generate_initial_population(self, gradients, scores):
-        # Sort gradients based on scores, and take the top_k
-        top_k_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:self.top_k]
-        top_k_gradients = [gradients[i] for i in top_k_indices]
-        population = []
-        for _ in range(self.population_size):
-            individual = self.combine_gradients(top_k_gradients)
-            population.append(individual)
-        return population
-
-    def combine_gradients(self, top_k_gradients):
-        combined_gradient = {}
-        for grad_dict in top_k_gradients:
-            for name, grad in grad_dict.items():
-                if name not in combined_gradient:
-                    combined_gradient[name] = grad.clone()  # Use clone to ensure no inplace operation
-                else:
-                    if random.random() < 0.5:
-                        combined_gradient[name] = combined_gradient[name] + grad
-        return combined_gradient
-
-    def evaluate_individual(self, individual):
-        original_state_dict = copy.deepcopy(self.model.state_dict())
-        self.apply_averaged_gradients(individual)
-        loss, _ = self.model_validator.evaluate_model()
-        self.model.load_state_dict(original_state_dict)  # Restore original state
-        return loss
-
-    def rank_selection(self, population):
-        ranked = sorted(population, key=self.evaluate_individual)
-        return ranked
-
-    def average_gradients(self, gradients, scores):
-        population = self.generate_initial_population(gradients, scores)
-
-        for generation in range(self.generations):
-            ranked_population = self.rank_selection(population)
-            new_population = ranked_population[:self.top_k]  # Keep top_k performers
-
-            # Generate new individuals by combining top performers
-            while len(new_population) < self.population_size:
-                selected = random.sample(new_population, 2)
-                new_individual = self.combine_gradients(selected)
-                new_population.append(new_individual)
-
-            population = new_population
-
-        # Returning the best gradients after final generation
-        best_gradients = self.rank_selection(population)[0]
-        return best_gradients
-
-    def run_periodic_averaging(self, t, scored_gradients):
-        while True:
-            logging.info("Averaging Beggining")
-            start_time = time.time()
-            receive_and_score_gradients
-            averaged_gradients = self.average_gradients(self.miner_gradients, self.miner_scores)
-            self.apply_averaged_gradients(averaged_gradients)
-            self.save_model()
-            logging.info("Pushing to HF")
-            self.push_to_hf_hub(commit_message="Updated model with new gradients")
-            elapsed_time = time.time() - start_time
-            time_to_wait = max(0, t - elapsed_time)
-            time.sleep(time_to_wait)

@@ -1,3 +1,7 @@
+import os
+import torch
+import hashlib
+
 from huggingface_hub import HfApi, Repository
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -33,15 +37,6 @@ class HFManager:
         else:
             print(f"Model file not found: {model_file_path}")
 
-
-import os
-import torch
-
-import os
-import torch
-
-import os
-import hashlib
 
 class LocalHFManager:
     def __init__(self, repo_id="local_models"):
