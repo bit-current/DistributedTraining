@@ -369,6 +369,7 @@ class MNISTDeltaTrain(LocalTrainingLoop):
             for batch_idx, (data, target) in enumerate(self.data_loader):
 
                 if hf_manager.check_for_new_submissions():#FIXME add this in other training manager classes
+                    time.sleep(3)
                     logging.info("Model updated from Hugging Face. Continuing training with new model...")
                     self.model = hf_manager.update_model(self.model)
                     self.optimizer = SGD(self.model.parameters(), lr=0.001)  # Reinitialize the optimizer
