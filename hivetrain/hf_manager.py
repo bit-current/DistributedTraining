@@ -13,11 +13,11 @@ class HFManager:
 
     def __init__(
         self,
-        local_dir=".",
+        local_dir=".",#gradients local
         hf_token=None,
-        my_repo_id=None,
-        averaged_model_repo_id=None,
-        model_dir=None,
+        my_repo_id=None,#gradients HF
+        averaged_model_repo_id=None,#averaged HF
+        model_dir=None,#averaged local
     ):
     
         # Initializes the HFManager with the necessary repository and authentication details.

@@ -8,10 +8,10 @@ from hivetrain.btt_connector import (
     # get_validator_uids_and_addresses,
     serve_axon,
 )
-from hivetrain.chain_manager import LocalAddressStore
+from hivetrain.chain_manager import ChainMultiAddressStore
 from hivetrain.config import Configurator
-from hivetrain.hf_manager import LocalHFManager
-from hivetrain.training_manager import LocalDeltaLoop
+from hivetrain.hf_manager import HFManager
+from hivetrain.training_manager import DeltaLoop
 
 from hivetrain import __spec_version__
 from bittensor.btlogging import logging
@@ -45,7 +45,7 @@ BittensorNetwork.initialize(args)
 my_hotkey = args.wallet.hotkey#LocalBittensorNetwork.wallet.hotkey.ss58_address
 my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
-address_store = LocalAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
+address_store = ChainMultiAddressStoreAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
 address_store.store_hf_repo(args.storage.gradient_dir)
 
 # Parameters
@@ -97,9 +97,9 @@ data_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=cus
 # Optimizer
 optimizer = AdamW(model.parameters(), lr=learning_rate)
 
-hf_manager = LocalHFManager(repo_id=args.storage.model_dir)
+hf_manager = HFManager(my_repo_id = args.storage.my_repo_id, averaged_model_repo_id= args.storage.averaged_model_repo_id)
 #model_name, data_loader,gradients_dir, learning_rate=5e-5, send_interval=30, averaging_dir = "averaged_model"
-training_loop = LocalDeltaLoop("mekaneeky/tiny-random-gpt2", data_loader, args.storage.gradient_dir,send_interval=30, learning_rate=5e-4,averaging_dir="averaged_model")
+training_loop = DeltaLoop("mekaneeky/tiny-random-gpt2", data_loader, args.storage.gradient_dir,send_interval=30, learning_rate=5e-4,averaging_dir="averaged_model")
 training_loop.train(epochs=30_000_000_000_000_000, hf_manager=hf_manager) 
 
 
