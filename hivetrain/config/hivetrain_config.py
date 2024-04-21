@@ -22,7 +22,10 @@ def add_meta_miner_args(parser):
     parser.add_argument('--miner.send_interval', type=int, help='URLs of the validators for local testing only')
     parser.add_argument('--storage.gradient_dir', type=str, help='URLs of the validators for local testing onl')
     parser.add_argument('--storage.model_dir', type=str, help='URLs of the validators for local testing only')
-    
+    parser.add_argument('--storage.my_repo_id', type=str, help='Miner repo on HuggingFace for storing weights')
+    parser.add_argument('--storage.averaged_model_repo_id', type=str, help='Huggingface repo for storing final model')
+
+
 
 def add_torch_miner_args(parser):
     parser.add_argument('--rank', type=int, help='Rank of process/node in training run')

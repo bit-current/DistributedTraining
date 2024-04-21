@@ -1,8 +1,6 @@
 import random
-
 import torch
 
-from hivemind import DHT
 from hivetrain.btt_connector import (
     LocalBittensorNetwork,
     # get_validator_uids_and_addresses,
@@ -10,14 +8,14 @@ from hivetrain.btt_connector import (
 )
 from hivetrain.chain_manager import LocalAddressStore
 from hivetrain.config import Configurator
-from hivetrain.hf_manager import LocalHFManager
-from hivetrain.training_manager import MNISTDeltaTrain
+from hivetrain.hf_manager import LocalHFManager, HFManager
+from hivetrain.training_manager import MNISTDeltaTrainHugging
 
 from hivetrain import __spec_version__
 from bittensor.btlogging import logging
 
 import torch
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
@@ -35,10 +33,6 @@ def flatten_list(nested_list):
     return nested_list
 
 
-# # set some basic configuration values
-# inital_peers_request = requests.get(args.miner.bootstrapping_server)
-# initial_peers = inital_peers_request.json()["initial_peers"]
-# assert not (initial_peers is None)
 args = Configurator.combine_configs()
 
 LocalBittensorNetwork.initialize(args)
@@ -69,18 +63,16 @@ test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 
 # Training loop
-hf_manager = LocalHFManager(repo_id=args.storage.model_dir)
+hf_manager = HFManager(my_repo_id = args.storage.model_dir, averaged_model_repo_id= ar)
 #def __init__(self, model_name, data_loader,gradients_dir, learning_rate=5e-5, send_interval=30):
 
-training_loop = MNISTDeltaTrain(None, train_loader, args.storage.gradient_dir,test_loader=test_loader, send_interval=args.miner.send_interval)
+training_loop = MNISTDeltaTrainHugging(None, train_loader, args.storage.gradient_dir,test_loader=test_loader, send_interval=args.miner.send_interval)
 #training_loop.train(epochs=1, hf_manager=hf_manager)
-
+# training_loop.save_model() 
 steps = [i for i in range(1000,10002,1000)]
 
 losses = []
 training_loop.train(epochs=30_000_000_000_000_000, hf_manager=hf_manager, n_steps = 1000) 
-
-
 
 # # Assuming `steps` and `losses` are defined as you described
 training_losses = [loss[0] for loss in losses]  # Extract training losses
@@ -88,35 +80,35 @@ test_losses = [loss[1] for loss in losses]      # Extract test losses
 test_accuracy = [loss[2] for loss in losses]      # Extract test losses
 
 
-# Plotting Training Loss over Steps
-plt.figure(figsize=(10, 5))
-plt.plot(steps, training_losses, label='Training Loss', color='blue')
-plt.xlabel('Step')
-plt.ylabel('Training Loss')
-plt.title('Training Loss over Steps')
-plt.legend()
-plt.grid(True)
-plt.savefig('training_loss.png')  # Save the plot instead of showing it
-plt.close()  # Close the figure to free up memory
+# # Plotting Training Loss over Steps
+# plt.figure(figsize=(10, 5))
+# plt.plot(steps, training_losses, label='Training Loss', color='blue')
+# plt.xlabel('Step')
+# plt.ylabel('Training Loss')
+# plt.title('Training Loss over Steps')
+# plt.legend()
+# plt.grid(True)
+# plt.savefig('training_loss.png')  # Save the plot instead of showing it
+# plt.close()  # Close the figure to free up memory
 
-# Plotting Test Loss over Steps
-plt.figure(figsize=(10, 5))
-plt.plot(steps, test_losses, label='Test Loss', color='red')
-plt.xlabel('Step')
-plt.ylabel('Test Loss')
-plt.title('Test Loss over Steps')
-plt.legend()
-plt.grid(True)
-plt.savefig('test_loss.png')  # Save the plot instead of showing it
-plt.close()  # Close the figure to free up memory
+# # Plotting Test Loss over Steps
+# plt.figure(figsize=(10, 5))
+# plt.plot(steps, test_losses, label='Test Loss', color='red')
+# plt.xlabel('Step')
+# plt.ylabel('Test Loss')
+# plt.title('Test Loss over Steps')
+# plt.legend()
+# plt.grid(True)
+# plt.savefig('test_loss.png')  # Save the plot instead of showing it
+# plt.close()  # Close the figure to free up memory
 
-# Plotting Test Loss over Steps
-plt.figure(figsize=(10, 5))
-plt.plot(steps, test_accuracy, label='Test Accuracy', color='red')
-plt.xlabel('Step')
-plt.ylabel('Test Loss')
-plt.title('Test Loss over Steps')
-plt.legend()
-plt.grid(True)
-plt.savefig('test_acc.png')  # Save the plot instead of showing it
-plt.close()  # Close the figure to free up memory
+# # Plotting Test Loss over Steps
+# plt.figure(figsize=(10, 5))
+# plt.plot(steps, test_accuracy, label='Test Accuracy', color='red')
+# plt.xlabel('Step')
+# plt.ylabel('Test Loss')
+# plt.title('Test Loss over Steps')
+# plt.legend()
+# plt.grid(True)
+# plt.savefig('test_acc.png')  # Save the plot instead of showing it
+# plt.close()  # Close the figure to free up memory
