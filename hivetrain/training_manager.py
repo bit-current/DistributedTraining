@@ -3,7 +3,7 @@ from transformers import AdamW #FIXME replace me with LAMB
 from huggingface_hub import Repository
 import torch
 import math
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
 from bittensor import logging
 import torch.nn as nn
@@ -12,7 +12,7 @@ from torch.optim import SGD
 import os
 import hashlib
 
-load_dotenv()
+#load_dotenv()
 token = os.getenv("HF_TOKEN")
 
 class TrainingLoop:
