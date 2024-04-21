@@ -4,7 +4,7 @@ import torch
 
 from hivemind import DHT
 from hivetrain.btt_connector import (
-    LocalBittensorNetwork,
+    BittensorNetwork,
     # get_validator_uids_and_addresses,
     serve_axon,
 )
