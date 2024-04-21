@@ -45,7 +45,7 @@ BittensorNetwork.initialize(args)
 my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
 my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
-address_store = ChainMultiAddressStoreAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
+address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
 address_store.store_hf_repo(args.storage.gradient_dir)
 
 # Parameters
