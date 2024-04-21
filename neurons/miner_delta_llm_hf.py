@@ -42,7 +42,7 @@ def flatten_list(nested_list):
 args = Configurator.combine_configs()
 
 BittensorNetwork.initialize(args)
-my_hotkey = args.wallet.hotkey#LocalBittensorNetwork.wallet.hotkey.ss58_address
+my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
 my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
 address_store = ChainMultiAddressStoreAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
