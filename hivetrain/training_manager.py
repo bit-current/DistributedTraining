@@ -93,9 +93,7 @@ class TrainingLoop:
                     #self.aggregated_gradients = {name: torch.zeros_like(param) for name, param in self.model.named_parameters() if param.requires_grad}
 
 class LocalTrainingLoop(TrainingLoop):
-    def __init__(self, model_name, data_loader, learning_rate=5e-5):
-        super(LocalTrainingLoop, self).__init__(model_name, data_loader, learning_rate)  
-
+    
     @staticmethod
     def store_gradients(aggregated_gradients, local_dir, gradient_file_name="gradients.pt"):
         """
@@ -112,6 +110,58 @@ class LocalTrainingLoop(TrainingLoop):
         print(f"Gradients saved locally at: {gradient_file_path}")
 
 
+class DeltaLoop(TrainingLoop):
+
+    def train(self, epochs, hf_manager):
+        self.last_send_time = time.time()
+        self.optimizer.zero_grad()
+        self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()}
+        for epoch in range(epochs):
+            logging.info(f"Starting Epoch: {epoch}")
+            # Check for new submissions at the start of each epoch
+
+            total_loss = 0
+            total_examples = 0
+
+            if hf_manager.check_for_new_submissions():#FIXME add this in other training manager classes
+                    time.sleep(3)
+                    logging.info("Model updated from Hugging Face. Continuing training with new model...")
+                    self.model = hf_manager.update_model(self.model)
+                    self.optimizer = SGD(self.model.parameters(), lr=0.001)  # Reinitialize the optimizer
+                    self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()}
+
+            for step, batch in enumerate(self.data_loader):
+                outputs = self.model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch['input_ids'])
+                loss = outputs.loss
+                loss.backward()
+                # Update loss and example counts
+                total_loss += loss.item() * batch['input_ids'].size(0)
+                total_examples += batch['input_ids'].size(0)
+                
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+
+                # Example of a condition to periodically send gradients
+                current_time = time.time() ##time.time()%sth works better
+                if current_time - self.last_send_time >= self.send_interval:
+                    average_loss = total_loss / total_examples
+                    perplexity = math.exp(average_loss)
+                    logging.info(f"Epoch: {epoch}, Examples: {total_examples}, Loss: {average_loss:.4f}, Perplexity: {perplexity:.4f}")
+
+                    try:
+                        logging.info(f"Attempting to send gradients")
+                        self.weight_diffs = {name:  param.data - self.base_weights[name] for name, param in self.model.named_parameters() if param.requires_grad}
+                        self.store_gradients(self.weight_diffs, self.gradients_dir)
+                    except Exception as e:
+                        logging.warning(f"Sending gradients failed: {e}")
+                        continue
+                    self.last_send_time = current_time
+                    # Reset aggregated gradients
+                    #self.aggregated_gradients = {name: torch.zeros_like(param) for name, param in self.model.named_parameters() if param.requires_grad}
+
+
+class LocalDeltaLoop(DeltaLoop, LocalTrainingLoop):
+    pass
 
 class FeedforwardNN(nn.Module):
     def __init__(self):
@@ -199,8 +249,6 @@ class MNISTTrain(LocalTrainingLoop):
             total_loss = 0
             total_examples = 0
             
-            
-
             # if hf_manager.check_for_new_submissions():
             #     logging.info("Model updated from Hugging Face. Continuing training with new model...")
             #     self.model = hf_manager.update_model(self.model)
@@ -262,8 +310,8 @@ class MNISTTrain(LocalTrainingLoop):
                     logging.info(f"Epoch: {epoch}, Batch: {batch_idx}, Loss: {average_loss:.4f}")
 
                     # Logic to send aggregated gradients
-                    self.aggregated_gradients = {name: param.grad.clone() for name, param in self.model.named_parameters() if param.requires_grad and param.grad is not None}
-                    self.store_gradients(self.aggregated_gradients, self.gradients_dir)
+                    self.weight_diffs = {name:  param.data - self.base_weights[name] for name, param in self.model.named_parameters() if param.requires_grad}
+                    self.store_gradients(self.weight_diffs, self.gradients_dir)
 
                     self.last_send_time = time.time()
                     #total_loss = 0

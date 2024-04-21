@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from huggingface_hub import Repository, HfFolder
-from hivetrain.averaging_logic import LocalParameterizedAverager
+from hivetrain.averaging_logic import LocalLLMParameterizedAverager
 from hivetrain.btt_connector import LocalBittensorNetwork
 from hivetrain.config import Configurator
 from hivetrain.chain_manager import LocalAddressStore
@@ -93,16 +93,17 @@ def custom_collate_fn(batch):
 
 # Create the dataset and data loader
 wikitext_dataset = WikitextDataset(texts, tokenizer)
-data_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=custom_collate_fn)
+test_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=custom_collate_fn)
 
 
 #__init__(self, model, local_dir, bittensor_network=None)
 #model, device, chain_manager=None,bittensor_network=None, hf_token=hf_token 
 
 hf_manager = LocalHFManager(repo_id=args.storage.model_dir)
-averager = LocalParameterizedAverager(model=model,device="cpu",hf_manager=hf_manager, local_dir=args.storage.model_dir, chain_manager=address_store,bittensor_network=LocalBittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
+averager = LocalLLMParameterizedAverager(model=model,device="cpu",hf_manager=hf_manager, local_dir=args.storage.model_dir, chain_manager=address_store,bittensor_network=LocalBittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
 #averager.run_periodic_averaging(test_loader,20,300)
 #val_loader,meta_epochs, lr, t
-averager.run_periodic_averaging(test_loader, 200,0.01,30)
+#averager.save_model()
+averager.run_periodic_averaging(test_loader, 200,0.1,30)
 # # Push the model to the Hugging Face Hub
 # push_to_hf_hub(local_dir=local_dir, repo_id=repo_id, hf_token=args.averager.hf_token, commit_message=f"Updated model SN25 with {222}")#FIXME add block numbers

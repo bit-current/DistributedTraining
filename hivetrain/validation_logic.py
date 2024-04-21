@@ -156,6 +156,16 @@ class LocalValidator(ModelValidator):
             logging.error(f"Error receiving gradients locally: {e}")
             return None
 
+class DeltaValidator(ModelValidator):
+
+    def update_model_weights(self, weight_deltas, alpha=5e-4):
+        with torch.no_grad():
+            for name, param in self.model.named_parameters():
+                if name in weight_deltas:
+                    param.data = weight_deltas[name] + param.data
+    
+class LocalDeltaValidator(DeltaValidator, LocalValidator):
+    pass
 
 class MNISTValidator(LocalValidator):
     def __init__(self, model, optimizer, data_loader, bittensor_network=None, chain_manager=None, hf_manager=None, interval=300,local_gradient_dir="local_gradients"):

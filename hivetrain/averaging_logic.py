@@ -281,7 +281,7 @@ class LocalParameterizedAverager(LocalAverager):
                 yield None
             else:
                 weight_delta = torch.load(os.path.join(model_path,"gradients.pt"), map_location='cpu')
-                base_model = self.model.state_dict()
+                base_model = torch.load(os.path.join(self.local_dir,"averaged_model.pt"), map_location='cpu')#self.model.state_dict()
                 for name, delta_param in weight_delta.items():
                     weight_delta[name] = weight_delta[name] + base_model[name]
                 yield weight_delta
@@ -299,7 +299,7 @@ class LocalParameterizedAverager(LocalAverager):
         """
         os.makedirs(self.local_dir, exist_ok=True)
         model_save_path = os.path.join(self.local_dir, "averaged_model.pt")
-        torch.save(self.final_averaged_model.state_dict(), model_save_path)
+        torch.save(self.model.state_dict(), model_save_path)
         logging.info(f"Model saved locally at {model_save_path}.")
 
     def meta_learning(self, val_loader, meta_epochs, lr):
@@ -348,7 +348,7 @@ class LocalParameterizedAverager(LocalAverager):
                         for main_param in averaged_model.parameters():
                             main_param.grad.zero_()
                         
-                        grad_weights = torch.clamp(grad_weights,min=-1,max=1)
+                        #grad_weights = torch.clamp(grad_weights,min=-1,max=1)
                         self.weights.data -= (lr * grad_weights)
                         #if (batch_count * epoch+1) % 100:
                         #    logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss.item():.4f}, Weights: {self.weights}")
@@ -372,7 +372,7 @@ class LocalParameterizedAverager(LocalAverager):
             self.num_models = len(self.model_paths)
             
 
-            self.final_averaged_model = self.meta_learning(val_loader, meta_epochs, lr)
+            self.model = self.meta_learning(val_loader, meta_epochs, lr)
             #self.apply_averaged_gradients(averaged_weights)
             self.save_model()
             self.push_to_hf_hub(commit_message="Updated model with new gradients")
@@ -383,7 +383,64 @@ class LocalParameterizedAverager(LocalAverager):
 
             logging.info("Averaging Done")
 
+class LocalLLMParameterizedAverager(LocalParameterizedAverager):
 
+    def meta_learning(self, val_loader, meta_epochs, lr):
+        
+        criterion = nn.CrossEntropyLoss()
+        #optimizer = optim.SGD([self.weights], lr=lr)
+        self.weights = None#nn.Parameter(nn.functional.softmax(torch.ones(self.num_models, device=self.device), dim=0))
+        for epoch in range(meta_epochs):
+            # Outer loop: Update averaging weights
+            
+            #val_loss = evaluate_model(averaged_model, val_loader, criterion, self.device)
+
+            #self.model.eval()
+            
+            for epoch in range(meta_epochs):
+                
+                total_loss = 0
+                total_samples = 0
+                
+                for batch_num, batch in enumerate(val_loader): #FIXME turn me into a generator?
+                    averaged_model = self.get_averaged_model()
+                    averaged_model.train()
+                    optimizer = optim.SGD(averaged_model.parameters(),lr=1010)#This is only used to clear grads
+                    outputs = averaged_model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch["labels"])
+                    val_loss = outputs.loss
+                    total_loss += val_loss.item() * batch['input_ids'].size(0)
+                    total_samples += batch['input_ids'].size(0)
+
+                    val_loss.backward()
+                    with torch.no_grad():
+                        grad_weights = torch.zeros_like(self.weights)
+
+                        # for main_param in averaged_model.parameters():
+                        #     if main_param.grad is not None:
+                        #         main_param.grad = torch.clamp(main_param.grad,min=-0.1,max=0.1)
+
+                        for i, model in enumerate(self.lazy_load_params()):
+                            for j, (model_param, main_param) in enumerate(zip(model.values(), averaged_model.parameters())):
+                                if main_param.grad is not None:
+                                    grad_weights[i, j] += torch.sum(main_param.grad * (model_param - main_param))
+
+                        for main_param in averaged_model.parameters():
+                            main_param.grad.zero_()
+                        optimizer.zero_grad()
+                        #grad_weights = torch.clamp(grad_weights,min=-1,max=1)
+                        self.weights.data -= (lr * grad_weights)
+                        if (batch_num * epoch+1) % 100:
+                            average_loss = total_loss / total_samples
+                            #logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {average_loss}, Weights: {self.weights}")
+
+                average_loss = total_loss / total_samples
+                try:
+                    perplexity = math.exp(average_loss)
+                except:
+                    perplexity = 999999
+                logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {average_loss:.4f}, Perplexity: {perplexity}, Weights: {self.weights}")
+                
+        return self.get_averaged_model()
 
 
 class GeneticAverager(nn.Module):
@@ -485,7 +542,7 @@ class GeneticAverager(nn.Module):
             self.num_models = len(self.model_paths)
             self.weights = nn.Parameter(nn.functional.softmax(torch.ones(self.num_models, device=self.device), dim=0))
 
-            self.final_averaged_model = self.run_evolution(val_loader)
+            self.model = self.run_evolution(val_loader)
             #self.apply_averaged_gradients(averaged_weights)
             self.save_model()
             self.push_to_hf_hub(commit_message="Updated model with new gradients")

@@ -23,7 +23,7 @@ from hivetrain.chain_manager import LocalAddressStore
 from hivetrain.config import Configurator
 from hivetrain import __spec_version__
 from bittensor.btlogging import logging
-from hivetrain.validation_logic import MNISTDeltaValidator
+from hivetrain.validation_logic import LocalDeltaValidator
 from hivetrain.dht_connector import DHTManager
 from hivetrain.hf_manager import LocalHFManager
 from hivetrain.training_manager import FeedforwardNN
@@ -41,23 +41,27 @@ model_name = "mekaneeky/tiny-random-gpt2"
 batch_size = args.batch_size
 epochs = 30_000_000_000_000_000
 learning_rate = 5e-5
-send_interval = 120   # Every 60 seconds 
+receive_interval = 120   # Every 60 seconds 
 
 # Load model and tokenizer
 # Load the Wikitext dataset
+# Load the wikitext dataset, focusing on the test split
 dataset = load_dataset("wikitext", "wikitext-103-v1")
 
-# Assuming you want to use the 'train' split of the dataset
-texts = dataset['test']['text'][:100]
+# Get test data (using the first 100 texts for this example)
 
-# Load model and tokenizer
+texts = dataset['test']['text'][:100]#FIXME 400?
+
+# Load the tokenizer and model
 model_name = "mekaneeky/tiny-random-gpt2"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 model = AutoModelForCausalLM.from_pretrained(model_name)
 model.resize_token_embeddings(len(tokenizer))
 model.train()
+optimizer = AdamW(model.parameters(), lr=5e-5)
 
+# Create a custom dataset class for Wikitext
 class WikitextDataset(Dataset):
     def __init__(self, texts, tokenizer, max_length=512):
         self.tokenizer = tokenizer
@@ -73,21 +77,20 @@ class WikitextDataset(Dataset):
         attention_mask = encoding['attention_mask'].squeeze()
         return {'input_ids': input_ids, 'attention_mask': attention_mask, 'labels': input_ids.clone()}
 
+# Define a collate function for data batching
 def custom_collate_fn(batch):
     input_ids = torch.stack([item['input_ids'] for item in batch])
     attention_mask = torch.stack([item['attention_mask'] for item in batch])
     labels = input_ids.clone()  # Copy input_ids to labels
     return {'input_ids': input_ids, 'attention_mask': attention_mask, 'labels': labels}
 
-# Create the dataset and data loader
-wikitext_dataset = WikitextDataset(texts, tokenizer)
-data_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=custom_collate_fn)
-
-
+# Create the test set and DataLoader
+test_set = WikitextDataset(texts, tokenizer)
+test_loader = DataLoader(test_set, batch_size=8, collate_fn=custom_collate_fn)
 # Load your model and other necessary components here
 #    def __init__(self, model, optimizer, data_loader, bittensor_network=None, chain_manager=None, interval=3600, local_gradient_dir="local_gradients"):
 hf_manager = LocalHFManager(repo_id=args.storage.model_dir)
-validator = MNISTDeltaValidator(model=model,optimizer=optimizer, data_loader=test_loader,
+validator = LocalDeltaValidator(model=model,optimizer=optimizer, data_loader=test_loader,
     bittensor_network=LocalBittensorNetwork ,hf_manager=hf_manager, interval=receive_interval, chain_manager=address_store,local_gradient_dir=args.storage.gradient_dir,
     )
 validator.start_periodic_validation()
