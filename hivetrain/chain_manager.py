@@ -80,7 +80,7 @@ class ChainMultiAddressStore:
             self.subtensor.commit,
             self.wallet,
             self.subnet_uid,
-            multiaddress,
+            hf_repo,
         )
         run_in_subprocess(partial, 60)
 
