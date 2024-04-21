@@ -14,7 +14,7 @@ class HFManager:
     def __init__(
         self,
         local_dir=".",#gradients local
-        hf_token=None,
+        hf_token=os.environ.get("HF_TOKEN"),
         my_repo_id=None,#gradients HF
         averaged_model_repo_id=None,#averaged HF
         model_dir=None,#averaged local
@@ -47,13 +47,12 @@ class HFManager:
         # Get the latest commit SHA for synchronization checks
         self.latest_model_commit_sha = self.get_latest_commit_sha(self.model_repo_id)
 
-    def push_changes(self, files):
+    def push_changes(self, file_to_send):
         """
         Stages, commits, and pushes changes to the configured repository.
         """
         try:
-            for file in files:
-                self.gradient_repo.git_add(file)
+            self.gradient_repo.git_add(file_to_send)
             self.gradient_repo.git_commit("Update model gradients")
             self.gradient_repo.git_push()
         except Exception as e:
@@ -108,7 +107,7 @@ class HFManager:
         self.model_repo.git_pull()
 
     def receive_gradients(self, miner_repo_id, weights_file_name="weight_diff.pt"):
-        try:
+        try: #TODO Add some garbage collection.
             # Download the gradients file from Hugging Face Hub
             weights_file_path = hf_hub_download(
                 repo_id=miner_repo_id, filename=weights_file_name, use_auth_token=True

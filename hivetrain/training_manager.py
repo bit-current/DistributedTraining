@@ -260,12 +260,14 @@ class DeltaLoop(TrainingLoop):
             total_loss = 0
             total_examples = 0
 
-            if hf_manager.check_for_new_submissions():#FIXME add this in other training manager classes
-                    time.sleep(3)
-                    logging.info("Model updated from Hugging Face. Continuing training with new model...")
-                    self.model = hf_manager.update_model(self.model)
-                    self.optimizer = SGD(self.model.parameters(), lr=0.001)  # Reinitialize the optimizer
-                    self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()}
+            if time.time() - self.last_pull_time >= self.check_update_interval and self.hf_manager.check_for_new_submissions(self.hf_manager.model_repo_id):
+                    logging.info("Averaged model updated on Hugging Face. Pulling latest model...")                
+                    self.hf_manager.pull_latest_model()
+                    time.sleep(10) #just to give enough time for pull
+                    self.model = self.hf_manager.update_model(self.model)
+                    optimizer = optim.Adam(self.model.parameters(), lr=5e-5)  # Reinitialize the optimizer
+                    self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()} 
+                    self.last_pull_time = time.time()
 
             for step, batch in enumerate(self.data_loader):
                 outputs = self.model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch['input_ids'])
@@ -280,21 +282,22 @@ class DeltaLoop(TrainingLoop):
 
                 # Example of a condition to periodically send gradients
                 current_time = time.time() ##time.time()%sth works better
-                if current_time - self.last_send_time >= self.send_interval:
+                if time.time() - self.last_send_time >= self.send_interval:
                     average_loss = total_loss / total_examples
                     perplexity = math.exp(average_loss)
-                    logging.info(f"Epoch: {epoch}, Examples: {total_examples}, Loss: {average_loss:.4f}, Perplexity: {perplexity:.4f}")
+                    logging.info(f"Epoch: {epoch}, Batch: {batch_idx}, Loss: {average_loss:.4f}")
 
                     try:
-                        logging.info(f"Attempting to send gradients")
+                        logging.info(f"Attempting to send weights")
+                        logging.info(f"********* Attempting to send weights")
+                        # Periodically save gradients
+                        model_gradients_path = os.path.join(self.hf_manager.get_local_gradient_directory(), 'weight_diff.pt')
                         self.weight_diffs = {name:  param.data - self.base_weights[name] for name, param in self.model.named_parameters() if param.requires_grad}
-                        self.store_gradients(self.weight_diffs, self.gradients_dir)
+                        torch.save(self.weight_diffs, model_gradients_path)
+                        self.hf_manager.push_changes('weight_diff.pt')
                     except Exception as e:
                         logging.warning(f"Sending gradients failed: {e}")
                         continue
-                    self.last_send_time = current_time
-                    # Reset aggregated gradients
-                    #self.aggregated_gradients = {name: torch.zeros_like(param) for name, param in self.model.named_parameters() if param.requires_grad}
 
 
 class LocalDeltaLoop(DeltaLoop, LocalTrainingLoop):
