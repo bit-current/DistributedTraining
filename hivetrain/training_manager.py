@@ -272,7 +272,7 @@ class DeltaLoop(TrainingLoop):
                     self.last_pull_time = time.time()
 
             for step, batch in enumerate(self.data_loader):
-                outputs = self.model(input_ids=batch['input_ids'].to(device), attention_mask=batch['attention_mask'].to(device), labels=batch['input_ids'].to(device))
+                outputs = self.model(input_ids=batch['input_ids'].to(self.device), attention_mask=batch['attention_mask'].to(self.device), labels=batch['input_ids'].to(self.device))
                 loss = outputs.loss
                 loss.backward()
                 # Update loss and example counts
