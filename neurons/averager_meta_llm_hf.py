@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from huggingface_hub import Repository, HfFolder
-from hivetrain.averaging_logic import LLMParameterizedAverager
+from hivetrain.averaging_logic import ParameterizedAverager
 from hivetrain.btt_connector import BittensorNetwork
 from hivetrain.config import Configurator
 from hivetrain.chain_manager import ChainMultiAddressStore
@@ -100,7 +100,7 @@ test_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=cus
 #model, device, chain_manager=None,bittensor_network=None, hf_token=hf_token 
 
 hf_manager = HFManager(repo_id=args.storage.model_dir)
-averager = LLMParameterizedAverager(model=model,device="cpu",hf_manager=hf_manager, local_dir=args.storage.model_dir, chain_manager=address_store,bittensor_network=LocalBittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
+averager = ParameterizedAverager(model=model,device="cpu",hf_manager=hf_manager, local_dir=args.storage.model_dir, chain_manager=address_store,bittensor_network=LocalBittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
 #averager.run_periodic_averaging(test_loader,20,300)
 #val_loader,meta_epochs, lr, t
 #averager.save_model()

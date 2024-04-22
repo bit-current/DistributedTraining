@@ -248,6 +248,132 @@ class LocalAverager(DeltaAverager):
         torch.save(self.model.state_dict(), model_save_path)
         logging.info(f"Model saved locally at {model_save_path}.")
 
+class ParameterizedAverager(DeltaAverager):
+    def __init__(self, model,local_dir, device,hf_manager, chain_manager=None,bittensor_network=None, hf_token=os.environ.get("HF_TOKEN") ):
+        LocalAverager.__init__(self,model, local_dir,hf_manager=hf_manager, chain_manager=chain_manager, bittensor_network=bittensor_network, hf_token=hf_token)
+        self.device = device
+
+    def get_model_paths(self, gradient_file_name="gradients.pt"):
+        self.model_paths = []
+        for uid, hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
+            try:
+                repo_id = self.chain_manager.retrieve_hf_repo(hotkey)
+                #gradient = self.receive_gradients(repo_id=repo_id)
+                if repo_id is not None:
+                    self.model_paths.append(repo_id)
+            except Exception as e:
+                logging.debug(f"Receiving gradients failed due to: {e}")
+
+    def get_averaged_params(self):
+        if self.weights is None:
+            self.weights = nn.functional.softmax(torch.ones((self.num_models,len(list(self.model.parameters()))), device=self.device),dim=0)
+        averaged_gradients = {name: torch.zeros_like(grad) for name, grad in self.model.named_parameters()}
+        for params, weight in zip(self.lazy_load_params(), self.weights):
+            for j, (name_reconstructed_model, param_reconstructed_model) in enumerate(params.items()):
+                averaged_gradients[name_reconstructed_model] += (param_reconstructed_model * weight[j]) #FIXME make weights per param
+
+        return averaged_gradients
+
+    def lazy_load_params(self):
+        for model_path in self.model_paths:
+            if model_path is None:
+                yield None
+            else:
+                weight_delta = torch.load(os.path.join(model_path,"gradients.pt"), map_location='cpu')
+                base_model = torch.load(os.path.join(self.local_dir,"averaged_model.pt"), map_location='cpu')#self.model.state_dict()
+                for name, delta_param in weight_delta.items():
+                    weight_delta[name] = weight_delta[name] + base_model[name]
+                yield weight_delta
+
+    def get_averaged_model(self):
+        averaged_params = self.get_averaged_params()
+        for param, averaged_param in zip(self.model.parameters(), averaged_params.values()):
+            param.data.copy_(averaged_param.data)  
+        self.model.to(self.device)
+        return self.model
+
+    def save_model(self):
+        """
+        Saves the model to the specified local directory.
+        """
+        os.makedirs(self.local_dir, exist_ok=True)
+        model_save_path = os.path.join(self.local_dir, "averaged_model.pt")
+        torch.save(self.model.state_dict(), model_save_path)
+        logging.info(f"Model saved locally at {model_save_path}.")
+
+    def meta_learning(self, val_loader, meta_epochs, lr):
+        
+        criterion = nn.CrossEntropyLoss()
+        self.weights = None#nn.Parameter(nn.functional.softmax(torch.ones(self.num_models, device=self.device), dim=0))
+        for epoch in range(meta_epochs):
+
+            for epoch in range(meta_epochs):
+                total_loss = 0
+                correct_predictions = 0
+                total_samples = 0
+
+                for batch_count, batch in enumerate(val_loader):
+                    averaged_model = self.get_averaged_model()
+
+                    images, labels = batch
+                    outputs = averaged_model(images)
+                    val_loss = F.cross_entropy(outputs, labels)
+                    total_loss += val_loss.item() 
+                    _, predicted = torch.max(outputs.data, 1)
+                    correct_predictions += (predicted == labels).sum().item()
+                    total_samples += labels.size(0)
+
+                    val_loss.backward()
+                    with torch.no_grad():
+                        grad_weights = torch.zeros_like(self.weights)
+
+                        # for main_param in averaged_model.parameters():
+                        #     if main_param.grad is not None:
+                        #         main_param.grad = torch.clamp(main_param.grad,min=-0.1,max=0.1)
+
+                        for i, model in enumerate(self.lazy_load_params()):
+                            for j, (model_param, main_param) in enumerate(zip(model.values(), averaged_model.parameters())):
+                                if main_param.grad is not None:
+                                    grad_weights[i,j] += torch.sum(main_param.grad * (model_param - main_param))
+
+                        for main_param in averaged_model.parameters():
+                            main_param.grad.zero_()
+                        
+                        #grad_weights = torch.clamp(grad_weights,min=-1,max=1)
+                        self.weights.data -= (lr * grad_weights)
+                        #if (batch_count * epoch+1) % 100:
+                        #    logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss.item():.4f}, Weights: {self.weights}")
+
+                average_loss = total_loss / total_samples
+                accuracy = correct_predictions / total_samples
+                logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {average_loss:.4f},Accuracy: {accuracy}, Weights: {self.weights}")
+                
+        return self.get_averaged_model()
+
+    def run_periodic_averaging(self, val_loader,meta_epochs, lr, t):
+        while True:
+            logging.info("Averaging Beginning")
+            start_time = time.time()
+
+            if self.hf_manager.check_for_new_submissions():
+                logging.info("Model updated from Hugging Face. Continuing training with new model...")
+                self.model = self.hf_manager.update_model(self.model)
+
+            self.get_model_paths()
+            self.num_models = len(self.model_paths)
+            
+
+            self.model = self.meta_learning(val_loader, meta_epochs, lr)
+            #self.apply_averaged_gradients(averaged_weights)
+            self.save_model()
+            self.push_to_hf_hub(commit_message="Updated model with new gradients")
+
+            elapsed_time = time.time() - start_time
+            time_to_wait = max(0, t - elapsed_time)
+            time.sleep(time_to_wait)
+
+            logging.info("Averaging Done")
+
 
 class LocalParameterizedAverager(LocalAverager):
     def __init__(self, model,local_dir, device,hf_manager, chain_manager=None,bittensor_network=None, hf_token=os.environ.get("HF_TOKEN") ):
