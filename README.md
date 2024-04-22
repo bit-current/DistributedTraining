@@ -4,16 +4,17 @@
 
 (WARNING: IN ACTIVE DEVELOPMENT)
 
-## Vision
+## Introduction
 
-This project aims to revolutionize distributed computing and mining by leveraging distributed training on Bittensor. It introduces a scalable system for training deep learning models across distributed nodes. Participants are rewarded in TAO for their computational contributions, fostering a decentralized ecosystem of computational resources.
+This project introduces a cutting-edge approach to distributed deep learning, utilizing the Bittensor network. Our method incentivizes participants by rewarding the generation of optimal weights that contribute significantly to minimizing the overall loss of the base model.
 
-## How to Use (Docker - Not yet production ready)
+To streamline the process and reduce communication overhead between miners, we integrate Hugging Face as a central hub. This serves as an intermediary, facilitating efficient miner-
+validator communications without the complexities of direct exchanges.
 
-## Install Dependencies
-
-1. [Docker](https://docs.docker.com/engine/install/)
-2. [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+Key Components: 
+* Miners: Miners are responsible for training the language model. They compute the weight delta—the difference between the weights of the trained model and the base model. This delta is then uploaded to Hugging Face, from where it can be accessed by validators. 
+* Validators: Validators play a crucial role in assessing the miners' contributions. They download the weight deltas from Hugging Face and evaluate them based on their impact on the model’s performance, focusing on metrics such as loss reduction and accuracy. 
+* Averager: We also introduce an averager, which analyzes the combined effect of individual weight contributions to determine the optimal combination that results in the lowest possible loss.
 
 ## Clone the Repo
 
@@ -36,61 +37,34 @@ pip install -e .
 ## Checkout the Dev Branch
 
 ```
-git checkout test-lightning
+git checkout chain_meta
 ```
+## Hugging Face
+Continue setting up by following these step:
 
-## Build the Docker Image
+### 1. Create a Hugging Face Account
+If you don't already have a Hugging Face account, you'll need to create one:
 
+Visit [Hugging Face](https://huggingface.co/) to sign up
+### 2. Create a Hugging Face Model Repository
+Once you have your Hugging Face account, you need to create a model repository:
+* Navigate to your profile by clicking on your username in the top right corner.
+* Click on "New Model" (you may find this button under the "Models" section if you have existing models).
+* Fill in the repository name, description, and set the visibility to public.
+* Click on "Create Model" to establish your new model repository.
+### 3. Generate a Token for the Repository
+To allow programmatic communication with your repository, you will need to generate an authentication token:
+
+* From your Hugging Face account, go to "Settings" by clicking on your profile icon.
+* Select the "Access Tokens" tab from the sidebar.
+* Click on "New Token".
+* Name your token and select the "write" access to be able to upload changes.
+* Click on "Create Token".
+
+### 4. Create a New .env File to Store Your Hugging Face Token
+Store your new token in the .env file in DistributedTranining directory:
 ```
-docker compose build
-```
-
-## Make a .env File
-
-Edit the existing .env file to include values that reflect your machine/network.
-
-## Join a Training Run
-
-To join the existing training run on the subnet, find the peer ID of a running node on the network.
-
-This will be provided for you. For the latest, see the pinned post on the Discord channel.
-
-Add this environment variable to your `.env` file:
-
-```
-INITIAL_PEERS="/ip4/peer_ip/tcp/peer_dht_port/p2p/12D3KooWE_some_hash_that_looks_like_this_VqgXKo9EUQ4hguny9"
-```
-
-After that, you may join the training run with:
-
-```
-docker compose up
-```
-
-## How to Use (No Docker)
-
-## Clone the Repo
-
-```
-git clone https://github.com/bit-current/DistributedTraining
-```
-
-## Move into the Repo
-
-```
-cd DistributedTraining
-```
-
-## Checkout Current Branch
-
-```
-cd DistributedTraining
-```
-
-## Install Repo + Requirements
-
-```
-pip install -e .
+HF_TOKEN="your_huggingface_token_here"
 ```
 
 ## Load Wallets and Register to Subnet
