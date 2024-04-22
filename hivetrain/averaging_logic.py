@@ -250,7 +250,7 @@ class LocalAverager(DeltaAverager):
 
 class ParameterizedAverager(DeltaAverager):
     def __init__(self, model,local_dir, device,hf_manager, chain_manager=None,bittensor_network=None, hf_token=os.environ.get("HF_TOKEN") ):
-        LocalAverager.__init__(self,model, local_dir,hf_manager=hf_manager, chain_manager=chain_manager, bittensor_network=bittensor_network, hf_token=hf_token)
+        DeltaAverager.__init__(self,model, local_dir,hf_manager=hf_manager, chain_manager=chain_manager, bittensor_network=bittensor_network, hf_token=hf_token)
         self.device = device
 
     def get_model_paths(self, gradient_file_name="gradients.pt"):
