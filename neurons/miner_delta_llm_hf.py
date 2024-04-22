@@ -24,8 +24,8 @@ from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 from tqdm import tqdm
 
+logging.enable_debug()
 logging.info("Starting !")
-breakpoint()
 
 def flatten_list(nested_list):
     """Flatten a nested list."""
