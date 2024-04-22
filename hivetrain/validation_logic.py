@@ -30,7 +30,7 @@ class ModelValidator:
         self.interval = interval  # Validation interval in seconds
         self.base_loss, self.base_perplexity = self.evaluate_model()
         self.bittensor_network = bittensor_network
-        self.scores = {hotkey:0.0 for _ in range(len(self.bittensor_network.metagraph.hotkeys))}
+        self.scores = {hotkey:0.0 for hotkey in self.bittensor_network.metagraph.hotkeys}
         self.chain_manager = chain_manager
         self.hf_manager = hf_manager
         self.last_pull_time = 0
