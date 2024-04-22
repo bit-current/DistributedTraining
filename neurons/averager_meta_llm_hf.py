@@ -35,6 +35,7 @@ from hivetrain.hf_manager import HFManager
 from torchvision import transforms, datasets
 from datasets import load_dataset
 
+logging.enable_debug()
 
 args = Configurator.combine_configs()
 
