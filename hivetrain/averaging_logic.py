@@ -324,7 +324,7 @@ class ParameterizedAverager(DeltaAverager):
                     averaged_model = self.get_averaged_model()
 
                     outputs = self.model(input_ids=batch['input_ids'].to(self.device), attention_mask=batch['attention_mask'].to(self.device), labels=batch["labels"].to(self.device))
-                    loss = outputs.loss
+                    val_loss = outputs.loss
                     total_loss += loss.item() * batch['input_ids'].size(0)
                     total_samples += batch['input_ids'].size(0)
 
