@@ -113,7 +113,7 @@ class HFManager:
                 repo_id=miner_repo_id, filename=weights_file_name, use_auth_token=True
             )
             # Load the gradients directly using torch.load
-            miner_weights = torch.load(weights_file_path)
+            miner_weights = torch.load(weights_file_path, map_location=self.device)
 
             return miner_weights
         except Exception as e:
