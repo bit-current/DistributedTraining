@@ -4,7 +4,7 @@ __spec_version__ = (100 * int(version_split[0])) + (10 * int(version_split[1])) 
 
 from . import btt_connector
 #from . import dht_connector
-from . import auth
+#from . import auth
 from . import chain_manager
 from . import validation_logic
 from . import averaging_logic
