@@ -250,11 +250,12 @@ class LocalAverager(DeltaAverager):
 
 class ParameterizedAverager(DeltaAverager):
     #__init__(self, model, local_dir, repo_id,hf_manager, chain_manager,bittensor_network, hf_token=os.environ.get("HF_TOKEN"))
-    def __init__(self, model,local_dir, device, repo_id = None, hf_manager=None, chain_manager=None,bittensor_network=None, hf_token=os.environ.get("HF_TOKEN"), check_update_interval=300 ):
+    def __init__(self, model,local_dir,gradients_dir, device, repo_id = None, hf_manager=None, chain_manager=None,bittensor_network=None, hf_token=os.environ.get("HF_TOKEN"), check_update_interval=300 ):
         DeltaAverager.__init__(self,model, local_dir=local_dir,repo_id=repo_id,hf_manager=hf_manager, chain_manager=chain_manager, bittensor_network=bittensor_network, hf_token=hf_token)
         self.device = device
         self.last_pull_time = 0
         self.check_update_interval = check_update_interval
+        self.gradients_dir = gradients_dir
 
     def get_model_paths(self, gradient_file_name="gradients.pt"):
         self.model_paths = []
@@ -263,9 +264,36 @@ class ParameterizedAverager(DeltaAverager):
                 repo_id = self.chain_manager.retrieve_hf_repo(hotkey)
                 #gradient = self.receive_gradients(repo_id=repo_id)
                 if repo_id is not None:
-                    self.model_paths.append(repo_id)
-            except Exception as e:
+                    self.model_paths.append( {"repo_id":repo_id, "hotkey":hotkey, "uid":uid } )
+            except Exception as e: 
                 logging.debug(f"Receiving gradients failed due to: {e}")
+
+    def store_weight_delta(self, hotkey):
+        """
+        Save the weight_delta state_dict to a local directory at regular intervals.
+        """
+        os.makedirs(self.gradients_dir, exist_ok=True)
+        save_path = os.path.join(self.gradients_dir, f"weight_delta_{hotkey}.pt")
+        torch.save(self.weight_delta_cache, save_path)
+
+    def load_weight_delta(self,hotkey):
+        """
+        Load the cached weight_delta state_dict from the local directory.
+        """
+        load_path = os.path.join(self.gradients_dir, f"weight_delta_{hotkey}.pt")
+        if os.path.exists(load_path):
+            return torch.load(load_path, map_location=self.device)
+        else:
+            return None
+
+    def cache_params_locally(self):
+        for model_path in self.model_paths:
+            if model_path is None:
+                continue
+            else:
+                weight_delta = self.hf_manager.receive_gradients(model_path["model_path"])
+                self.store_weight_delta(model_path["hotkey"])
+        #if time.time() - self.last_cache_time > self.caching_interval:
 
     def get_averaged_params(self):
         if self.weights is None:
@@ -282,20 +310,17 @@ class ParameterizedAverager(DeltaAverager):
         return averaged_gradients
 
     def lazy_load_params(self):
-        for model_path in self.model_paths:
-            if model_path is None:
+        for uid,hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
+            weight_delta = self.load_weight_delta(hotkey)
+            if weight_delta is None:
                 yield None
-            else:
-                weight_delta = self.hf_manager.receive_gradients(model_path)
-                if weight_delta is None:
-                    yield None
-                    continue
-                base_model = torch.load(os.path.join(self.hf_manager.get_local_model_directory(),"averaged_model.pt"), map_location=self.device)#self.model.state_dict()
-                for name, delta_param in weight_delta.items():
-                    weight_delta[name] = weight_delta[name].to(self.device)
-                    base_model[name] = base_model[name].to(self.device)
-                    weight_delta[name] = weight_delta[name] + base_model[name]
-                yield weight_delta
+                continue
+            base_model = torch.load(os.path.join(self.hf_manager.get_local_model_directory(),"averaged_model.pt"), map_location=self.device)#self.model.state_dict()
+            for name, delta_param in weight_delta.items():
+                weight_delta[name] = weight_delta[name].to(self.device)
+                base_model[name] = base_model[name].to(self.device)
+                weight_delta[name] = weight_delta[name] + base_model[name]
+            yield weight_delta
 
     def get_averaged_model(self):
         averaged_params = self.get_averaged_params()
@@ -327,7 +352,7 @@ class ParameterizedAverager(DeltaAverager):
                 for batch_count, batch in enumerate(val_loader):
                     averaged_model = self.get_averaged_model()
 
-                    outputs = self.model(input_ids=batch['input_ids'].to(self.device), attention_mask=batch['attention_mask'].to(self.device), labels=batch["labels"].to(self.device))
+                    outputs = averaged_model(input_ids=batch['input_ids'].to(self.device), attention_mask=batch['attention_mask'].to(self.device), labels=batch["labels"].to(self.device))
                     val_loss = outputs.loss
                     total_loss += val_loss.item() * batch['input_ids'].size(0)
                     total_samples += batch['input_ids'].size(0)
@@ -378,6 +403,8 @@ class ParameterizedAverager(DeltaAverager):
             
                 self.last_pull_time = time.time()
 
+            breakpoint()
+            
             self.get_model_paths()
             self.num_models = len(self.model_paths)
             
