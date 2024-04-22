@@ -39,10 +39,30 @@ pip install -e .
 ```
 git checkout chain_meta
 ```
+## Hugging Face
+Continue setting up by following these step:
 
-## Make a .env File
+### 1. Create a Hugging Face Account
+If you don't already have a Hugging Face account, you'll need to create one:
 
-Edit the existing .env file to include values that reflect your machine/network.
+Visit [Hugging Face](https://huggingface.co/) to sign up
+## 2. Create a Hugging Face Model Repository
+Once you have your Hugging Face account, you need to create a model repository:
+* Navigate to your profile by clicking on your username in the top right corner.
+* Click on "New Model" (you may find this button under the "Models" section if you have existing models).
+* Fill in the repository name, description, and set the visibility to public.
+* Click on "Create Model" to establish your new model repository.
+## 3. Generate a Token for the Repository
+To allow programmatic communication with your repository, you will need to generate an authentication token:
+
+* From your Hugging Face account, go to "Settings" by clicking on your profile icon.
+* Select the "Access Tokens" tab from the sidebar.
+* Click on "New Token".
+* Name your token and select the "write" access to be able to upload changes.
+* Click on "Create Token".
+
+## 4. Create a New .env File to Store Your Hugging Face Token
+Store your new token in the .env file in DistributedTranining directory:
 
 ## Load Wallets and Register to Subnet
 
