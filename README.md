@@ -37,13 +37,7 @@ pip install -e .
 ## Checkout the Dev Branch
 
 ```
-git checkout test-lightning
-```
-
-## Build the Docker Image
-
-```
-docker compose build
+git checkout chain_meta
 ```
 
 ## Make a .env File
