@@ -290,6 +290,8 @@ class ParameterizedAverager(DeltaAverager):
                     continue
                 base_model = torch.load(os.path.join(self.hf_manager.get_local_model_directory(),"averaged_model.pt"), map_location=self.device)#self.model.state_dict()
                 for name, delta_param in weight_delta.items():
+                    weight_delta[name] = weight_delta[name].to(self.device)
+                    base_model[name] = base_model[name].to(self.device)
                     weight_delta[name] = weight_delta[name] + base_model[name]
                 yield weight_delta
 
