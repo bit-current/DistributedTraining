@@ -1,21 +1,23 @@
+import os
 import time
-from transformers import AdamW  # FIXME replace me with LAMB
 import torch
 import math
-
-# from dotenv import load_dotenv
-from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
-from bittensor import logging
+import hashlib
+import mlflow
+import mlflow.pytorch
 import torch.nn as nn
-from dotenv import load_dotenv
 import torch.nn.functional as F
 from torch.optim import SGD
-import os
-import hashlib
+from bittensor import logging
+from hivetrain.config import Configurator
+from hivetrain.utils.mlflow_utils import get_gpu_utilization, get_network_bandwidth, get_memory_usage
+from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
+from hivetrain.btt_connector import BittensorNetwork
 
-load_dotenv()
-token = os.getenv("HF_TOKEN")
 
+args = Configurator.combine_configs()
+BittensorNetwork.initialize(args)
+my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
 
 class TrainingLoop:
     def __init__(
@@ -27,6 +29,7 @@ class TrainingLoop:
         check_update_interval=300,
         send_interval=300,
         hf_manager=None,
+
     ):
         # huggingface has all information about directories and repos
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -46,6 +49,13 @@ class TrainingLoop:
         self.send_interval = send_interval
         self.last_pull_time = 0
         self.last_send_time = 0
+
+        # Start an MLflow run and log parameters
+        mlflow.start_run(f"miner_{my_hotkey}")
+        mlflow.log_param('device', self.device)
+        mlflow.log_param("learning_rate", self.learning_rate)
+        mlflow.log_param("send_interval", self.send_interval)
+        mlflow.log_param("check_update_interval", self.check_update_interval)
 
     def train(self, epochs):
         self.optimizer.zero_grad()
@@ -168,6 +178,10 @@ class GradientDeltaLoop(TrainingLoop):
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
+                mlflow.log_metric("train_loss", loss.item(), step= step)
+                mlflow.log_metric("compute_utilization", get_gpu_utilization(), step=step)
+                mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
+
                 # Condition to periodically send gradients
                 if time.time() - self.last_send_time >= self.send_interval:
                     average_loss = total_loss / total_examples
@@ -189,6 +203,10 @@ class GradientDeltaLoop(TrainingLoop):
                         torch.save(self.weight_diffs, model_gradients_path)
                         self.hf_manager.push_changes("weight_diff.pt")
                         self.last_send_time = time.time()
+                        
+                        mlflow.log_metric("gradient_staleness", self.get_gradient_staleness(), step=step)
+                        mlflow.log_metric("network_bandwidth", get_network_bandwidth(), step=step)
+
                     except Exception as e:
                         logging.warning(f"Sending gradients failed: {e}")
                         continue
