@@ -18,12 +18,14 @@ class HFManager:
         my_repo_id=None,#gradients HF
         averaged_model_repo_id=None,#averaged HF
         model_dir=None,#averaged local
+        device="cuda"
     ):
     
         # Initializes the HFManager with the necessary repository and authentication details.
         self.my_repo_id = my_repo_id
         self.model_repo_id = averaged_model_repo_id
         self.hf_token = hf_token
+        self.device = device
 
         # Define the local directory structure based on repository IDs but only do clone personal repo if miner
         if self.my_repo_id != None:
