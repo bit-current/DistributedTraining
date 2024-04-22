@@ -34,6 +34,7 @@ from hivetrain.hf_manager import HFManager
 # and `get_weights(key)` is a function to retrieve serialized gradients
 from torchvision import transforms, datasets
 from datasets import load_dataset
+from bittensor import logging
 
 logging.enable_debug()
 
