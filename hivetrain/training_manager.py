@@ -287,7 +287,7 @@ class DeltaLoop(TrainingLoop):
                 if time.time() - self.last_send_time >= self.send_interval:
                     average_loss = total_loss / total_examples
                     perplexity = math.exp(average_loss)
-                    logging.info(f"Epoch: {epoch}, Batch: {batch_idx}, Loss: {average_loss:.4f}")
+                    logging.info(f"Epoch: {epoch}, Loss: {average_loss:.4f}")
 
                     try:
                         logging.info(f"Attempting to send weights")

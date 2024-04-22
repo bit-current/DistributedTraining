@@ -14,7 +14,7 @@ from hivetrain.hf_manager import HFManager
 from hivetrain.training_manager import DeltaLoop
 
 from hivetrain import __spec_version__
-from bittensor.btlogging import logging
+from bittensor import logging
 
 import torch
 import matplotlib.pyplot as plt

@@ -10,9 +10,10 @@ import bittensor.utils.networking as net
 import threading
 import logging
 from . import __spec_version__
-
-logger = logging.getLogger('waitress')
-logger.setLevel(logging.DEBUG)
+from bittensor import logging
+logger = logging
+#logger = logging.getLogger('waitress')
+#logger.setLevel(logging.DEBUG)
 
 
 def initialize_bittensor_objects():
