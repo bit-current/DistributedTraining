@@ -1,10 +1,8 @@
 import time
-from transformers import AdamW #FIXME replace me with LAMB
-from huggingface_hub import Repository
 import torch
 import math
-#from dotenv import load_dotenv
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
+from huggingface_hub import Repository
 from bittensor import logging
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,13 +10,19 @@ from torch.optim import SGD
 import os
 import hashlib
 
-#load_dotenv()
-token = os.getenv("HF_TOKEN")
-
 class TrainingLoop:
-    def __init__(self, device, model_name, data_loader, gradients_dir, learning_rate=5e-5, check_update_interval = 300, send_interval=300, averaging_dir = "averaged_model", hf_manager = None):
-
-        # huggingface has all information about directories and repos
+        def __init__(
+        self,
+        device,
+        model_name,
+        data_loader,
+        gradients_dir,
+        learning_rate=5e-5,
+        check_update_interval=300,
+        send_interval=300,
+        averaging_dir="averaged_model",
+        hf_manager=None,
+    ):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(model_name)
         self.model = self.model.to(device)
@@ -35,8 +39,7 @@ class TrainingLoop:
         self.check_update_interval = check_update_interval
         self.send_interval = send_interval
         self.last_pull_time = 0
-        # self.gradients_dir = gradients_dir
-        # self.averaging_dir = averaging_dir
+    
 
     def train(self, epochs):
         self.last_send_time = time.time()
