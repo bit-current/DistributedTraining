@@ -99,7 +99,7 @@ test_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=cus
 #__init__(self, model, local_dir, bittensor_network=None)
 #model, device, chain_manager=None,bittensor_network=None, hf_token=hf_token 
 
-hf_manager = HFManager(repo_id=args.storage.model_dir)
+hf_manager = HFManager(my_repo_id = None, averaged_model_repo_id= args.storage.averaged_model_repo_id)
 averager = ParameterizedAverager(model=model,device="cpu",hf_manager=hf_manager, local_dir=args.storage.model_dir, chain_manager=address_store,bittensor_network=LocalBittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
 #averager.run_periodic_averaging(test_loader,20,300)
 #val_loader,meta_epochs, lr, t
