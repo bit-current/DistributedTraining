@@ -254,6 +254,7 @@ class DeltaLoop(TrainingLoop):
         self.last_send_time = time.time()
         self.optimizer.zero_grad()
         self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()}
+        self.model.to(self.device)
         for epoch in range(epochs):
             logging.info(f"Starting Epoch: {epoch}")
             # Check for new submissions at the start of each epoch
@@ -271,7 +272,7 @@ class DeltaLoop(TrainingLoop):
                     self.last_pull_time = time.time()
 
             for step, batch in enumerate(self.data_loader):
-                outputs = self.model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch['input_ids'])
+                outputs = self.model(input_ids=batch['input_ids'].to(device), attention_mask=batch['attention_mask'].to(device), labels=batch['input_ids'].to(device))
                 loss = outputs.loss
                 loss.backward()
                 # Update loss and example counts
