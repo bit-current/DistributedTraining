@@ -11,10 +11,10 @@ This project introduces a cutting-edge approach to distributed deep learning, ut
 To streamline the process and reduce communication overhead between miners, we integrate Hugging Face as a central hub. This serves as an intermediary, facilitating efficient miner-
 validator communications without the complexities of direct exchanges.
 
-Key Components:
-Miners: Miners are responsible for training the language model. They compute the weight delta—the difference between the weights of the trained model and the base model. This delta is then uploaded to Hugging Face, from where it can be accessed by validators.
-Validators: Validators play a crucial role in assessing the miners' contributions. They download the weight deltas from Hugging Face and evaluate them based on their impact on the model’s performance, focusing on metrics such as loss reduction and accuracy.
-Averager: We also introduce an averager, which analyzes the combined effect of individual weight contributions to determine the optimal combination that results in the lowest possible loss.
+Key Components: 
+* Miners: Miners are responsible for training the language model. They compute the weight delta—the difference between the weights of the trained model and the base model. This delta is then uploaded to Hugging Face, from where it can be accessed by validators. 
+* Validators: Validators play a crucial role in assessing the miners' contributions. They download the weight deltas from Hugging Face and evaluate them based on their impact on the model’s performance, focusing on metrics such as loss reduction and accuracy. 
+* Averager: We also introduce an averager, which analyzes the combined effect of individual weight contributions to determine the optimal combination that results in the lowest possible loss.
 
 ## Clone the Repo
 
