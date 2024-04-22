@@ -46,7 +46,7 @@ my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
 my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
 address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
-address_store.store_hf_repo(args.storage.averaged_model_repo_id)
+#address_store.store_hf_repo(args.storage.averaged_model_repo_id) #FIXME check first then commit
 
 # Parameters
 
@@ -101,6 +101,7 @@ hf_manager = HFManager(my_repo_id = args.storage.my_repo_id, averaged_model_repo
 #model_name, data_loader,gradients_dir, learning_rate=5e-5, send_interval=30, averaging_dir = "averaged_model"
 training_loop = DeltaLoop("mekaneeky/tiny-random-gpt2", data_loader, args.storage.gradient_dir,send_interval=30, learning_rate=5e-4,averaging_dir="averaged_model")
 training_loop.train(epochs=30_000_000_000_000_000, hf_manager=hf_manager) 
+
 
 
 
