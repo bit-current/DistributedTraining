@@ -124,7 +124,6 @@ class ModelValidator:
 
     def calculate_model_hash(self):
         
-        
         model_hash = hashlib.sha256()
         for name, param in self.model.named_parameters():
             model_hash.update(name.encode('utf-8'))
