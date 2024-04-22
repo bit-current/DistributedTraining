@@ -35,18 +35,18 @@ class ModelValidator:
         self.check_update_interval = check_update_interval
 
     
-    def receive_gradients(self, repo_id="your_username/your_repo_name", gradient_file_name="gradients.pt"):
-        try:
-            # Download the gradients file from Hugging Face Hub
-            gradient_file_path = hf_hub_download(repo_id=repo_id, filename=gradient_file_name, use_auth_token=True)
+    # def receive_gradients(self, repo_id="your_username/your_repo_name", gradient_file_name="gradients.pt"):
+    #     try:
+    #         # Download the gradients file from Hugging Face Hub
+    #         gradient_file_path = hf_hub_download(repo_id=repo_id, filename=gradient_file_name, use_auth_token=True)
 
-            # Load the gradients directly using torch.load
-            aggregated_gradients = torch.load(gradient_file_path)
+    #         # Load the gradients directly using torch.load
+    #         aggregated_gradients = torch.load(gradient_file_path)
                 
-            return aggregated_gradients
-        except Exception as e:
-            logging.debug(f"Error receiving gradients from Hugging Face: {e}")
-            return None
+    #         return aggregated_gradients
+    #     except Exception as e:
+    #         logging.debug(f"Error receiving gradients from Hugging Face: {e}")
+    #         return None
 
     def update_model_weights(self, gradients, alpha=5e-4):
         with torch.no_grad():
@@ -91,7 +91,7 @@ class ModelValidator:
 
         for uid,hotkey_address in enumerate(self.bittensor_network.metagraph.hotkeys):
             hf_repo = self.chain_manager.retrieve_hf_repo(hotkey_address)
-            gradients = self.receive_gradients(hf_repo)
+            gradients = self.hf_manager.receive_gradients(hf_repo)
             if gradients is not None:
                 logging.info(f"Receiving Gradients from: {hotkey_address}")
                 logging.info(f"Updating Model Weights")
