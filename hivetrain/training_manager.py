@@ -294,15 +294,17 @@ class DeltaLoop(TrainingLoop):
 
                     try:
                         logging.info(f"Attempting to send weights")
-                        logging.info(f"********* Attempting to send weights")
                         # Periodically save gradients
                         model_gradients_path = os.path.join(self.hf_manager.get_local_gradient_directory(), 'weight_diff.pt')
                         self.weight_diffs = {name:  param.data - self.base_weights[name] for name, param in self.model.named_parameters() if param.requires_grad}
                         torch.save(self.weight_diffs, model_gradients_path)
                         self.hf_manager.push_changes('weight_diff.pt')
+                        self.last_send_time = time.time()
                     except Exception as e:
                         logging.warning(f"Sending gradients failed: {e}")
+                        self.last_send_time = time.time()
                         continue
+                    
 
 
 class LocalDeltaLoop(DeltaLoop, LocalTrainingLoop):
