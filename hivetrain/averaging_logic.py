@@ -268,13 +268,13 @@ class ParameterizedAverager(DeltaAverager):
             except Exception as e: 
                 logging.debug(f"Receiving gradients failed due to: {e}")
 
-    def store_weight_delta(self, hotkey):
+    def store_weight_delta(self,weight_delta, hotkey):
         """
         Save the weight_delta state_dict to a local directory at regular intervals.
         """
         os.makedirs(self.gradients_dir, exist_ok=True)
         save_path = os.path.join(self.gradients_dir, f"weight_delta_{hotkey}.pt")
-        torch.save(self.weight_delta_cache, save_path)
+        torch.save(weight_delta, save_path)
 
     def load_weight_delta(self,hotkey):
         """
@@ -292,7 +292,7 @@ class ParameterizedAverager(DeltaAverager):
                 continue
             else:
                 weight_delta = self.hf_manager.receive_gradients(model_path["model_path"])
-                self.store_weight_delta(model_path["hotkey"])
+                self.store_weight_delta(weight_delta,model_path["hotkey"])
         #if time.time() - self.last_cache_time > self.caching_interval:
 
     def get_averaged_params(self):
