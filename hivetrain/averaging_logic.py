@@ -270,11 +270,13 @@ class ParameterizedAverager(DeltaAverager):
     def get_averaged_params(self):
         if self.weights is None:
             self.weights = nn.functional.softmax(torch.ones((self.num_models,len(list(self.model.parameters()))), device=self.device),dim=0)
-        averaged_gradients = {name: torch.zeros_like(grad) for name, grad.to(self.device) in self.model.named_parameters()}
+        averaged_gradients = {name: torch.zeros_like(grad) for name, grad in self.model.named_parameters()}
         for params, weight in zip(self.lazy_load_params(), self.weights):
             if params is None or torch.all(weight == 0):
                 continue
             for j, (name_reconstructed_model, param_reconstructed_model) in enumerate(params.items()):
+                param_reconstructed_model = param_reconstructed_model.to(self.device)
+                averaged_gradients[name_reconstructed_model] = averaged_gradients[name_reconstructed_model].to(self.device)
                 averaged_gradients[name_reconstructed_model] += (param_reconstructed_model * weight[j]) #FIXME make weights per param
 
         return averaged_gradients
