@@ -43,7 +43,7 @@ BittensorNetwork.initialize(args)
 my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
 my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
-address_store = ChainMultiAddressStoreAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
+address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
 
 # Define your model's local directory and repository ID
 #local_dir = "./save_me"#args.averager.save_directory #TODO add me to config :)
