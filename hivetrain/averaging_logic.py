@@ -403,11 +403,10 @@ class ParameterizedAverager(DeltaAverager):
             
                 self.last_pull_time = time.time()
 
-            breakpoint()
-            
+                        
             self.get_model_paths()
             self.num_models = len(self.model_paths)
-            
+            self.cache_params_locally()            
 
             self.model = self.meta_learning(val_loader, meta_epochs, lr)
             #self.apply_averaged_gradients(averaged_weights)
