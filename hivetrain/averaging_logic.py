@@ -356,9 +356,17 @@ class ParameterizedAverager(DeltaAverager):
             logging.info("Averaging Beginning")
             start_time = time.time()
 
-            if self.hf_manager.check_for_new_submissions():
-                logging.info("Model updated from Hugging Face. Continuing training with new model...")
-                self.model = self.hf_manager.update_model(self.model)
+            if time.time() - self.last_pull_time >= self.check_update_interval:
+                if self.hf_manager.check_for_new_submissions(self.hf_manager.model_repo_id):
+                    logging.info("Averaged model updated on Hugging Face. Pulling latest model...")                
+                    self.hf_manager.pull_latest_model()
+                    time.sleep(10) #just to give enough time for pull
+                    self.model = self.hf_manager.update_model(self.model)
+                    self.model = self.model.to(self.device)
+                    optimizer = optim.Adam(self.model.parameters(), lr=5e-5)  # Reinitialize the optimizer
+                    self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()} 
+            
+                self.last_pull_time = time.time()
 
             self.get_model_paths()
             self.num_models = len(self.model_paths)
