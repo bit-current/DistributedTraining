@@ -34,7 +34,7 @@ class TrainingLoop:
         self.optimizer = AdamW(self.model.parameters(), lr= self.learning_rate)
         self.check_update_interval = check_update_interval
         self.send_interval = send_interval
-        self.latest_pull_time = 0
+        self.last_pull_time = 0
         # self.gradients_dir = gradients_dir
         # self.averaging_dir = averaging_dir
 
