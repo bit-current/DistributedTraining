@@ -282,7 +282,7 @@ class ParameterizedAverager(DeltaAverager):
             if model_path is None:
                 yield None
             else:
-                weight_delta = torch.load(os.path.join(model_path,"gradients.pt"), map_location='cpu')
+                weight_delta = self.hf_manager.receive_gradients(model_path)
                 base_model = torch.load(os.path.join(self.local_dir,"averaged_model.pt"), map_location='cpu')#self.model.state_dict()
                 for name, delta_param in weight_delta.items():
                     weight_delta[name] = weight_delta[name] + base_model[name]
