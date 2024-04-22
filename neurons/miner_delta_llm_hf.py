@@ -25,7 +25,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 
 logging.info("Starting !")
-
+breakpoint()
 
 def flatten_list(nested_list):
     """Flatten a nested list."""
