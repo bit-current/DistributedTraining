@@ -266,7 +266,7 @@ class DeltaLoop(TrainingLoop):
 
             for step, batch in enumerate(self.data_loader):
 
-                if time.time() - self.last_pull_time >= self.check_update_interval  
+                if time.time() - self.last_pull_time >= self.check_update_interval:
                     if self.hf_manager.check_for_new_submissions(self.hf_manager.model_repo_id):
                         logging.info("Averaged model updated on Hugging Face. Pulling latest model...")                
                         self.hf_manager.pull_latest_model()
