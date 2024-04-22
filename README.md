@@ -44,50 +44,6 @@ git checkout chain_meta
 
 Edit the existing .env file to include values that reflect your machine/network.
 
-## Join a Training Run
-
-To join the existing training run on the subnet, find the peer ID of a running node on the network.
-
-This will be provided for you. For the latest, see the pinned post on the Discord channel.
-
-Add this environment variable to your `.env` file:
-
-```
-INITIAL_PEERS="/ip4/peer_ip/tcp/peer_dht_port/p2p/12D3KooWE_some_hash_that_looks_like_this_VqgXKo9EUQ4hguny9"
-```
-
-After that, you may join the training run with:
-
-```
-docker compose up
-```
-
-## How to Use (No Docker)
-
-## Clone the Repo
-
-```
-git clone https://github.com/bit-current/DistributedTraining
-```
-
-## Move into the Repo
-
-```
-cd DistributedTraining
-```
-
-## Checkout Current Branch
-
-```
-cd DistributedTraining
-```
-
-## Install Repo + Requirements
-
-```
-pip install -e .
-```
-
 ## Load Wallets and Register to Subnet
 
 ```
