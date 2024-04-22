@@ -21,7 +21,7 @@ import torch.nn.functional as F
 import hashlib
 
 class ModelValidator:
-    def __init__(self, model, optimizer, data_loader, bittensor_network = None, chain_manager= None,hf_manager=None, interval=300):
+    def __init__(self, model, optimizer, data_loader,check_update_interval=300, bittensor_network = None, chain_manager= None,hf_manager=None, interval=300):
         self.model = model
         self.optimizer = optimizer
         self.data_loader = data_loader
@@ -31,6 +31,8 @@ class ModelValidator:
         self.scores = [0 for _ in range(len(self.bittensor_network.metagraph.hotkeys))]
         self.chain_manager = chain_manager
         self.hf_manager = hf_manager
+        self.last_pull_time = 0
+        self.check_update_interval = check_update_interval
 
     
     def receive_gradients(self, repo_id="your_username/your_repo_name", gradient_file_name="gradients.pt"):
