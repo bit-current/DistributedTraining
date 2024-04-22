@@ -130,7 +130,7 @@ class TrainingLoop:
                     self.last_send_time = time.time()
 
 
-class GradientDeltaLoop(TrainingLoop):
+class WeightDeltaLoop(TrainingLoop):
     def train(self, epochs):
         self.last_send_time = time.time()
         self.optimizer.zero_grad()
@@ -400,7 +400,7 @@ class LocalTrainingLoop(TrainingLoop):
         print(f"Gradients saved locally at: {gradient_file_path}")
 
 
-class LocalDeltaLoop(DeltaLoop, LocalTrainingLoop):
+class LocalDeltaLoop(WeightDeltaLoop, LocalTrainingLoop):
     pass
 
 
