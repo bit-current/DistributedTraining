@@ -103,8 +103,8 @@ class ModelValidator:
                 perplexity_score = max(0, self.base_perplexity - perplexity)
                 self.model.load_state_dict(self.original_state_dict)
             else:
-                loss = 99999999
-                perplexity = 99999999
+                loss_score = 99999999
+                perplexity_score = 99999999
                 
             self.scores[uid] = perplexity_score
 
