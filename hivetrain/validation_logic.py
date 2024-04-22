@@ -108,10 +108,10 @@ class ModelValidator:
             else:
                 loss = 99999999
                 perplexity = 99999999
-                loss_score = 99999999
-                perplexity_score = 99999999
+                loss_score = 0
+                perplexity_score = 0
                 
-            self.scores[uid] = perplexity_score
+            self.scores[hotkey_address] = perplexity_score
 
             # Reset the model to its original state
             
@@ -120,7 +120,7 @@ class ModelValidator:
             time.sleep(0.1)
 
 
-            #if self.bittensor_network.should_set_weights():    
+        if self.bittensor_network.should_set_weights():    
             self.bittensor_network.set_weights(torch.tensor(self.scores))
 
     def start_periodic_validation(self):
