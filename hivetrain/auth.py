@@ -1,16 +1,17 @@
 from functools import wraps
 from flask import request, make_response, jsonify
 import bittensor
+from bittensor import logging
 from .btt_connector import BittensorNetwork
 from . import __spec_version__
 from substrateinterface import Keypair, KeypairType
 #metagraph = bittensor.metagraph()  # Ensure this metagraph is synced before using it in the decorator.
-import logging
+#import logging
 
-logger = logging.getLogger('waitress')
-logger.setLevel(logging.DEBUG)
+#logger = logging.getLogger('waitress')
+#logger.setLevel(logging.DEBUG)
 
-
+logger = logging
 def authenticate_request_with_bittensor(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):

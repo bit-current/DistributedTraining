@@ -262,7 +262,11 @@ class DeltaLoop(TrainingLoop):
             total_loss = 0
             total_examples = 0
 
-            if time.time() - self.last_pull_time >= self.check_update_interval and self.hf_manager.check_for_new_submissions(self.hf_manager.model_repo_id):
+            
+
+            for step, batch in enumerate(self.data_loader):
+
+                if time.time() - self.last_pull_time >= self.check_update_interval and self.hf_manager.check_for_new_submissions(self.hf_manager.model_repo_id):
                     logging.info("Averaged model updated on Hugging Face. Pulling latest model...")                
                     self.hf_manager.pull_latest_model()
                     time.sleep(10) #just to give enough time for pull
@@ -271,7 +275,6 @@ class DeltaLoop(TrainingLoop):
                     self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()} 
                     self.last_pull_time = time.time()
 
-            for step, batch in enumerate(self.data_loader):
                 outputs = self.model(input_ids=batch['input_ids'].to(self.device), attention_mask=batch['attention_mask'].to(self.device), labels=batch['input_ids'].to(self.device))
                 loss = outputs.loss
                 loss.backward()
@@ -283,7 +286,6 @@ class DeltaLoop(TrainingLoop):
                 self.optimizer.zero_grad()
 
                 # Example of a condition to periodically send gradients
-                current_time = time.time() ##time.time()%sth works better
                 if time.time() - self.last_send_time >= self.send_interval:
                     average_loss = total_loss / total_examples
                     perplexity = math.exp(average_loss)
