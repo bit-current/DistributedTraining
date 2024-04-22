@@ -268,13 +268,13 @@ class ParameterizedAverager(DeltaAverager):
             except Exception as e: 
                 logging.debug(f"Receiving gradients failed due to: {e}")
 
-    def store_weight_delta(self, hotkey):
+    def store_weight_delta(self, weight_delta, hotkey):
         """
         Save the weight_delta state_dict to a local directory at regular intervals.
         """
         os.makedirs(self.gradients_dir, exist_ok=True)
         save_path = os.path.join(self.gradients_dir, f"weight_delta_{hotkey}.pt")
-        torch.save(self.weight_delta_cache, save_path)
+        torch.save(weight_delta, save_path)
 
     def load_weight_delta(self,hotkey):
         """
@@ -287,12 +287,23 @@ class ParameterizedAverager(DeltaAverager):
             return None
 
     def cache_params_locally(self):
+        self.num_models = 0
+        self.active_hotkeys = []
         for model_path in self.model_paths:
             if model_path is None:
                 continue
             else:
-                weight_delta = self.hf_manager.receive_gradients(model_path["model_path"])
-                self.store_weight_delta(model_path["hotkey"])
+                try:
+                    weight_delta = self.hf_manager.receive_gradients(model_path["repo_id"])
+                    self.store_weight_delta(weight_delta, model_path["hotkey"])
+                    if weight_delta is None:
+                        raise ValueError(f"Failed to receive gradients at: {model_path['repo_id']}")
+                    self.num_models +=1
+                    self.active_hotkeys.append(model_path["hotkey"])
+                except Exception as e:
+                    logging.warning(f"Failed to get model at {model_path['hotkey']}: {e}")
+        if len(self.active_hotkeys) > 0:
+            assert len(self.active_hotkeys) == self.num_models
         #if time.time() - self.last_cache_time > self.caching_interval:
 
     def get_averaged_params(self):
@@ -310,11 +321,11 @@ class ParameterizedAverager(DeltaAverager):
         return averaged_gradients
 
     def lazy_load_params(self):
-        for uid,hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
+        for uid,hotkey in enumerate(self.active_hotkeys):
             weight_delta = self.load_weight_delta(hotkey)
-            if weight_delta is None:
-                yield None
-                continue
+            # if weight_delta is None:
+            #     yield None
+            #     continue
             base_model = torch.load(os.path.join(self.hf_manager.get_local_model_directory(),"averaged_model.pt"), map_location=self.device)#self.model.state_dict()
             for name, delta_param in weight_delta.items():
                 weight_delta[name] = weight_delta[name].to(self.device)
@@ -366,8 +377,6 @@ class ParameterizedAverager(DeltaAverager):
                         #         main_param.grad = torch.clamp(main_param.grad,min=-0.1,max=0.1)
 
                         for i, model in enumerate(self.lazy_load_params()):
-                            if model is None:
-                                continue
                             for j, (model_param, main_param) in enumerate(zip(model.values(), averaged_model.parameters())):
                                 if main_param.grad is not None:
                                     grad_weights[i,j] += torch.sum(main_param.grad * (model_param - main_param))
@@ -405,7 +414,7 @@ class ParameterizedAverager(DeltaAverager):
 
                         
             self.get_model_paths()
-            self.num_models = len(self.model_paths)
+            #self.num_models = len(self.model_paths)
             self.cache_params_locally()            
 
             self.model = self.meta_learning(val_loader, meta_epochs, lr)
