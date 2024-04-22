@@ -24,7 +24,6 @@ from hivetrain.config import Configurator
 from hivetrain import __spec_version__
 from bittensor.btlogging import logging
 from hivetrain.validation_logic import DeltaValidator
-from hivetrain.dht_connector import DHTManager
 from hivetrain.hf_manager import HFManager
 from hivetrain.training_manager import FeedforwardNN
 
