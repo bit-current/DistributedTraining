@@ -110,8 +110,10 @@ class ModelValidator:
 
             # Reset the model to its original state
             
-            
-            logging.info(f"Loss: {loss}, Perplexity: {perplexity}")
+            try:
+                logging.info(f"Loss: {loss}, Perplexity: {perplexity}")
+            except:
+                pass
             logging.info(f"Loss Score: {loss_score}, Perplexity Score: {perplexity_score}")
             time.sleep(0.1)
 
