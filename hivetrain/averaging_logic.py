@@ -323,13 +323,10 @@ class ParameterizedAverager(DeltaAverager):
                 for batch_count, batch in enumerate(val_loader):
                     averaged_model = self.get_averaged_model()
 
-                    images, labels = batch
-                    outputs = averaged_model(images)
-                    val_loss = F.cross_entropy(outputs, labels)
-                    total_loss += val_loss.item() 
-                    _, predicted = torch.max(outputs.data, 1)
-                    correct_predictions += (predicted == labels).sum().item()
-                    total_samples += labels.size(0)
+                    outputs = self.model(input_ids=batch['input_ids'].to(self.device), attention_mask=batch['attention_mask'].to(self.device), labels=batch["labels"].to(self.device))
+                    loss = outputs.loss
+                    total_loss += loss.item() * batch['input_ids'].size(0)
+                    total_samples += batch['input_ids'].size(0)
 
                     val_loss.backward()
                     with torch.no_grad():
@@ -353,8 +350,8 @@ class ParameterizedAverager(DeltaAverager):
                         #    logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss.item():.4f}, Weights: {self.weights}")
 
                 average_loss = total_loss / total_samples
-                accuracy = correct_predictions / total_samples
-                logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {average_loss:.4f},Accuracy: {accuracy}, Weights: {self.weights}")
+                perplexity = math.exp(average_loss) 
+                logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {average_loss:.4f},Perplexity: {perplexity}, Weights: {self.weights}")
                 
         return self.get_averaged_model()
 
