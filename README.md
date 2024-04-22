@@ -4,16 +4,17 @@
 
 (WARNING: IN ACTIVE DEVELOPMENT)
 
-## Vision
+## Introduction
 
-This project aims to revolutionize distributed computing and mining by leveraging distributed training on Bittensor. It introduces a scalable system for training deep learning models across distributed nodes. Participants are rewarded in TAO for their computational contributions, fostering a decentralized ecosystem of computational resources.
+This project introduces a cutting-edge approach to distributed deep learning, utilizing the Bittensor network. Our method incentivizes participants by rewarding the generation of optimal weights that contribute significantly to minimizing the overall loss of the base model.
 
-## How to Use (Docker - Not yet production ready)
+To streamline the process and reduce communication overhead between miners, we integrate Hugging Face as a central hub. This serves as an intermediary, facilitating efficient miner-
+validator communications without the complexities of direct exchanges.
 
-## Install Dependencies
-
-1. [Docker](https://docs.docker.com/engine/install/)
-2. [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+Key Components:
+Miners: Miners are responsible for training the language model. They compute the weight delta—the difference between the weights of the trained model and the base model. This delta is then uploaded to Hugging Face, from where it can be accessed by validators.
+Validators: Validators play a crucial role in assessing the miners' contributions. They download the weight deltas from Hugging Face and evaluate them based on their impact on the model’s performance, focusing on metrics such as loss reduction and accuracy.
+Averager: We also introduce an averager, which analyzes the combined effect of individual weight contributions to determine the optimal combination that results in the lowest possible loss.
 
 ## Clone the Repo
 
