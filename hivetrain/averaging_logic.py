@@ -337,6 +337,8 @@ class ParameterizedAverager(DeltaAverager):
                         #         main_param.grad = torch.clamp(main_param.grad,min=-0.1,max=0.1)
 
                         for i, model in enumerate(self.lazy_load_params()):
+                            if model is None:
+                                continue
                             for j, (model_param, main_param) in enumerate(zip(model.values(), averaged_model.parameters())):
                                 if main_param.grad is not None:
                                     grad_weights[i,j] += torch.sum(main_param.grad * (model_param - main_param))
