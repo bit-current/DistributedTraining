@@ -8,7 +8,6 @@ from bittensor import logging
 from copy import deepcopy
 from hivetrain.btt_connector import (
     BittensorNetwork,
-    # get_validator_uids_and_addresses,
     serve_axon,
     sync
 )
@@ -37,6 +36,8 @@ class ModelValidator:
         try:
             # Download the gradients file from Hugging Face Hub
             gradient_file_path = hf_hub_download(repo_id=repo_id, filename=gradient_file_name, use_auth_token=True)
+            
+            #TODO add garbage cleaning 
 
             # Load the gradients directly using torch.load
             aggregated_gradients = torch.load(gradient_file_path)
@@ -90,25 +91,24 @@ class ModelValidator:
                 logging.info(f"Updating Model Weights")
                 self.update_model_weights(gradients)
                 logging.info(f"The model hash: {self.calculate_model_hash()}")
+                logging.info(f"Evaluating model")
+                loss, perplexity = self.evaluate_model()
+                loss_score = max(0, self.base_loss - loss)
+                perplexity_score = max(0, self.base_perplexity - perplexity)
+                self.model.load_state_dict(self.original_state_dict)
             else:
                 loss = 99999999
-                perplexity = -99999999
-                continue
-            logging.info(f"Evaluating model")
-            loss, perplexity = self.evaluate_model()
-            loss_score = max(0, self.base_loss - loss)
-            perplexity_score = max(0,  perplexity - self.base_perplexity) if perplexity else 0 #FIXME accuracy here need to flip for perplexity
+                perplexity = 99999999
+                
             self.scores[uid] = perplexity_score
-
-            # Reset the model to its original state
             
-            self.model.load_state_dict(self.original_state_dict)
+            
             logging.info(f"Loss: {loss}, Perplexity: {perplexity}")
             logging.info(f"Loss Score: {loss_score}, Perplexity Score: {perplexity_score}")
             time.sleep(0.1)
 
 
-            #if self.bittensor_network.should_set_weights():    
+        if self.bittensor_network.should_set_weights():    
             self.bittensor_network.set_weights(self.scores)
 
     def start_periodic_validation(self):
