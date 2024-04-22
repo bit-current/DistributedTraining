@@ -91,7 +91,8 @@ test_loader = DataLoader(test_set, batch_size=8, collate_fn=custom_collate_fn)
 # Load your model and other necessary components here
 #    def __init__(self, model, optimizer, data_loader, bittensor_network=None, chain_manager=None, interval=3600, local_gradient_dir="local_gradients"):
 hf_manager = HFManager(my_repo_id = None, averaged_model_repo_id= args.storage.averaged_model_repo_id)
-validator = DeltaValidator(model=model,optimizer=optimizer, data_loader=test_loader,
+device = "cuda" if torch.cuda.is_available() else "cpu"
+validator = DeltaValidator(device=device,model=model,optimizer=optimizer, data_loader=test_loader,
     bittensor_network=BittensorNetwork ,hf_manager=hf_manager, interval=receive_interval, chain_manager=address_store
     )
 validator.start_periodic_validation()

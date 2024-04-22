@@ -21,8 +21,10 @@ import torch.nn.functional as F
 import hashlib
 
 class ModelValidator:
-    def __init__(self, model, optimizer, data_loader,check_update_interval=300, bittensor_network = None, chain_manager= None,hf_manager=None, interval=300):
+    def __init__(self,device, model, optimizer, data_loader,check_update_interval=300, bittensor_network = None, chain_manager= None,hf_manager=None, interval=300):
+        self.device = device
         self.model = model
+        self.model = self.model.to(device)
         self.optimizer = optimizer
         self.data_loader = data_loader
         self.interval = interval  # Validation interval in seconds
@@ -60,7 +62,7 @@ class ModelValidator:
         total_samples = 0
         with torch.no_grad():
             for batch_num, batch in enumerate(self.data_loader): #FIXME turn me into a generator?
-                outputs = self.model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch["labels"])
+                outputs = self.model(input_ids=batch['input_ids'].to(self.device), attention_mask=batch['attention_mask'].to(self.device), labels=batch["labels"].to(self.device))
                 loss = outputs.loss
                 total_loss += loss.item() * batch['input_ids'].size(0)
                 total_samples += batch['input_ids'].size(0)
@@ -83,6 +85,7 @@ class ModelValidator:
                 self.hf_manager.pull_latest_model()
                 time.sleep(10) #just to give enough time for pull
                 self.model = self.hf_manager.update_model(self.model)
+                self.model = self.model.to(self.device)
                 optimizer = optim.Adam(self.model.parameters(), lr=5e-5)  # Reinitialize the optimizer
                 self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()} 
             self.last_pull_time = time.time()
