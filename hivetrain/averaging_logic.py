@@ -249,8 +249,9 @@ class LocalAverager(DeltaAverager):
         logging.info(f"Model saved locally at {model_save_path}.")
 
 class ParameterizedAverager(DeltaAverager):
-    def __init__(self, model,local_dir, device,hf_manager, chain_manager=None,bittensor_network=None, hf_token=os.environ.get("HF_TOKEN") ):
-        DeltaAverager.__init__(self,model, local_dir,hf_manager=hf_manager, chain_manager=chain_manager, bittensor_network=bittensor_network, hf_token=hf_token)
+    #__init__(self, model, local_dir, repo_id,hf_manager, chain_manager,bittensor_network, hf_token=os.environ.get("HF_TOKEN"))
+    def __init__(self, model,local_dir, repo_id = None, device,hf_manager, chain_manager=None,bittensor_network=None, hf_token=os.environ.get("HF_TOKEN") ):
+        DeltaAverager.__init__(self,model, local_dir=local_dir,repo_id=repo_id,hf_manager=hf_manager, chain_manager=chain_manager, bittensor_network=bittensor_network, hf_token=hf_token)
         self.device = device
 
     def get_model_paths(self, gradient_file_name="gradients.pt"):
