@@ -8,7 +8,7 @@ import bittensor as bt
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 from hivetrain.btt_connector import (
-    BittensorNetwork
+    BittensorNetwork,
     # get_validator_uids_and_addresses,
     serve_axon,
 )
