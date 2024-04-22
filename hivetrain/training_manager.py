@@ -266,13 +266,14 @@ class DeltaLoop(TrainingLoop):
 
             for step, batch in enumerate(self.data_loader):
 
-                if time.time() - self.last_pull_time >= self.check_update_interval and self.hf_manager.check_for_new_submissions(self.hf_manager.model_repo_id):
-                    logging.info("Averaged model updated on Hugging Face. Pulling latest model...")                
-                    self.hf_manager.pull_latest_model()
-                    time.sleep(10) #just to give enough time for pull
-                    self.model = self.hf_manager.update_model(self.model)
-                    optimizer = optim.Adam(self.model.parameters(), lr=5e-5)  # Reinitialize the optimizer
-                    self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()} 
+                if time.time() - self.last_pull_time >= self.check_update_interval  
+                    if self.hf_manager.check_for_new_submissions(self.hf_manager.model_repo_id):
+                        logging.info("Averaged model updated on Hugging Face. Pulling latest model...")                
+                        self.hf_manager.pull_latest_model()
+                        time.sleep(10) #just to give enough time for pull
+                        self.model = self.hf_manager.update_model(self.model)
+                        optimizer = optim.Adam(self.model.parameters(), lr=5e-5)  # Reinitialize the optimizer
+                        self.base_weights = {name: param.clone() for name, param in self.model.named_parameters()} 
                     self.last_pull_time = time.time()
 
                 outputs = self.model(input_ids=batch['input_ids'].to(self.device), attention_mask=batch['attention_mask'].to(self.device), labels=batch['input_ids'].to(self.device))
