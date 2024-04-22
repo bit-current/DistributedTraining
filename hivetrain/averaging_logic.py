@@ -268,11 +268,7 @@ class ParameterizedAverager(DeltaAverager):
             except Exception as e: 
                 logging.debug(f"Receiving gradients failed due to: {e}")
 
-<<<<<<< HEAD
-    def store_weight_delta(self,weight_delta, hotkey):
-=======
     def store_weight_delta(self, weight_delta, hotkey):
->>>>>>> 4f7d68066a0fd7101fe23181a4bc5a5adc2e353c
         """
         Save the weight_delta state_dict to a local directory at regular intervals.
         """
