@@ -63,6 +63,9 @@ To allow programmatic communication with your repository, you will need to gener
 
 ### 4. Create a New .env File to Store Your Hugging Face Token
 Store your new token in the .env file in DistributedTranining directory:
+```
+HF_TOKEN="your_huggingface_token_here"
+```
 
 ## Load Wallets and Register to Subnet
 
