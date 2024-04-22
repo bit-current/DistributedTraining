@@ -98,8 +98,9 @@ data_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=cus
 optimizer = AdamW(model.parameters(), lr=learning_rate)
 
 hf_manager = HFManager(my_repo_id = args.storage.my_repo_id, averaged_model_repo_id= args.storage.averaged_model_repo_id)
-#model_name, data_loader,gradients_dir, learning_rate=5e-5, send_interval=30, averaging_dir = "averaged_model"
-training_loop = DeltaLoop("mekaneeky/tiny-random-gpt2", data_loader, args.storage.gradient_dir,send_interval=30, learning_rate=5e-4,averaging_dir="averaged_model")
+#def __init__(self, device, model_name, data_loader, gradients_dir, learning_rate=5e-5, check_update_interval = 10, send_interval=30, averaging_dir = "averaged_model", hf_manager = None):
+device = "cuda" if torch.cuda.is_available() else "cpu"
+training_loop = DeltaLoop(device, "mekaneeky/tiny-random-gpt2", data_loader, gradients_dir=args.storage.gradient_dir,send_interval=30, learning_rate=5e-4,averaging_dir=None)
 training_loop.train(epochs=30_000_000_000_000_000, hf_manager=hf_manager) 
 
 
