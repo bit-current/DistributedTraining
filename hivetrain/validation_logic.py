@@ -121,7 +121,7 @@ class ModelValidator:
 
 
         if self.bittensor_network.should_set_weights():    
-            self.bittensor_network.set_weights(torch.tensor(self.scores))
+            self.bittensor_network.set_weights(self.scores)
 
     def start_periodic_validation(self):
         #def run():
