@@ -2,7 +2,6 @@ import random
 
 import torch
 
-from hivemind import DHT
 from hivetrain.btt_connector import (
     BittensorNetwork,
     # get_validator_uids_and_addresses,
