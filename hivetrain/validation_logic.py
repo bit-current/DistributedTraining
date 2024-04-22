@@ -106,6 +106,8 @@ class ModelValidator:
                 perplexity_score = max(0, self.base_perplexity - perplexity)
                 self.model.load_state_dict(self.original_state_dict)
             else:
+                loss = 99999999
+                perplexity = 99999999
                 loss_score = 99999999
                 perplexity_score = 99999999
                 
@@ -113,16 +115,13 @@ class ModelValidator:
 
             # Reset the model to its original state
             
-            try:
-                logging.info(f"Loss: {loss}, Perplexity: {perplexity}")
-            except:
-                pass
+            logging.info(f"Loss: {loss}, Perplexity: {perplexity}")
             logging.info(f"Loss Score: {loss_score}, Perplexity Score: {perplexity_score}")
             time.sleep(0.1)
 
 
             #if self.bittensor_network.should_set_weights():    
-            self.bittensor_network.set_weights(self.scores)
+            self.bittensor_network.set_weights(torch.tensor(self.scores))
 
     def start_periodic_validation(self):
         #def run():
