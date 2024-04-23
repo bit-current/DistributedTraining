@@ -66,7 +66,17 @@ Store your new token in the .env file in DistributedTranining directory:
 ```
 HF_TOKEN="your_huggingface_token_here"
 ```
+or 
 
+```
+echo "HF_TOKEN=your_huggingface_token_here" >> .env
+```
+### 4. Install git-lfs to be be able to handle large files
+
+```
+curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
+sudo apt install git-lfs
+```
 ## Load Wallets and Register to Subnet
 
 ```
