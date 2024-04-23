@@ -8,13 +8,12 @@
 
 This project introduces a cutting-edge approach to distributed deep learning, utilizing the Bittensor network. Our method incentivizes participants by rewarding the generation of optimal weights that contribute significantly to minimizing the overall loss of the base model.
 
-To streamline the process and reduce communication overhead between miners, we integrate Hugging Face as a central hub. This serves as an intermediary, facilitating efficient miner-
-validator communications without the complexities of direct exchanges.
+To streamline the process and reduce communication overhead between miners, we integrate Hugging Face as a central hub. This serves as an intermediary, facilitating efficient miner-validator communications without the complexities of direct exchanges.
 
 Key Components: 
-* Miners: Miners are responsible for training the language model. They compute the weight delta—the difference between the weights of the trained model and the base model. This delta is then uploaded to Hugging Face, from where it can be accessed by validators. 
-* Validators: Validators play a crucial role in assessing the miners' contributions. They download the weight deltas from Hugging Face and evaluate them based on their impact on the model’s performance, focusing on metrics such as loss reduction and accuracy. 
-* Averager: We also introduce an averager, which analyzes the combined effect of individual weight contributions to determine the optimal combination that results in the lowest possible loss.
+* Miners: Miners are responsible for training a model. Each miner trains a weight-delta. A weight-delta is the difference between the weights of the trained model and the base model. This delta is then uploaded to Hugging Face, from where it can be accessed by validators. 
+* Validators: Validators asses the loss reduction by each miner on a randomized test set. They download the weight deltas from Hugging Face and evaluate them based on their impact on the model’s performance, focusing on metrics such as loss reduction and accuracy.Better performing miners that improve on the base model are assigned better scores.
+* Averager: We also introduce an averager node, which is a centralized node run by the subnet owner. The averager is responsible for providing the averaged model that becomes the base model for miners and validators, this is repeated every averaging interval. The averager performs a weighted average of the parameters resulting in an averaged model. Currently the weights of the weighted average are also parameterized allowing the process to be optimized to find the best averaged model. 
 
 ## Clone the Repo
 
@@ -28,17 +27,18 @@ git clone https://github.com/bit-current/DistributedTraining
 cd DistributedTraining
 ```
 
+## Remove Previous Hivetrain installation
+
+```
+pip uninstall hivetrain
+```
+
 ## Install Repo + Requirements
 
 ```
 pip install -e .
 ```
 
-## Checkout the Dev Branch
-
-```
-git checkout chain_meta
-```
 ## Hugging Face
 Continue setting up by following these step:
 
@@ -75,18 +75,22 @@ btcli regen_hotkey --mnemonic your super secret mnemonic
 btcli s register --netuid 100 --subtensor.network test
 ```
 
+## New arguments
+```storage.averaged_model_repo_id```: The repo that is used by the averager. Currently this is ```Hivetrain/averaging_run_1```. Changes with each training run, review changes on the discord channel.  
+```storage.my_repo_id```: Repo id for the repo that is used by a **miner only** to upload the miner's trained model weight delta. 
+
 ## Miner Run Command
 
 ```
-python miner.py --netuid 25 --wallet.name some_test_wallet_cold --wallet.hotkey some_test_wallet_hot --initial_peers (please add an existing miner's dht address here. Check discord pinned post or ask on discord channel)
+python miner.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_name --storage.my_repo_id your_/your_repo --storage.averaged_model_repo_id Hivetrain/averaging_run_1
 ```
 
 ## Validator
 
-### Validators need to have at least 10 test TAO to be able to set weights.
+### Validators need to have at least 1000 TAO to set weights on the main net and 10 TAO on the test net
 
 ```
-python validator.py --netuid 25 --wallet.name some_test_wallet_cold --wallet.hotkey some_test_wallet_hot --axon.external_ip your_external_ip --axon.port your_external_port --logging.debug --logging.trace --axon.ip your_extrenal_ip_still --axon.external_port your_external_port_still --flask.host_address on_device_ip_to_bind_to --flask.host_port on_device_port_to_bind_to
+python validator.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_name --storage.averaged_model_repo_id Hivetrain/averaging_run_1
 ```
 
 ## Bug Reporting and Contributions
