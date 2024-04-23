@@ -1,14 +1,26 @@
+import os
 import time
 import torch
 import math
+import hashlib
+import mlflow
+import mlflow.pytorch
+from hivetrain.config import Configurator
+from hivetrain.btt_connector import BittensorNetwork
+from hivetrain.config.mlflow_config import MLFLOW_UI_URL, CURRENT_MODEL_NAME
+from hivetrain.utils.mlflow_utils import (get_gpu_utilization, get_network_bandwidth,
+                                        get_memory_usage, VERSION)
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
 from huggingface_hub import Repository
 from bittensor import logging
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import SGD
-import os
-import hashlib
+
+
+args = Configurator.combine_configs()
+BittensorNetwork.initialize(args)
+MY_HOTKEY = BittensorNetwork.wallet.hotkey.ss58_address
 
 class TrainingLoop:
         def __init__(
@@ -39,6 +51,19 @@ class TrainingLoop:
         self.check_update_interval = check_update_interval
         self.send_interval = send_interval
         self.last_pull_time = 0
+
+        # Set the MLflow tracking URI Server
+        mlflow.set_tracking_uri(MLFLOW_UI_URL)
+        # Start an experiment or use an existing one
+        mlflow.set_experiment(CURRENT_MODEL_NAME)
+
+        # Start an MLflow run and log parameters
+        mlflow.start_run(f"miner_{MY_HOTKEY}")
+        mlflow.log_param('device', self.device)
+        mlflow.log_param('Version of Code', VERSION)
+        mlflow.log_param("learning_rate", self.learning_rate)
+        mlflow.log_param("send_interval", self.send_interval)
+        mlflow.log_param("check_update_interval", self.check_update_interval)
     
 
     def train(self, epochs):
