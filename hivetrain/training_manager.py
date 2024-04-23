@@ -7,18 +7,19 @@ import mlflow
 import mlflow.pytorch
 from config import Configurator
 from btt_connector import BittensorNetwork
-from config.mlflow_config import MLFLOW_UI_URL, CURRENT_MODEL_NAME
-from utils.mflow_utils import (
-    get_network_bandwidth,
-    get_memory_usage,
-    get_gpu_utilization,
-    VERSION,
-)
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
 from bittensor import logging
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import SGD
+from config.mlflow_config import MLFLOW_UI_URL, CURRENT_MODEL_NAME
+from utils.mflow_utils import (
+    get_network_bandwidth,
+    get_memory_usage,
+    get_gpu_utilization,
+    VERSION
+)
+
 
 
 args = Configurator.combine_configs()
