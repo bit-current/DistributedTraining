@@ -36,7 +36,7 @@ class TrainingLoop:
         learning_rate=5e-5,
         check_update_interval=300,
         send_interval=300,
-        averaging_dir="averaged_model",
+        # averaging_dir="averaged_model",
         hf_manager=None,
     ):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
