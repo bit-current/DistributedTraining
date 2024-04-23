@@ -8,7 +8,8 @@ import mlflow.pytorch
 from hivetrain.config import Configurator
 from hivetrain.btt_connector import BittensorNetwork
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
-from bittensor import logging
+# from bittensor import logging
+import logging
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import SGD
@@ -20,7 +21,8 @@ from hivetrain.utils.mflow_utils import (
     VERSION
 )
 
-
+logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 args = Configurator.combine_configs()
 BittensorNetwork.initialize(args)

@@ -13,7 +13,8 @@ from hivetrain.training_manager import DeltaLoop
 
 
 logging.basicConfig(level=logging.INFO)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 # logging.enable_debug()
 logging.info("Starting !")
