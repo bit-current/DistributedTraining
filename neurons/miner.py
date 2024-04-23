@@ -1,16 +1,11 @@
-import random
-
-import torch
-
+import torch   
+from bittensor import logging
 from hivetrain.btt_connector import BittensorNetwork
-
 from hivetrain.chain_manager import ChainMultiAddressStore
 from hivetrain.config import Configurator
 from hivetrain.hf_manager import HFManager
 from hivetrain.training_manager import DeltaLoop
 from hivetrain import __spec_version__
-from bittensor import logging
-from dotenv import load_dotenv
 import torch
 import matplotlib.pyplot as plt
 from torchvision import datasets, transforms
@@ -19,7 +14,6 @@ from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 from tqdm import tqdm
 
-load_dotenv()
 
 logging.enable_debug()
 logging.info("Starting !")
@@ -103,41 +97,41 @@ training_loop.train(epochs=30_000_000_000_000_000, hf_manager=hf_manager)
 
 
 
-# # Assuming `steps` and `losses` are defined as you described
-training_losses = [loss[0] for loss in losses]  # Extract training losses
-test_losses = [loss[1] for loss in losses]      # Extract test losses
-test_accuracy = [loss[2] for loss in losses]      # Extract test losses
+# # # Assuming `steps` and `losses` are defined as you described
+# training_losses = [loss[0] for loss in losses]  # Extract training losses
+# test_losses = [loss[1] for loss in losses]      # Extract test losses
+# test_accuracy = [loss[2] for loss in losses]      # Extract test losses
 
 
-# Plotting Training Loss over Steps
-plt.figure(figsize=(10, 5))
-plt.plot(steps, training_losses, label='Training Loss', color='blue')
-plt.xlabel('Step')
-plt.ylabel('Training Loss')
-plt.title('Training Loss over Steps')
-plt.legend()
-plt.grid(True)
-plt.savefig('training_loss.png')  # Save the plot instead of showing it
-plt.close()  # Close the figure to free up memory
+# # Plotting Training Loss over Steps
+# plt.figure(figsize=(10, 5))
+# plt.plot(steps, training_losses, label='Training Loss', color='blue')
+# plt.xlabel('Step')
+# plt.ylabel('Training Loss')
+# plt.title('Training Loss over Steps')
+# plt.legend()
+# plt.grid(True)
+# plt.savefig('training_loss.png')  # Save the plot instead of showing it
+# plt.close()  # Close the figure to free up memory
 
-# Plotting Test Loss over Steps
-plt.figure(figsize=(10, 5))
-plt.plot(steps, test_losses, label='Test Loss', color='red')
-plt.xlabel('Step')
-plt.ylabel('Test Loss')
-plt.title('Test Loss over Steps')
-plt.legend()
-plt.grid(True)
-plt.savefig('test_loss.png')  # Save the plot instead of showing it
-plt.close()  # Close the figure to free up memory
+# # Plotting Test Loss over Steps
+# plt.figure(figsize=(10, 5))
+# plt.plot(steps, test_losses, label='Test Loss', color='red')
+# plt.xlabel('Step')
+# plt.ylabel('Test Loss')
+# plt.title('Test Loss over Steps')
+# plt.legend()
+# plt.grid(True)
+# plt.savefig('test_loss.png')  # Save the plot instead of showing it
+# plt.close()  # Close the figure to free up memory
 
-# Plotting Test Loss over Steps
-plt.figure(figsize=(10, 5))
-plt.plot(steps, test_accuracy, label='Test Accuracy', color='red')
-plt.xlabel('Step')
-plt.ylabel('Test Loss')
-plt.title('Test Loss over Steps')
-plt.legend()
-plt.grid(True)
-plt.savefig('test_acc.png')  # Save the plot instead of showing it
-plt.close()  # Close the figure to free up memory
+# # Plotting Test Loss over Steps
+# plt.figure(figsize=(10, 5))
+# plt.plot(steps, test_accuracy, label='Test Accuracy', color='red')
+# plt.xlabel('Step')
+# plt.ylabel('Test Loss')
+# plt.title('Test Loss over Steps')
+# plt.legend()
+# plt.grid(True)
+# plt.savefig('test_acc.png')  # Save the plot instead of showing it
+# plt.close()  # Close the figure to free up memory
