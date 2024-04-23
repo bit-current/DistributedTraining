@@ -1,6 +1,5 @@
 
-# from bittensor import logging
-import logging
+from bittensor import logging
 import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset, IterableDataset
@@ -14,10 +13,7 @@ from hivetrain.training_manager import DeltaLoop
 
 
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-
-# logging.enable_debug()
+logging.enable_debug()
 logging.info("Starting !")
 
 def flatten_list(nested_list):
