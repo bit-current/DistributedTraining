@@ -1,5 +1,6 @@
 import torch   
-from bittensor import logging
+# from bittensor import logging
+import logging
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
@@ -9,8 +10,10 @@ from hivetrain.chain_manager import ChainMultiAddressStore
 from hivetrain.config import Configurator
 from hivetrain.hf_manager import HFManager
 from hivetrain.training_manager import DeltaLoop
-# from hivetrain import __spec_version__
 
+
+logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 
 # logging.enable_debug()
 logging.info("Starting !")
