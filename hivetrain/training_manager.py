@@ -31,7 +31,6 @@ class TrainingLoop:
         device,
         model_name,
         data_loader,
-        gradients_dir,
         learning_rate=5e-5,
         check_update_interval=300,
         send_interval=300,
@@ -122,6 +121,7 @@ class TrainingLoop:
                 if step % 500 == 0:
                     mlflow.log_metric("train_loss", loss.item(), step=step)
                     mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
+                    mlflow.log_param("Version of Code", VERSION) # just to make sure version is update frequently
 
                 # Example of a condition to periodically send gradients
 
@@ -392,8 +392,10 @@ class DeltaLoop(TrainingLoop):
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
-                mlflow.log_metric("train_loss", loss.item(), step=step)
-                mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
+                if step % 500 == 0:
+                    mlflow.log_metric("train_loss", loss.item(), step=step)
+                    mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
+                    mlflow.log_param("Version of Code", VERSION) # just to make sure version is update frequently
 
                 # Example of a condition to periodically send gradients
                 if time.time() - self.last_send_time >= self.send_interval:
