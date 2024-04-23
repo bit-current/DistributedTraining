@@ -55,12 +55,9 @@ class TrainingLoop:
         self.send_interval = send_interval
         self.last_pull_time = 0
 
-        # Set the MLflow tracking URI Server
+        # initialize mlflow
         mlflow.set_tracking_uri(MLFLOW_UI_URL)
-        # Start an experiment or use an existing one
         mlflow.set_experiment(CURRENT_MODEL_NAME)
-
-        # Start an MLflow run and log parameters
         mlflow.start_run(run_name=f"miner_{MY_HOTKEY}")
         mlflow.log_param("device", self.device)
         mlflow.log_param("Version of Code", VERSION)
