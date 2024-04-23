@@ -11,6 +11,7 @@ from hivetrain.config.mlflow_config import MLFLOW_UI_URL, CURRENT_MODEL_NAME
 from hivetrain.utils.mflow_utils import (
     get_network_bandwidth,
     get_memory_usage,
+    get_gpu_utilization,
     VERSION,
 )
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
@@ -121,6 +122,7 @@ class TrainingLoop:
                 if step % 500 == 0:
                     mlflow.log_metric("train_loss", loss.item(), step=step)
                     mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
+                    mlflow.log_metric("memory_usage", get_gpu_utilization(), step=step)
                     mlflow.log_param("Version of Code", VERSION) # just to make sure version is update frequently
 
                 # Example of a condition to periodically send gradients
@@ -395,6 +397,7 @@ class DeltaLoop(TrainingLoop):
                 if step % 500 == 0:
                     mlflow.log_metric("train_loss", loss.item(), step=step)
                     mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
+                    mlflow.log_metric("memory_usage", get_gpu_utilization(), step=step)
                     mlflow.log_param("Version of Code", VERSION) # just to make sure version is update frequently
 
                 # Example of a condition to periodically send gradients
