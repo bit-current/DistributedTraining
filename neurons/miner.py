@@ -1,6 +1,7 @@
-import torch   
+
 # from bittensor import logging
 import logging
+import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
