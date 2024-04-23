@@ -75,18 +75,22 @@ btcli regen_hotkey --mnemonic your super secret mnemonic
 btcli s register --netuid 100 --subtensor.network test
 ```
 
+## New arguments
+storage.averaged_model_repo_id: The repo that is used by the averager. Currently this is Hivetrain/averaging_run_1. Changes with each training run, review changes on the discord channel .
+storage.my_repo_id: Repo id for the repo that is used by a **miner only** to upload the miner's trained model weight delta 
+
 ## Miner Run Command
 
 ```
-python miner.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_name --storage.my_repo_id your_/your_repo --storage.averaged_model_repo_id username/averaging_repo
+python miner.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_name --storage.my_repo_id your_/your_repo --storage.averaged_model_repo_id Hivetrain/averaging_run_1
 ```
-storage.averaged_model_repo_id: The repo that cons
+
 ## Validator
 
-### Validators need to have at least 10 test TAO to be able to set weights.
+### Validators need to have at least 1000 TAO to set weights on the main net and 10 TAO on the test net
 
 ```
-python validator.py --netuid 25 --wallet.name some_test_wallet_cold --wallet.hotkey some_test_wallet_hot --axon.external_ip your_external_ip --axon.port your_external_port --logging.debug --logging.trace --axon.ip your_extrenal_ip_still --axon.external_port your_external_port_still --flask.host_address on_device_ip_to_bind_to --flask.host_port on_device_port_to_bind_to
+python validator.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_name --storage.averaged_model_repo_id Hivetrain/averaging_run_1
 ```
 
 ## Bug Reporting and Contributions
