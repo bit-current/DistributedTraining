@@ -392,7 +392,7 @@ class DeltaLoop(TrainingLoop):
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
-                if step % 500 == 0:
+                if step % 1000 == 0:
                     mlflow.log_metric("train_loss", loss.item(), step=step)
                     mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
                     mlflow.log_metric("gpu_usage", get_gpu_utilization(), step=step)
