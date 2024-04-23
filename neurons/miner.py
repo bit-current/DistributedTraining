@@ -1,18 +1,17 @@
 import torch   
 from bittensor import logging
-from hivetrain.btt_connector import BittensorNetwork
-from hivetrain.chain_manager import ChainMultiAddressStore
-from hivetrain.config import Configurator
-from hivetrain.hf_manager import HFManager
-from hivetrain.training_manager import DeltaLoop
-from hivetrain import __spec_version__
-import torch
 import matplotlib.pyplot as plt
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
-from tqdm import tqdm
+print('packages imported')
+from hivetrain.btt_connector import BittensorNetwork
+from hivetrain.chain_manager import ChainMultiAddressStore
+from hivetrain.config import Configurator
+from hivetrain.hf_manager import HFManager
+from hivetrain.training_manager import DeltaLoop
+# from hivetrain import __spec_version__
 
 
 logging.enable_debug()
