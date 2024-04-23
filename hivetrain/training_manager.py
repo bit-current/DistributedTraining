@@ -5,10 +5,10 @@ import math
 import hashlib
 import mlflow
 import mlflow.pytorch
-from hivetrain.config import Configurator
-from hivetrain.btt_connector import BittensorNetwork
-from hivetrain.config.mlflow_config import MLFLOW_UI_URL, CURRENT_MODEL_NAME
-from hivetrain.utils.mflow_utils import (
+from config import Configurator
+from btt_connector import BittensorNetwork
+from config.mlflow_config import MLFLOW_UI_URL, CURRENT_MODEL_NAME
+from utils.mflow_utils import (
     get_network_bandwidth,
     get_memory_usage,
     get_gpu_utilization,
