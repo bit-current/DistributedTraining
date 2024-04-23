@@ -119,8 +119,9 @@ class TrainingLoop:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
-                mlflow.log_metric("train_loss", loss.item(), step=step)
-                mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
+                if step % 500 == 0:
+                    mlflow.log_metric("train_loss", loss.item(), step=step)
+                    mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
 
                 # Example of a condition to periodically send gradients
 

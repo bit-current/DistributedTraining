@@ -15,6 +15,8 @@ from hivetrain.training_manager import DeltaLoop
 from hivetrain import __spec_version__
 from bittensor import logging
 
+from dotenv import load_dotenv
+
 import torch
 import matplotlib.pyplot as plt
 from torchvision import datasets, transforms
@@ -22,6 +24,8 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 from tqdm import tqdm
+
+load_dotenv()
 
 logging.enable_debug()
 logging.info("Starting !")
