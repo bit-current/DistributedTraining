@@ -122,7 +122,7 @@ class TrainingLoop:
                 if step % 500 == 0:
                     mlflow.log_metric("train_loss", loss.item(), step=step)
                     mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
-                    mlflow.log_metric("memory_usage", get_gpu_utilization(), step=step)
+                    mlflow.log_metric("gpu_usage", get_gpu_utilization(), step=step)
                     mlflow.log_param("Version of Code", VERSION) # just to make sure version is update frequently
 
                 # Example of a condition to periodically send gradients
@@ -397,7 +397,7 @@ class DeltaLoop(TrainingLoop):
                 if step % 500 == 0:
                     mlflow.log_metric("train_loss", loss.item(), step=step)
                     mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
-                    mlflow.log_metric("memory_usage", get_gpu_utilization(), step=step)
+                    mlflow.log_metric("gpu_usage", get_gpu_utilization(), step=step)
                     mlflow.log_param("Version of Code", VERSION) # just to make sure version is update frequently
 
                 # Example of a condition to periodically send gradients
