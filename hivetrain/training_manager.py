@@ -9,7 +9,6 @@ from hivetrain.config import Configurator
 from hivetrain.btt_connector import BittensorNetwork
 from hivetrain.config.mlflow_config import MLFLOW_UI_URL, CURRENT_MODEL_NAME
 from hivetrain.utils.mflow_utils import (
-    get_gpu_utilization,
     get_network_bandwidth,
     get_memory_usage,
     VERSION,
@@ -121,7 +120,6 @@ class TrainingLoop:
                 self.optimizer.zero_grad()
 
                 mlflow.log_metric("train_loss", loss.item(), step=step)
-                mlflow.log_metric("gpu_utilization", get_gpu_utilization(), step=step)
                 mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
 
                 # Example of a condition to periodically send gradients
@@ -394,7 +392,6 @@ class DeltaLoop(TrainingLoop):
                 self.optimizer.zero_grad()
 
                 mlflow.log_metric("train_loss", loss.item(), step=step)
-                mlflow.log_metric("gpu_utilization", get_gpu_utilization(), step=step)
                 mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
 
                 # Example of a condition to periodically send gradients
