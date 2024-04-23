@@ -12,7 +12,7 @@ from hivetrain.training_manager import DeltaLoop
 # from hivetrain import __spec_version__
 
 
-logging.enable_debug()
+# logging.enable_debug()
 logging.info("Starting !")
 
 def flatten_list(nested_list):
