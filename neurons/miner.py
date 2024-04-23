@@ -2,21 +2,15 @@ import random
 
 import torch
 
-from hivetrain.btt_connector import (
-    BittensorNetwork,
-    # get_validator_uids_and_addresses,
-    serve_axon,
-)
+from hivetrain.btt_connector import BittensorNetwork
+
 from hivetrain.chain_manager import ChainMultiAddressStore
 from hivetrain.config import Configurator
 from hivetrain.hf_manager import HFManager
 from hivetrain.training_manager import DeltaLoop
-
 from hivetrain import __spec_version__
 from bittensor import logging
-
 from dotenv import load_dotenv
-
 import torch
 import matplotlib.pyplot as plt
 from torchvision import datasets, transforms
