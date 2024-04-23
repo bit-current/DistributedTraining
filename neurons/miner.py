@@ -12,7 +12,7 @@ from hivetrain.hf_manager import HFManager
 from hivetrain.training_manager import DeltaLoop
 
 
-logging.basicConfig(level=logging.INFO)
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
