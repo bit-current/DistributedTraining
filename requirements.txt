@@ -7,3 +7,4 @@ datasets
 transformers
 mlflow
 python-dotenv
+psutil

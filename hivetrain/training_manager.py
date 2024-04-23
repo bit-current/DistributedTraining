@@ -5,8 +5,8 @@ import math
 import hashlib
 import mlflow
 import mlflow.pytorch
-from config import Configurator
-from btt_connector import BittensorNetwork
+from hivetrain.config import Configurator
+from hivetrain.btt_connector import BittensorNetwork
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
 from bittensor import logging
 import torch.nn as nn
