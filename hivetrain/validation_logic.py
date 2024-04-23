@@ -56,13 +56,13 @@ class ModelValidator:
         self.check_update_interval = check_update_interval
 
         # Initialize mlflow
-        mlflow.set_tracking_uri(MLFLOW_UI_URL)
-        mlflow.set_experiment(CURRENT_MODEL_NAME)
-        mlflow.start_run(run_name=f"validator_{MY_HOTKEY}")
-        mlflow.log_param("device", self.device)
-        mlflow.log_param("Version of Code", VERSION)
-        mlflow.log_param("learning_rate", self.learning_rate)
-        mlflow.log_param("check_update_interval", self.check_update_interval)
+        # mlflow.set_tracking_uri(MLFLOW_UI_URL)
+        # mlflow.set_experiment(CURRENT_MODEL_NAME)
+        # mlflow.start_run(run_name=f"validator_{MY_HOTKEY}")
+        # mlflow.log_param("device", self.device)
+        # mlflow.log_param("Version of Code", VERSION)
+        # mlflow.log_param("learning_rate", self.learning_rate)
+        # mlflow.log_param("check_update_interval", self.check_update_interval)
 
     def update_model_weights(self, gradients, alpha=5e-4):
         with torch.no_grad():
@@ -132,18 +132,18 @@ class ModelValidator:
                 self.model.load_state_dict(self.original_state_dict)
 
                 current_time = time.time()
-                mlflow.log_metric(f"loss_{hotkey_address}", loss, step=current_time)
-                mlflow.log_metric(
-                    f"perplexity_{hotkey_address}", perplexity, step=current_time
-                )
-                mlflow.log_metric(
-                    f"loss_score{hotkey_address}", loss_score, step=current_time
-                )
-                mlflow.log_metric(
-                    f"perplexity_score{hotkey_address}",
-                    perplexity_score,
-                    step=current_time,
-                )
+                # mlflow.log_metric(f"loss_{hotkey_address}", loss, step=current_time)
+                # mlflow.log_metric(
+                #     f"perplexity_{hotkey_address}", perplexity, step=current_time
+                # )
+                # mlflow.log_metric(
+                #     f"loss_score{hotkey_address}", loss_score, step=current_time
+                # )
+                # mlflow.log_metric(
+                #     f"perplexity_score{hotkey_address}",
+                #     perplexity_score,
+                #     step=current_time,
+                # )
             else:
                 loss = 99999999
                 perplexity = 99999999
@@ -151,29 +151,29 @@ class ModelValidator:
                 perplexity_score = 0
 
                 current_time = time.time()
-                mlflow.log_metric(f"loss_{hotkey_address}", loss, step=current_time)
-                mlflow.log_metric(
-                    f"perplexity_{hotkey_address}", perplexity, step=current_time
-                )
-                mlflow.log_metric(
-                    f"loss_score{hotkey_address}", loss_score, step=current_time
-                )
-                mlflow.log_metric(
-                    f"perplexity_score{hotkey_address}",
-                    perplexity_score,
-                    step=current_time,
-                )
+                # mlflow.log_metric(f"loss_{hotkey_address}", loss, step=current_time)
+                # mlflow.log_metric(
+                #     f"perplexity_{hotkey_address}", perplexity, step=current_time
+                # )
+                # mlflow.log_metric(
+                #     f"loss_score{hotkey_address}", loss_score, step=current_time
+                # )
+                # mlflow.log_metric(
+                #     f"perplexity_score{hotkey_address}",
+                #     perplexity_score,
+                #     step=current_time,
+                # )
 
             self.scores[hotkey_address] = perplexity_score
             # log validator performance
 
             if uid == 1:
                 logging_time = time.time()
-                mlflow.log_metric(
-                    "network_bandwidth", get_network_bandwidth(), step=logging_time
-                )
-                mlflow.log_metric("gpu_usage", get_gpu_utilization(), step=logging_time)
-                mlflow.log_param("Version of Code", VERSION)
+                # mlflow.log_metric(
+                #     "network_bandwidth", get_network_bandwidth(), step=logging_time
+                # )
+                # mlflow.log_metric("gpu_usage", get_gpu_utilization(), step=logging_time)
+                # mlflow.log_param("Version of Code", VERSION)
 
             # Reset the model to its original state
             logging.info(f"Loss: {loss}, Perplexity: {perplexity}")
