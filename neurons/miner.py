@@ -4,7 +4,6 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AdamW, AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
-print('packages imported')
 from hivetrain.btt_connector import BittensorNetwork
 from hivetrain.chain_manager import ChainMultiAddressStore
 from hivetrain.config import Configurator
