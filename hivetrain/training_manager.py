@@ -58,7 +58,7 @@ class TrainingLoop:
         mlflow.set_experiment(CURRENT_MODEL_NAME)
 
         # Start an MLflow run and log parameters
-        mlflow.start_run(f"miner_{MY_HOTKEY}")
+        mlflow.start_run(run_name = f"miner_{MY_HOTKEY}")
         mlflow.log_param('device', self.device)
         mlflow.log_param('Version of Code', VERSION)
         mlflow.log_param("learning_rate", self.learning_rate)
@@ -100,26 +100,45 @@ class TrainingLoop:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
+                mlflow.log_metric("train_loss", loss.item(), step=step)
+                mlflow.log_metric("gpu_utilization", get_gpu_utilization(), step=step)
+                mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
+
                 # Example of a condition to periodically send gradients
-                current_time = time.time() ##time.time()%sth works better
-                if current_time - self.last_send_time >= self.send_interval:
-                    
+    
+                if time.time() - self.last_send_time >= self.send_interval:
                     average_loss = total_loss / total_examples
                     perplexity = math.exp(average_loss)
                     logging.info(f"Epoch: {epoch}, Examples: {total_examples}, Loss: {average_loss:.4f}, Perplexity: {perplexity:.4f}")
 
                     try:
                         logging.info(f"Attempting to send gradients")
-                # Periodically save gradients
+                        # Periodically save gradients
                         model_gradients_path = os.path.join(self.hf_manager.get_local_gradient_dir(), 'gradients.pt')
                         torch.save(self.model.state_dict(), model_gradients_path)
-                        self.hf_manager.push_changes(['gradients.pt'])
+                        self.hf_manager.push_changes('gradients.pt')
+                        
                     except Exception as e:
                         logging.warning(f"Sending gradients failed: {e}")
                         continue
-                    self.last_send_time = current_time
+                    self.last_send_time = time.time()
                     # Reset aggregated gradients
                     #self.aggregated_gradients = {name: torch.zeros_like(param) for name, param in self.model.named_parameters() if param.requires_grad}
+
+        def get_gradient_staleness(self):
+            """
+            Calculates the staleness of the gradient by measuring the time elapsed since the last gradient update.
+    
+            Returns:
+                float: The staleness of the gradient in seconds. Returns 0.0 if this is the first call (no previous updates).
+            """
+            current_time = time.time()
+            if self.last_send_time == 0:
+                return 0.0
+            else:
+                staleness = current_time - self.last_send_time
+                return staleness
+
 
 
 class MNISTDeltaTrainHugging(TrainingLoop):  
