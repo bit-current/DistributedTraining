@@ -76,8 +76,8 @@ btcli s register --netuid 100 --subtensor.network test
 ```
 
 ## New arguments
-storage.averaged_model_repo_id: The repo that is used by the averager. Currently this is Hivetrain/averaging_run_1. Changes with each training run, review changes on the discord channel .
-storage.my_repo_id: Repo id for the repo that is used by a **miner only** to upload the miner's trained model weight delta 
+```storage.averaged_model_repo_id```: The repo that is used by the averager. Currently this is ```Hivetrain/averaging_run_1```. Changes with each training run, review changes on the discord channel.  
+```storage.my_repo_id```: Repo id for the repo that is used by a **miner only** to upload the miner's trained model weight delta. 
 
 ## Miner Run Command
 
