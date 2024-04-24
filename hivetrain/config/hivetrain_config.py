@@ -7,6 +7,8 @@ def add_meta_miner_args(parser):
     #parser.add_argument("--meta-miner.log-activity", type=bool, help="Display logging message every request")
     parser.add_argument("--miner.batch-size", type=int, default=64, help="Batch size per forward/backward pass")
     parser.add_argument("--miner.epochs", type=int, default=100, help="Number of epochs to train")
+    
+    parser.add_argument("--device", type=str, default="cuda", help="Device to use for inference/training")
 
     parser.add_argument('--miner.send_interval', type=int, help='URLs of the validators for local testing only')
     parser.add_argument('--storage.gradient_dir', type=str, help='Local path to gradients/weight deltas')
