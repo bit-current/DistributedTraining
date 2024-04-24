@@ -104,6 +104,6 @@ averager = ParameterizedAverager(model=model,device=device,hf_manager=hf_manager
 #averager.run_periodic_averaging(test_loader,20,300)
 #val_loader,meta_epochs, lr, t
 #averager.save_model()
-averager.run_periodic_averaging(test_loader, 200,0.1,30)
+averager.run_periodic_averaging(test_loader, 200,0.01,30)
 # # Push the model to the Hugging Face Hub
 # push_to_hf_hub(local_dir=local_dir, repo_id=repo_id, hf_token=args.averager.hf_token, commit_message=f"Updated model SN25 with {222}")#FIXME add block numbers

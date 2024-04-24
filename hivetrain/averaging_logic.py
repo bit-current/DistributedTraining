@@ -292,17 +292,21 @@ class ParameterizedAverager(DeltaAverager):
             if model_path is None:
                 continue
             else:
-                try:
-                    weight_delta = self.hf_manager.receive_gradients(model_path["repo_id"])
-                    if self.model.state_dict().keys() != weight_delta.keys():
-                        continue
-                    self.store_weight_delta(weight_delta, model_path["hotkey"])
-                    if weight_delta is None:
-                        raise ValueError(f"Failed to receive gradients at: {model_path['repo_id']}")
-                    self.num_models +=1
-                    self.active_hotkeys.append(model_path["hotkey"])
-                except Exception as e:
-                    logging.warning(f"Failed to get model at {model_path['hotkey']}: {e}")
+                #try:
+                weight_delta = self.hf_manager.receive_gradients(model_path["repo_id"])
+                false_model_flag = False
+                for name, param in weight_delta.items():
+                    if weight_delta[name].shape != self.model.state_dict()[name].shape:
+                        false_model_flag = True
+                if false_model_flag:
+                    continue
+                self.store_weight_delta(weight_delta, model_path["hotkey"])
+                if weight_delta is None:
+                    raise ValueError(f"Failed to receive gradients at: {model_path['repo_id']}")
+                self.num_models +=1
+                self.active_hotkeys.append(model_path["hotkey"])
+                #except Exception as e:
+                #    logging.warning(f"Failed to get model at {model_path['hotkey']}: {e}")
         if len(self.active_hotkeys) > 0:
             assert len(self.active_hotkeys) == self.num_models
         #if time.time() - self.last_cache_time > self.caching_interval:
@@ -386,9 +390,6 @@ class ParameterizedAverager(DeltaAverager):
                         #         main_param.grad = torch.clamp(main_param.grad,min=-0.1,max=0.1)
 
                         for i, model in enumerate(self.lazy_load_params()):
-                            if self.model.state_dict().keys != model.keys():
-                                logging.warning("Model Mismatch")
-                                continue
                             for j, (model_param, main_param) in enumerate(zip(model.values(), averaged_model.parameters())):
                                 if main_param.grad is not None:
                                     grad_weights[i,j] += torch.sum(main_param.grad * (model_param - main_param))
@@ -398,8 +399,8 @@ class ParameterizedAverager(DeltaAverager):
                         
                         #grad_weights = torch.clamp(grad_weights,min=-1,max=1)
                         self.weights.data -= (lr * grad_weights)
-                        if (batch_count * epoch+1) % 100:
-                            logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss.item():.4f}, Weights: {torch.mean(self.weights,dim=1)}")
+                        #if (batch_count * epoch+1) % 1000:
+                        #    logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss.item():.4f}, Weights: {torch.mean(self.weights,dim=1)}")
 
                 average_loss = total_loss / total_samples
                 perplexity = math.exp(average_loss) 
