@@ -6,16 +6,16 @@ import math
 import mlflow
 import mlflow.pytorch
 from bittensor import logging
+import logging
 from copy import deepcopy
 from hivetrain.btt_connector import BittensorNetwork
 from hivetrain.config import Configurator
-from hivetrain.config.mlflow_config import MLFLOW_UI_URL, CURRENT_MODEL_NAME
-from hivetrain.utils.mflow_utils import (
-    get_network_bandwidth,
-    get_memory_usage,
-    get_gpu_utilization,
-    VERSION,
+from hivetrain.config.mlflow_config import (
+    MLFLOW_UI_URL,
+    CURRENT_MODEL_NAME,
+    MLFLOW_ACTIVE,
 )
+from hivetrain.utils.mflow_utils import initialize_mlflow, log_model_metrics, VERSION
 from torch.optim import AdamW
 import torch.nn as nn
 import torch.nn.functional as F
@@ -55,14 +55,16 @@ class ModelValidator:
         self.last_pull_time = 0
         self.check_update_interval = check_update_interval
 
-        # Initialize mlflow
-        # mlflow.set_tracking_uri(MLFLOW_UI_URL)
-        # mlflow.set_experiment(CURRENT_MODEL_NAME)
-        # mlflow.start_run(run_name=f"validator_{MY_HOTKEY}")
-        # mlflow.log_param("device", self.device)
-        # mlflow.log_param("Version of Code", VERSION)
-        # mlflow.log_param("learning_rate", self.learning_rate)
-        # mlflow.log_param("check_update_interval", self.check_update_interval)
+        if MLFLOW_ACTIVE:
+            initialize_mlflow(
+                role="validator",
+                device=self.device,
+                version=VERSION,
+                mlflow_ui_url=MLFLOW_UI_URL,
+                current_model_name=CURRENT_MODEL_NAME,
+                my_hotkey=MY_HOTKEY,
+                check_update_interval=self.check_update_interval,
+            )
 
     def update_model_weights(self, gradients, alpha=5e-4):
         with torch.no_grad():
@@ -131,49 +133,42 @@ class ModelValidator:
                 perplexity_score = max(0, self.base_perplexity - perplexity)
                 self.model.load_state_dict(self.original_state_dict)
 
-                current_time = time.time()
-                # mlflow.log_metric(f"loss_{hotkey_address}", loss, step=current_time)
-                # mlflow.log_metric(
-                #     f"perplexity_{hotkey_address}", perplexity, step=current_time
-                # )
-                # mlflow.log_metric(
-                #     f"loss_score{hotkey_address}", loss_score, step=current_time
-                # )
-                # mlflow.log_metric(
-                #     f"perplexity_score{hotkey_address}",
-                #     perplexity_score,
-                #     step=current_time,
-                # )
-            else:
-                loss = 99999999
-                perplexity = 99999999
-                loss_score = 0
-                perplexity_score = 0
+                if MLFLOW_ACTIVE:
+                    metrics = {
+                        f"loss_{hotkey_address}": loss.item(),
+                        f"perplexity_{hotkey_address}": perplexity,
+                        f"loss_score_{hotkey_address}": loss_score,
+                        f"perplexity_score_{hotkey_address}": perplexity_score,
+                    }
 
-                current_time = time.time()
-                # mlflow.log_metric(f"loss_{hotkey_address}", loss, step=current_time)
-                # mlflow.log_metric(
-                #     f"perplexity_{hotkey_address}", perplexity, step=current_time
-                # )
-                # mlflow.log_metric(
-                #     f"loss_score{hotkey_address}", loss_score, step=current_time
-                # )
-                # mlflow.log_metric(
-                #     f"perplexity_score{hotkey_address}",
-                #     perplexity_score,
-                #     step=current_time,
-                # )
+                    # Log metrics with dynamic names
+                    log_model_metrics(step=int(current_time), **metrics)
+
+            else:
+                loss = 99999999.0
+                perplexity = 99999999.0
+                loss_score = 0.0
+                perplexity_score = 0.0
+
+                current_time = int(time.time())
+                if MLFLOW_ACTIVE:
+                    metrics = {
+                        f"loss_{hotkey_address}": loss,
+                        f"perplexity_{hotkey_address}": perplexity,
+                        f"loss_score_{hotkey_address}": loss_score,
+                        f"perplexity_score_{hotkey_address}": perplexity_score,
+                    }
+                    log_model_metrics(step=int(current_time), **metrics)
 
             self.scores[hotkey_address] = perplexity_score
             # log validator performance
 
             if uid == 1:
-                logging_time = time.time()
-                # mlflow.log_metric(
-                #     "network_bandwidth", get_network_bandwidth(), step=logging_time
-                # )
-                # mlflow.log_metric("gpu_usage", get_gpu_utilization(), step=logging_time)
-                # mlflow.log_param("Version of Code", VERSION)
+                if MLFLOW_ACTIVE:
+                    try:
+                        mlflow.log_param("Version of Code", VERSION)
+                    except Exception as e:
+                        return None
 
             # Reset the model to its original state
             logging.info(f"Loss: {loss}, Perplexity: {perplexity}")

@@ -12,14 +12,12 @@ from bittensor import logging
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import SGD
-from hivetrain.config.mlflow_config import MLFLOW_UI_URL, CURRENT_MODEL_NAME
-from hivetrain.utils.mflow_utils import (
-    get_network_bandwidth,
-    get_memory_usage,
-    get_gpu_utilization,
-    VERSION
+from hivetrain.config.mlflow_config import (
+    MLFLOW_UI_URL,
+    CURRENT_MODEL_NAME,
+    MLFLOW_ACTIVE,
 )
-
+from hivetrain.utils.mflow_utils import initialize_mlflow, log_model_metrics, VERSION
 
 args = Configurator.combine_configs()
 BittensorNetwork.initialize(args)
@@ -35,7 +33,6 @@ class TrainingLoop:
         learning_rate=5e-5,
         check_update_interval=300,
         send_interval=300,
-        # averaging_dir="averaged_model",
         hf_manager=None,
     ):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -56,14 +53,20 @@ class TrainingLoop:
         self.last_pull_time = 0
 
         # initialize mlflow
-        mlflow.set_tracking_uri(MLFLOW_UI_URL)
-        mlflow.set_experiment(CURRENT_MODEL_NAME)
-        mlflow.start_run(run_name=f"miner_{MY_HOTKEY}")
-        mlflow.log_param("device", self.device)
-        mlflow.log_param("Version of Code", VERSION)
-        mlflow.log_param("learning_rate", self.learning_rate)
-        mlflow.log_param("send_interval", self.send_interval)
-        mlflow.log_param("check_update_interval", self.check_update_interval)
+        if MLFLOW_ACTIVE:
+            initialize_mlflow(
+                role="miner",
+                device=self.device,
+                version=VERSION,
+                mlflow_ui_url=MLFLOW_UI_URL,
+                current_model_name=CURRENT_MODEL_NAME,
+                my_hotkey=MY_HOTKEY,
+                learning_rate=self.learning_rate,
+                send_interval=self.send_interval,
+                check_update_interval=self.check_update_interval,
+            )
+        else:
+            logging.INFO("****************MLFLOW IS INACTIVE************")
 
     def train(self, epochs):
         self.last_send_time = time.time()
@@ -117,10 +120,12 @@ class TrainingLoop:
                 self.optimizer.zero_grad()
 
                 if step % 500 == 0:
-                    mlflow.log_metric("train_loss", loss.item(), step=step)
-                    mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
-                    # mlflow.log_metric("gpu_usage", get_gpu_utilization(), step=step)
-                    mlflow.log_param("Version of Code", VERSION) # just to make sure version is update frequently
+                    if MLFLOW_ACTIVE:
+                        log_model_metrics(step=step, train_loss=loss.item())
+                        try:
+                            mlflow.log_param("Version of Code", VERSION)
+                        except Exception as e:
+                            logging.error(f"Failed to log metrics to MLflow: {e}")
 
                 # Example of a condition to periodically send gradients
 
@@ -139,15 +144,9 @@ class TrainingLoop:
                         )
                         torch.save(self.model.state_dict(), model_gradients_path)
                         self.hf_manager.push_changes("gradients.pt")
-                        mlflow.log_metric(
-                            "gradient_staleness",
-                            self.get_gradient_staleness(),
-                            step=step,
+                        log_model_metrics(
+                            step=step, gradient_staleness=self.get_gradient_staleness()
                         )
-                        mlflow.log_metric(
-                            "network_bandwidth", get_network_bandwidth(), step=step
-                        )
-
                     except Exception as e:
                         logging.warning(f"Sending gradients failed: {e}")
                         continue
@@ -343,7 +342,7 @@ class LocalTrainingLoop(TrainingLoop):
 
 
 class DeltaLoop(TrainingLoop):
-    def train(self, epochs, hf_manager):
+    def train(self, epochs):
         self.last_send_time = time.time()
         self.optimizer.zero_grad()
         self.base_weights = {
@@ -392,10 +391,14 @@ class DeltaLoop(TrainingLoop):
                 self.optimizer.zero_grad()
 
                 if step % 1000 == 0:
-                    mlflow.log_metric("train_loss", loss.item(), step=step)
-                    mlflow.log_metric("memory_usage", get_memory_usage(), step=step)
-                    mlflow.log_metric("gpu_usage", get_gpu_utilization(), step=step)
-                    mlflow.log_param("Version of Code", VERSION) # just to make sure version is update frequently
+                    if MLFLOW_ACTIVE:
+                        log_model_metrics(step=step, train_loss=loss.item())
+                        try:
+                            mlflow.log_param(
+                                "Version of Code", VERSION
+                            )  # just to make sure version is update frequently
+                        except Exception as e:
+                            return None
 
                 # Example of a condition to periodically send gradients
                 if time.time() - self.last_send_time >= self.send_interval:
@@ -418,19 +421,15 @@ class DeltaLoop(TrainingLoop):
                         torch.save(self.weight_diffs, model_gradients_path)
                         self.hf_manager.push_changes("weight_diff.pt")
                         self.last_send_time = time.time()
-                        mlflow.log_metric(
-                            "gradient_staleness",
-                            self.get_gradient_staleness(),
-                            step=step,
-                        )
-                        mlflow.log_metric(
-                            "network_bandwidth", get_network_bandwidth(), step=step
+                        log_model_metrics(
+                            step=step, gradient_staleness=self.get_gradient_staleness()
                         )
                     except Exception as e:
                         logging.warning(f"Sending gradients failed: {e}")
                         self.last_send_time = time.time()
                         continue
-        mlflow.en_run()
+        if MLFLOW_ACTIVE:
+            mlflow.en_run()
 
 
 class LocalDeltaLoop(DeltaLoop, LocalTrainingLoop):
