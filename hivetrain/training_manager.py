@@ -17,7 +17,7 @@ from hivetrain.config.mlflow_config import (
     CURRENT_MODEL_NAME,
     MLFLOW_ACTIVE,
 )
-from hivetrain.utils.mflow_utils import initialize_mlflow, log_model_metrics, VERSION
+from hivetrain.utils.mlflow_utils import initialize_mlflow, log_model_metrics, VERSION
 
 args = Configurator.combine_configs()
 BittensorNetwork.initialize(args)
