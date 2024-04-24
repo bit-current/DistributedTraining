@@ -95,7 +95,6 @@ class Averager:
         self.miner_gradients = [gradients for gradients in self.miner_gradients if gradients is not None]
         assert len(self.miner_gradients) > 0
         averaged_gradients = {name: torch.zeros_like(grad) for name, grad in self.miner_gradients[0].items()}
-
         for score, gradients in zip(self.validator_combined_weights, self.miner_gradients):
             logging.info("Averaging Gradient")
             for name, grad in gradients.items():

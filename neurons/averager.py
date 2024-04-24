@@ -49,7 +49,6 @@ address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,B
 #local_dir = "./save_me"#args.averager.save_directory #TODO add me to config :)
 #repo_id = "test_me"#args.averager.hf_repository #TODO add me to config :)
 
-model_name = "mekaneeky/tiny-random-gpt2"
 batch_size = args.batch_size
 epochs = 30_000_000_000_000_000
 learning_rate = 5e-5
@@ -63,7 +62,7 @@ dataset = load_dataset("wikitext", "wikitext-103-v1")
 texts = dataset['test']['text'][:100]
 
 # Load model and tokenizer
-model_name = "mekaneeky/tiny-random-gpt2"
+model_name = "openai-community/gpt2"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 model = AutoModelForCausalLM.from_pretrained(model_name)
@@ -101,7 +100,7 @@ test_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=cus
 
 hf_manager = HFManager(my_repo_id = None, averaged_model_repo_id= args.storage.averaged_model_repo_id)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-averager = ParameterizedAverager(model=model,device=device,hf_manager=hf_manager, local_dir=args.storage.model_dir, gradients_dir=args.storage.my_repo_id ,chain_manager=address_store,bittensor_network=BittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
+averager = ParameterizedAverager(model=model,device=device,hf_manager=hf_manager, local_dir=args.storage.model_dir, gradients_dir=args.storage.gradient_dir ,chain_manager=address_store,bittensor_network=BittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
 #averager.run_periodic_averaging(test_loader,20,300)
 #val_loader,meta_epochs, lr, t
 #averager.save_model()
