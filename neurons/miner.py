@@ -104,6 +104,7 @@ optimizer = AdamW(model.parameters(), lr=learning_rate)
 hf_manager = HFManager(my_repo_id = args.storage.my_repo_id, averaged_model_repo_id= args.storage.averaged_model_repo_id)
 #device = "cuda" if torch.cuda.is_available() else "cpu"
 device = args.device
+
 training_loop = DeltaLoop(device, "mekaneeky/tiny-random-gpt2", data_loader,send_interval=300, learning_rate=5e-4,hf_manager = hf_manager)
 training_loop.train(epochs=30_000_000_000_000_000, hf_manager=hf_manager) 
 

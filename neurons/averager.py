@@ -16,7 +16,6 @@ import numpy as np
 import requests
 import torch
 from datasets import load_dataset
-from hivemind.utils.networking import log_visible_maddrs
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
