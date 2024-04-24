@@ -25,7 +25,6 @@ from hivetrain.averaging_logic import ParameterizedAverager
 from hivetrain.btt_connector import BittensorNetwork
 from hivetrain.config import Configurator
 from hivetrain.chain_manager import ChainMultiAddressStore
-from hivetrain.dht_connector import DHTManager
 from hivetrain.training_manager import FeedforwardNN
 from hivetrain.hf_manager import HFManager
 
