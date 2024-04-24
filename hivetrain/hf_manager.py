@@ -2,9 +2,12 @@ import os
 import torch
 import hashlib
 from bittensor import logging
+from dotenv import load_dotenv
 from huggingface_hub import HfApi, Repository
 from huggingface_hub import hf_hub_download
 
+
+load_dotenv()
 
 class HFManager:
     """
@@ -14,7 +17,7 @@ class HFManager:
     def __init__(
         self,
         local_dir=".",#gradients local
-        hf_token=os.environ.get("HF_TOKEN"),
+        hf_token=os.getenv("HF_TOKEN"),
         my_repo_id=None,#gradients HF
         averaged_model_repo_id=None,#averaged HF
         model_dir=None,#averaged local
