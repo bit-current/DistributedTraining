@@ -13,7 +13,7 @@ To streamline the process and reduce communication overhead between miners, we i
 Key Components: 
 * Miners: Miners are responsible for training a model. Each miner trains a weight-delta. A weight-delta is the difference between the weights of the trained model and the base model. This delta is then uploaded to Hugging Face, from where it can be accessed by validators. 
 * Validators: Validators asses the loss reduction by each miner on a randomized test set. They download the weight deltas from Hugging Face and evaluate them based on their impact on the model’s performance, focusing on metrics such as loss reduction and accuracy.Better performing miners that improve on the base model are assigned better scores.
-* Averager: We also introduce an averager node, which is a centralized node run by the subnet owner. The averager is responsible for providing the averaged model that becomes the base model for miners and validators, this is repeated every averaging interval. The averager performs a weighted average of the parameters resulting in an averaged model. Currently the weights of the weighted average are also parameterized allowing the process to be optimized to find the best averaged model. 
+* Averager: We also introduce an averager node, a centralized node run by the subnet owner. The averager is responsible for creating the averaged model that becomes the base model for miners and validators, this is repeated every averaging interval. The averager performs a weighted average of the parameters resulting in an averaged model. Currently the weights of the weighted average are also parameterized allowing the process to be optimized to find the best averaged model. 
 
 ## Clone the Repo
 
