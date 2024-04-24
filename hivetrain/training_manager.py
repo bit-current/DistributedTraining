@@ -16,7 +16,7 @@ import hashlib
 token = os.getenv("HF_TOKEN")
 
 class TrainingLoop:
-    def __init__(self, device, model_name, data_loader, gradients_dir, learning_rate=5e-5, check_update_interval = 300, send_interval=300, averaging_dir = "averaged_model", hf_manager = None):
+    def __init__(self, device, model_name, data_loader, learning_rate=5e-5, check_update_interval = 300, send_interval=300, averaging_dir = "averaged_model", hf_manager = None):
 
         # huggingface has all information about directories and repos
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
