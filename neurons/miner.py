@@ -67,8 +67,8 @@ texts = dataset['train']['text']
 
 # Load model and tokenizer
 # model_name = "openai-community/gpt2"
-# tokenizer = AutoTokenizer.from_pretrained(model_name)
-# tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 # model = AutoModelForCausalLM.from_pretrained(model_name)
 # model.resize_token_embeddings(len(tokenizer))
 # model.train()
