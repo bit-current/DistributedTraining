@@ -66,7 +66,7 @@ dataset = load_dataset("wikitext", "wikitext-103-v1")
 texts = dataset['train']['text']
 
 # Load model and tokenizer
-# model_name = "openai-community/gpt2"
+model_name = "openai-community/gpt2"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 # model = AutoModelForCausalLM.from_pretrained(model_name)
@@ -104,7 +104,7 @@ hf_manager = HFManager(my_repo_id = args.storage.my_repo_id, averaged_model_repo
 #device = "cuda" if torch.cuda.is_available() else "cpu"
 device = args.device
 
-training_loop = DeltaLoop(device, "openai-community/gpt2", data_loader,send_interval=300, learning_rate=5e-4,hf_manager = hf_manager)
+training_loop = DeltaLoop(device, model_name, data_loader,send_interval=300, learning_rate=5e-4,hf_manager = hf_manager)
 training_loop.train(epochs=30_000_000_000_000_000, hf_manager=hf_manager) 
 
 
