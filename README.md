@@ -82,7 +82,7 @@ sudo apt install git-lfs
 ```
 btcli regen_coldkey --mnemonic your super secret mnemonic
 btcli regen_hotkey --mnemonic your super secret mnemonic
-btcli s register --netuid 100 --subtensor.network test
+btcli s register --netuid 25
 ```
 
 ## New arguments
