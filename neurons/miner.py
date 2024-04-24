@@ -35,7 +35,11 @@ my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
 my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
 address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
-#address_store.store_hf_repo(args.storage.my_repo_id) #FIXME check first then commit
+current_address_in_store = address_store.retrieve_hf_repo(my_hotkey)
+logging.info(f"Current value in store:{current_address_in_store}")
+if current_address_in_store != args.storage.my_repo_id:
+    logging.info(f"Storing new value: {args.storage.my_repo_id}")
+    address_store.store_hf_repo(args.storage.my_repo_id) 
 
 # Parameters
 
