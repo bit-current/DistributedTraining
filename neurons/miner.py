@@ -98,7 +98,7 @@ def custom_collate_fn(batch):
 wikitext_dataset = WikitextDataset(texts, tokenizer)
 data_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=custom_collate_fn)
 # Optimizer
-optimizer = AdamW(model.parameters(), lr=learning_rate)
+#optimizer = AdamW(model.parameters(), lr=learning_rate)
 
 hf_manager = HFManager(my_repo_id = args.storage.my_repo_id, averaged_model_repo_id= args.storage.averaged_model_repo_id)
 #device = "cuda" if torch.cuda.is_available() else "cpu"
