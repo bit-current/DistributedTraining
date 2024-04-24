@@ -54,7 +54,6 @@ if current_address_in_store != args.storage.my_repo_id:
 
 # Parameters
 
-model_name = "mekaneeky/tiny-random-gpt2"
 batch_size = args.batch_size
 epochs = 30_000_000_000_000_000
 learning_rate = 5e-5

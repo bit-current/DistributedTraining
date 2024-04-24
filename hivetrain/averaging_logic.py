@@ -315,7 +315,10 @@ class ParameterizedAverager(DeltaAverager):
             for j, (name_reconstructed_model, param_reconstructed_model) in enumerate(params.items()):
                 param_reconstructed_model = param_reconstructed_model.to(self.device)
                 averaged_gradients[name_reconstructed_model] = averaged_gradients[name_reconstructed_model].to(self.device)
-                averaged_gradients[name_reconstructed_model] += (param_reconstructed_model * weight[j]) #FIXME make weights per param
+                try:
+                    averaged_gradients[name_reconstructed_model] += (param_reconstructed_model * weight[j]) #FIXME make weights per param
+                except Exception as e:
+                    logging.warning("Skipping parameter due to: {e}")
 
         return averaged_gradients
 
@@ -329,7 +332,10 @@ class ParameterizedAverager(DeltaAverager):
             for name, delta_param in weight_delta.items():
                 weight_delta[name] = weight_delta[name].to(self.device)
                 base_model[name] = base_model[name].to(self.device)
-                weight_delta[name] = weight_delta[name] + base_model[name]
+                try:
+                    weight_delta[name] = weight_delta[name] + base_model[name]
+                except Exception as e:
+                    logging.warning(f"Error loading param: {e}")
             yield weight_delta
 
     def get_averaged_model(self):

@@ -173,7 +173,10 @@ class DeltaValidator(ModelValidator):
         with torch.no_grad():
             for name, param in self.model.named_parameters():
                 if name in weight_deltas:
-                    param.data = weight_deltas[name] + param.data
+                    try:
+                        param.data = weight_deltas[name] + param.data
+                    except Exception as e:
+                        logging.warning(f"Error loading gradients: {e}")
     
 class LocalDeltaValidator(DeltaValidator, LocalValidator):
     pass
