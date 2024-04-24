@@ -67,7 +67,7 @@ class TrainingLoop:
                 check_update_interval=self.check_update_interval,
             )
         else:
-            logging.INFO("****************MLFLOW IS INACTIVE************")
+            logging.info("****************MLFLOW IS INACTIVE************")
 
     def train(self, epochs):
         self.last_send_time = time.time()

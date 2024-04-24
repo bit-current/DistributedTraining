@@ -7,7 +7,7 @@ import mlflow
 import mlflow.pytorch
 from huggingface_hub import hf_hub_download
 from hivetrain.config.mlflow_config import MLFLOW_UI_URL, CURRENT_MODEL_NAME
-from hivetrain.utils.mflow_utils import (
+from hivetrain.utils.mlflow_utils import (
     get_network_bandwidth,
     get_memory_usage,
     get_gpu_utilization,
@@ -44,12 +44,12 @@ class Averager:
         self.chain_manager = chain_manager
         self.hf_manager = hf_manager
 
-        # initialize mlflow
-        mlflow.set_tracking_uri(MLFLOW_UI_URL)
-        mlflow.set_experiment(CURRENT_MODEL_NAME)
-        mlflow.start_run(run_name=f"AVERAGER")
-        mlflow.log_param("device", self.device)
-        mlflow.log_param("Version of Code", VERSION)
+        # # initialize mlflow
+        # mlflow.set_tracking_uri(MLFLOW_UI_URL)
+        # mlflow.set_experiment(CURRENT_MODEL_NAME)
+        # mlflow.start_run(run_name=f"AVERAGER")
+        # mlflow.log_param("device", self.device)
+        # mlflow.log_param("Version of Code", VERSION)
 
     def receive_gradients(
         self, repo_id="your_username/your_repo_name", gradient_file_name="gradients.pt"
