@@ -71,7 +71,7 @@ or in terminal enter:
 ```
 echo "HF_TOKEN=your_huggingface_token_here" >> .env
 ```
-### 4. Install git-lfs to be be able to handle large files
+### 4. Install git-lfs to to handle upload of large files 
 
 ```
 curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
