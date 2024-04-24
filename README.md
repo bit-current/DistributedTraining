@@ -62,11 +62,11 @@ To allow programmatic communication with your repository, you will need to gener
 * Click on "Create Token".
 
 ### 4. Create a New .env File to Store Your Hugging Face Token
-Store your new token in the .env file in DistributedTranining directory:
+Open your .env file in DistributedTranining directory and store your new token there:
 ```
 HF_TOKEN="your_huggingface_token_here"
 ```
-or 
+or in terminal enter:
 
 ```
 echo "HF_TOKEN=your_huggingface_token_here" >> .env
