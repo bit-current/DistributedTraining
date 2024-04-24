@@ -33,7 +33,6 @@ address_store = ChainMultiAddressStore(
 )
 
 
-model_name = "mekaneeky/tiny-random-gpt2"
 batch_size = args.batch_size
 epochs = 30_000_000_000_000_000
 learning_rate = 5e-5
@@ -49,7 +48,7 @@ dataset = load_dataset("wikitext", "wikitext-103-v1")
 texts = dataset["test"]["text"][:100]  # FIXME 400?
 
 # Load the tokenizer and model
-model_name = "mekaneeky/tiny-random-gpt2"
+model_name = "openai-community/gpt2"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer.add_special_tokens({"pad_token": "[PAD]"})
 model = AutoModelForCausalLM.from_pretrained(model_name)

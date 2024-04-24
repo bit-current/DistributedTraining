@@ -36,6 +36,7 @@ my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 address_store = ChainMultiAddressStore(
     BittensorNetwork.subtensor, args.netuid, BittensorNetwork.wallet
 )
+
 current_address_in_store = address_store.retrieve_hf_repo(my_hotkey)
 logging.info(f"Current value in store:{current_address_in_store}")
 if current_address_in_store != args.storage.my_repo_id:
@@ -44,7 +45,6 @@ if current_address_in_store != args.storage.my_repo_id:
 
 # Parameters
 
-model_name = "mekaneeky/tiny-random-gpt2"
 batch_size = args.batch_size
 epochs = 30_000_000_000_000_000
 learning_rate = 5e-5
@@ -57,12 +57,13 @@ dataset = load_dataset("wikitext", "wikitext-103-v1")
 texts = dataset["train"]["text"]
 
 # Load model and tokenizer
-model_name = "mekaneeky/tiny-random-gpt2"
+model_name = "openai-community/gpt2"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
-tokenizer.add_special_tokens({"pad_token": "[PAD]"})
-model = AutoModelForCausalLM.from_pretrained(model_name)
-model.resize_token_embeddings(len(tokenizer))
-model.train()
+tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+# model = AutoModelForCausalLM.from_pretrained(model_name)
+# model.resize_token_embeddings(len(tokenizer))
+# model.train()
+
 
 
 class WikitextDataset(Dataset):
@@ -104,14 +105,19 @@ data_loader = DataLoader(
     wikitext_dataset, batch_size=batch_size, collate_fn=custom_collate_fn
 )
 # Optimizer
-optimizer = AdamW(model.parameters(), lr=learning_rate)
+#optimizer = AdamW(model.parameters(), lr=learning_rate)
+
+
+hf_manager = HFManager(my_repo_id = args.storage.my_repo_id, averaged_model_repo_id= args.storage.averaged_model_repo_id)
+#device = "cuda" if torch.cuda.is_available() else "cpu"
+device = args.device
 
 hf_manager = HFManager(
     my_repo_id=args.storage.my_repo_id,
     averaged_model_repo_id=args.storage.averaged_model_repo_id,
 )
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model_name = "mekaneeky/tiny-random-gpt2"
+device = args.device
+model_name = "openai-community/gpt2"
 training_loop = DeltaLoop(
     device,
     model_name,
@@ -121,3 +127,4 @@ training_loop = DeltaLoop(
     hf_manager=hf_manager,
 )
 training_loop.train(epochs=30_000_000_000_000_000)
+

@@ -16,7 +16,6 @@ import numpy as np
 import requests
 import torch
 from datasets import load_dataset
-from hivemind.utils.networking import log_visible_maddrs
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
@@ -26,7 +25,6 @@ from hivetrain.averaging_logic import ParameterizedAverager
 from hivetrain.btt_connector import BittensorNetwork
 from hivetrain.config import Configurator
 from hivetrain.chain_manager import ChainMultiAddressStore
-from hivetrain.dht_connector import DHTManager
 from hivetrain.training_manager import FeedforwardNN
 from hivetrain.hf_manager import HFManager
 
@@ -51,7 +49,6 @@ address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,B
 #local_dir = "./save_me"#args.averager.save_directory #TODO add me to config :)
 #repo_id = "test_me"#args.averager.hf_repository #TODO add me to config :)
 
-model_name = "mekaneeky/tiny-random-gpt2"
 batch_size = args.batch_size
 epochs = 30_000_000_000_000_000
 learning_rate = 5e-5
@@ -65,7 +62,7 @@ dataset = load_dataset("wikitext", "wikitext-103-v1")
 texts = dataset['test']['text'][:100]
 
 # Load model and tokenizer
-model_name = "mekaneeky/tiny-random-gpt2"
+model_name = "openai-community/gpt2"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 model = AutoModelForCausalLM.from_pretrained(model_name)
@@ -103,10 +100,10 @@ test_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=cus
 
 hf_manager = HFManager(my_repo_id = None, averaged_model_repo_id= args.storage.averaged_model_repo_id)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-averager = ParameterizedAverager(model=model,device=device,hf_manager=hf_manager, local_dir=args.storage.model_dir, gradients_dir=args.storage.my_repo_id ,chain_manager=address_store,bittensor_network=BittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
+averager = ParameterizedAverager(model=model,device=device,hf_manager=hf_manager, local_dir=args.storage.model_dir, gradients_dir=args.storage.gradient_dir ,chain_manager=address_store,bittensor_network=BittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
 #averager.run_periodic_averaging(test_loader,20,300)
 #val_loader,meta_epochs, lr, t
 #averager.save_model()
-averager.run_periodic_averaging(test_loader, 200,0.1,30)
+averager.run_periodic_averaging(test_loader, 200,0.01,30)
 # # Push the model to the Hugging Face Hub
 # push_to_hf_hub(local_dir=local_dir, repo_id=repo_id, hf_token=args.averager.hf_token, commit_message=f"Updated model SN25 with {222}")#FIXME add block numbers

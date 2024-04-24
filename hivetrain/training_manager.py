@@ -24,6 +24,7 @@ BittensorNetwork.initialize(args)
 MY_HOTKEY = BittensorNetwork.wallet.hotkey.ss58_address
 
 
+
 class TrainingLoop:
     def __init__(
         self,

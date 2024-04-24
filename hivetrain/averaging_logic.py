@@ -125,6 +125,7 @@ class Averager:
             gradients for gradients in self.miner_gradients if gradients is not None
         ]
         assert len(self.miner_gradients) > 0
+
         averaged_gradients = {
             name: torch.zeros_like(grad)
             for name, grad in self.miner_gradients[0].items()
@@ -393,21 +394,21 @@ class ParameterizedAverager(DeltaAverager):
             if model_path is None:
                 continue
             else:
-                try:
-                    weight_delta = self.hf_manager.receive_gradients(
-                        model_path["repo_id"]
-                    )
-                    self.store_weight_delta(weight_delta, model_path["hotkey"])
-                    if weight_delta is None:
-                        raise ValueError(
-                            f"Failed to receive gradients at: {model_path['repo_id']}"
-                        )
-                    self.num_models += 1
-                    self.active_hotkeys.append(model_path["hotkey"])
-                except Exception as e:
-                    logging.warning(
-                        f"Failed to get model at {model_path['hotkey']}: {e}"
-                    )
+                #try:
+                weight_delta = self.hf_manager.receive_gradients(model_path["repo_id"])
+                false_model_flag = False
+                for name, param in weight_delta.items():
+                    if weight_delta[name].shape != self.model.state_dict()[name].shape:
+                        false_model_flag = True
+                if false_model_flag:
+                    continue
+                self.store_weight_delta(weight_delta, model_path["hotkey"])
+                if weight_delta is None:
+                    raise ValueError(f"Failed to receive gradients at: {model_path['repo_id']}")
+                self.num_models +=1
+                self.active_hotkeys.append(model_path["hotkey"])
+                #except Exception as e:
+                #    logging.warning(f"Failed to get model at {model_path['hotkey']}: {e}")
         if len(self.active_hotkeys) > 0:
             assert len(self.active_hotkeys) == self.num_models
         # if time.time() - self.last_cache_time > self.caching_interval:
@@ -431,12 +432,12 @@ class ParameterizedAverager(DeltaAverager):
                 params.items()
             ):
                 param_reconstructed_model = param_reconstructed_model.to(self.device)
-                averaged_gradients[name_reconstructed_model] = averaged_gradients[
-                    name_reconstructed_model
-                ].to(self.device)
-                averaged_gradients[name_reconstructed_model] += (
-                    param_reconstructed_model * weight[j]
-                )  # FIXME make weights per param
+                averaged_gradients[name_reconstructed_model] = averaged_gradients[name_reconstructed_model].to(self.device)
+                try:
+                    averaged_gradients[name_reconstructed_model] += (param_reconstructed_model * weight[j]) #FIXME make weights per param
+                except Exception as e:
+                    #logging.warning(f"Skipping parameter due to: {e}")
+                    pass
 
         return averaged_gradients
 
@@ -455,7 +456,11 @@ class ParameterizedAverager(DeltaAverager):
             for name, delta_param in weight_delta.items():
                 weight_delta[name] = weight_delta[name].to(self.device)
                 base_model[name] = base_model[name].to(self.device)
-                weight_delta[name] = weight_delta[name] + base_model[name]
+                try:
+                    weight_delta[name] = weight_delta[name] + base_model[name]
+                except Exception as e:
+                    #logging.warning(f"Error loading param: {e}")
+                    pass
             yield weight_delta
 
     def get_averaged_model(self):
@@ -512,24 +517,16 @@ class ParameterizedAverager(DeltaAverager):
 
                         for main_param in averaged_model.parameters():
                             main_param.grad.zero_()
-
-                        # grad_weights = torch.clamp(grad_weights,min=-1,max=1)
-                        self.weights.data -= lr * grad_weights
-                        # if (batch_count * epoch+1) % 100:
-                        #    logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss.item():.4f}, Weights: {self.weights}")
+                        
+                        #grad_weights = torch.clamp(grad_weights,min=-1,max=1)
+                        self.weights.data -= (lr * grad_weights)
+                        #if (batch_count * epoch+1) % 1000:
+                        #    logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss.item():.4f}, Weights: {torch.mean(self.weights,dim=1)}")
 
                 average_loss = total_loss / total_samples
-                perplexity = math.exp(average_loss)
-
-                if epoch % 50 == 0:
-                    mlflow.log_metric("average_loss", average_loss, step=epoch)
-                    mlflow.log_metric("perplexity", perplexity, step=epoch)
-                    mlflow.log_metric("gpu_usage", get_gpu_utilization(), step=epoch)
-
-                logging.info(
-                    f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {average_loss:.4f},Perplexity: {perplexity}, Weights: {self.weights}"
-                )
-
+                perplexity = math.exp(average_loss) 
+                logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {average_loss:.4f},Perplexity: {perplexity}, Weights: {torch.mean(self.weights,dim=1)}")
+                
         return self.get_averaged_model()
 
     def run_periodic_averaging(self, val_loader, meta_epochs, lr, t):
