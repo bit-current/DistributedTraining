@@ -92,7 +92,7 @@ btcli s register --netuid 25
 ## Miner Run Command
 
 ```
-python miner.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_name --storage.my_repo_id your_hf_username/your_repo --storage.averaged_model_repo_id Hivetrain/averaging_run_1
+python neurons/miner.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_name --storage.my_repo_id your_hf_username/your_repo --storage.averaged_model_repo_id Hivetrain/averaging_run_1
 ```
 
 ## Validator
@@ -100,7 +100,7 @@ python miner.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_nam
 ### Validators need to have at least 1000 TAO to set weights on the main net and 10 TAO on the test net
 
 ```
-python validator.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_name --storage.averaged_model_repo_id Hivetrain/averaging_run_1
+python neurons/validator.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_name --storage.averaged_model_repo_id Hivetrain/averaging_run_1
 ```
 
 ## Bug Reporting and Contributions
