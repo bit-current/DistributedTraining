@@ -92,7 +92,7 @@ btcli s register --netuid 25
 ## Miner Run Command
 
 ```
-python miner.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_name --storage.my_repo_id your_/your_repo --storage.averaged_model_repo_id Hivetrain/averaging_run_1
+python miner.py --netuid 25 --wallet.name wallet_name --wallet.hotkey hotkey_name --storage.my_repo_id your_username/your_repo --storage.averaged_model_repo_id Hivetrain/averaging_run_1
 ```
 
 ## Validator
