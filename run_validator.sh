@@ -4,7 +4,7 @@
 # Initialize variables
 script="neurons/validator.py"
 autoRunLoc=$(readlink -f "$0")
-proc_name="distributed_training_validator_auto_update" 
+proc_name="distributed_training_auto_update" 
 args=()
 version_location="./template/__init__.py"
 version="__version__"
