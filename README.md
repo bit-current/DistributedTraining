@@ -2,7 +2,7 @@
 
 # Distributed Training Framework
 
-(WARNING: IN ACTIVE DEVELOPMENT)
+(WARNING: IN ACTIVE DEVELOPMENT. FOR TESTING ADD --subtensor.network test AND SET --netuid to 100)
 
 ## Introduction
 
