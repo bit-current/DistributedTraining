@@ -4,12 +4,12 @@
 # Initialize variables
 script="neurons/validator.py"
 autoRunLoc=$(readlink -f "$0")
-proc_name="distributed_training_validator" 
+proc_name="distributed_training_validator_auto_update" 
 args=()
 version_location="./template/__init__.py"
 version="__version__"
 repo="bit-current/DistributedTraining"
-branch="main"
+branch="chain_meta"
 repo_url="https://github.com/$repo.git"
 
 old_args=$@
