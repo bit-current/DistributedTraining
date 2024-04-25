@@ -48,7 +48,7 @@ if current_address_in_store != args.storage.my_repo_id:
 batch_size = args.batch_size
 epochs = 30_000_000_000_000_000
 learning_rate = 5e-5
-send_interval = 60  # Every 60 seconds
+send_interval = 600  # Every 60 seconds
 
 # Load the Wikitext dataset
 dataset = load_dataset("wikitext", "wikitext-103-v1")
