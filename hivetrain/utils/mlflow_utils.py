@@ -88,7 +88,7 @@ def initialize_mlflow(
     version,
     mlflow_ui_url,
     current_model_name,
-    my_hotkey,
+    my_hotkey = None,
     learning_rate=None,
     send_interval=None,
     check_update_interval=None,
@@ -113,6 +113,11 @@ def initialize_mlflow(
             mlflow.log_param("device", device)
             mlflow.log_param("Version of Code", version)
             mlflow.log_param("check_update_interval", check_update_interval)
+        else:
+            run_name = f"AVERAGER"
+            mlflow.start_run(run_name=run_name)
+            mlflow.log_param("device", device)
+            mlflow.log_param("Version of Code", version)
     except Exception as e:
         logging.error(f"Failed to initialize and log parameters to MLflow: {e}")
         return None
