@@ -1,4 +1,4 @@
-bittensor
+bittensor==6.10.1
 requests
 substrate-interface
 torch
