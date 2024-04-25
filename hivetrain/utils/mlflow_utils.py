@@ -88,14 +88,17 @@ def initialize_mlflow(
     version,
     mlflow_ui_url,
     current_model_name,
-    my_hotkey,
+    my_hotkey = None,
     learning_rate=None,
     send_interval=None,
     check_update_interval=None,
 ):
     try:
         os.environ["MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING"] = "true"
-        os.environ["MLFLOW_START_RETRY_ATTEMPT_MAX"] = "2"
+        mlflow.config.set_system_metrics_sampling_interval(600)
+        # os.environ["MLFLOW_START_RETRY_ATTEMPT_MAX"] = "2"
+        os.environ['MLFLOW_TRACKING_USERNAME'] = "Hivetrain" 
+        os.environ['MLFLOW_TRACKING_PASSWORD'] = "m8ai8ulr9q"
         mlflow.set_tracking_uri(mlflow_ui_url)
         mlflow.set_experiment(current_model_name)
 
@@ -113,6 +116,11 @@ def initialize_mlflow(
             mlflow.log_param("device", device)
             mlflow.log_param("Version of Code", version)
             mlflow.log_param("check_update_interval", check_update_interval)
+        else:
+            run_name = f"AVERAGER"
+            mlflow.start_run(run_name=run_name)
+            mlflow.log_param("device", device)
+            mlflow.log_param("Version of Code", version)
     except Exception as e:
         logging.error(f"Failed to initialize and log parameters to MLflow: {e}")
         return None

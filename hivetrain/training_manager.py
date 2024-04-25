@@ -120,7 +120,7 @@ class TrainingLoop:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
-                if step % 500 == 0:
+                if step % 100 == 0:
                     if MLFLOW_ACTIVE:
                         log_model_metrics(step=step, train_loss=loss.item())
                         try:
@@ -152,6 +152,8 @@ class TrainingLoop:
                         logging.warning(f"Sending gradients failed: {e}")
                         continue
                     self.last_send_time = time.time()
+        if MLFLOW_ACTIVE:
+            mlflow.en_run()
 
     def get_gradient_staleness(self):
         """
@@ -391,21 +393,20 @@ class DeltaLoop(TrainingLoop):
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
-                if step % 1000 == 0:
-                    if MLFLOW_ACTIVE:
-                        log_model_metrics(step=step, train_loss=loss.item())
-                        try:
-                            mlflow.log_param(
-                                "Version of Code", VERSION
-                            )  # just to make sure version is update frequently
-                        except Exception as e:
-                            return None
 
                 # Example of a condition to periodically send gradients
                 if time.time() - self.last_send_time >= self.send_interval:
                     average_loss = total_loss / total_examples
                     perplexity = math.exp(average_loss)
                     logging.info(f"Epoch: {epoch}, Loss: {average_loss:.4f}")
+                    if MLFLOW_ACTIVE:
+                        log_model_metrics(step=step, train_loss= average_loss)
+                        try:
+                            mlflow.log_param(
+                                "Version of Code", VERSION
+                            )  # Make sure version is update frequently
+                        except Exception as e:
+                            return None
 
                     try:
                         logging.info(f"Attempting to send weights")

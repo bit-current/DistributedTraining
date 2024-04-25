@@ -7,11 +7,11 @@ import mlflow
 import mlflow.pytorch
 from huggingface_hub import hf_hub_download
 from hivetrain.config.mlflow_config import MLFLOW_UI_URL, CURRENT_MODEL_NAME
-from hivetrain.utils.mlflow_utils import (
-    get_network_bandwidth,
-    get_memory_usage,
-    get_gpu_utilization,
-    VERSION,
+from hivetrain.utils.mlflow_utils import VERSION,initialize_mlflow, log_model_metrics
+from hivetrain.config.mlflow_config import (
+    MLFLOW_UI_URL,
+    CURRENT_MODEL_NAME,
+    MLFLOW_ACTIVE,
 )
 from copy import deepcopy
 from hivetrain.btt_connector import BittensorNetwork, sync
@@ -45,11 +45,15 @@ class Averager:
         self.hf_manager = hf_manager
 
         # # initialize mlflow
-        # mlflow.set_tracking_uri(MLFLOW_UI_URL)
-        # mlflow.set_experiment(CURRENT_MODEL_NAME)
-        # mlflow.start_run(run_name=f"AVERAGER")
-        # mlflow.log_param("device", self.device)
-        # mlflow.log_param("Version of Code", VERSION)
+              # initialize mlflow
+        if MLFLOW_ACTIVE:
+            initialize_mlflow(
+                role="averager",
+                device=self.device,
+                version=VERSION,
+                mlflow_ui_url=MLFLOW_UI_URL,
+                current_model_name=CURRENT_MODEL_NAME)
+
 
     def receive_gradients(
         self, repo_id="your_username/your_repo_name", gradient_file_name="gradients.pt"
