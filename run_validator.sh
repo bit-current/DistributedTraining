@@ -9,7 +9,7 @@ args=()
 version_location="./template/__init__.py"
 version="__version__"
 repo="bit-current/DistributedTraining"
-branch="chain_meta"
+branch="main"
 repo_url="https://github.com/$repo.git"
 
 old_args=$@
