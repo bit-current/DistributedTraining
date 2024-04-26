@@ -287,13 +287,13 @@ class BittensorNetwork:
         return cls._instance
 
     @classmethod
-    def initialize(cls, config):
+    def initialize(cls, config, ignore_regs=False):
         with cls._lock:
                 cls.wallet = bt.wallet(config=config)
                 cls.subtensor = bt.subtensor(config=config)
                 cls.metagraph = cls.subtensor.metagraph(config.netuid)
                 cls.config = config
-                if not cls.subtensor.is_hotkey_registered(netuid=config.netuid, hotkey_ss58=cls.wallet.hotkey.ss58_address):
+                if not cls.subtensor.is_hotkey_registered(netuid=config.netuid, hotkey_ss58=cls.wallet.hotkey.ss58_address) and not ignore_regs:
                     print(f"Wallet: {config.wallet} is not registered on netuid {config.netuid}. Please register the hotkey before trying again")
                     exit()
                 cls.uid = cls.metagraph.hotkeys.index(
