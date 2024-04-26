@@ -51,9 +51,9 @@ Once you have your Hugging Face account, you need to create a model repository:
 * Navigate to your profile by clicking on your username in the top right corner.
 * Click on "New Model" (you may find this button under the "Models" section if you have existing models).
 * Fill in the repository name, description, and set the visibility to public.
-* Click on "Create Model" to establish your new model repository.
-### 3. Generate a Token for the Repository
-To allow programmatic communication with your repository, you will need to generate an authentication token:
+* Click on "Create Model" to establish your new model repository (Note this **personal repo** is only required for miners).
+### 3. Generate a Token for the Repository (For miners and validators)
+To allow programmatic communication with huggingface, you will need to generate an authentication token:
 
 * From your Hugging Face account, go to "Settings" by clicking on your profile icon.
 * Select the "Access Tokens" tab from the sidebar.
