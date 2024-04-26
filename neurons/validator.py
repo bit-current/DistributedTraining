@@ -21,6 +21,7 @@ from hivetrain.validation_logic import DeltaValidator
 from hivetrain.hf_manager import HFManager
 from hivetrain.training_manager import FeedforwardNN
 
+logging.enable_debug()
 
 args = Configurator.combine_configs()
 
