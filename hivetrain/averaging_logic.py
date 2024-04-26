@@ -533,7 +533,7 @@ class ParameterizedAverager(DeltaAverager):
                 perplexity = math.exp(average_loss) 
                 
                 if MLFLOW_ACTIVE:
-                    step = int(epoch+1/meta_epochs)
+                    step = int(time.time())
                     log_model_metrics(step=step, loss_averaged = average_loss, perplexity_averaged = perplexity)
 
                 logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {average_loss:.4f},Perplexity: {perplexity}, Weights: {torch.mean(self.weights,dim=1)}")
