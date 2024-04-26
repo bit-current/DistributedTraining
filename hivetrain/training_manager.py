@@ -20,7 +20,7 @@ from hivetrain.config.mlflow_config import (
 from hivetrain.utils.mlflow_utils import initialize_mlflow, log_model_metrics, VERSION
 
 args = Configurator.combine_configs()
-BittensorNetwork.initialize(args)
+BittensorNetwork.initialize(args, ignore_regs=True)
 MY_HOTKEY = BittensorNetwork.wallet.hotkey.ss58_address
 
 

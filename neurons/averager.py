@@ -37,11 +37,10 @@ from bittensor import logging
 logging.enable_debug()
 
 args = Configurator.combine_configs()
-
 BittensorNetwork.initialize(args, ignore_regs=True)
 
 my_hotkey = BittensorNetwork.wallet.hotkey.ss58_address
-my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
+#my_uid = BittensorNetwork.metagraph.hotkeys.index(my_hotkey)
 
 address_store = ChainMultiAddressStore(BittensorNetwork.subtensor, args.netuid,BittensorNetwork.wallet)
 

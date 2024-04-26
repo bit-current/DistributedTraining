@@ -22,7 +22,7 @@ import torch.nn.functional as F
 
 
 args = Configurator.combine_configs()
-BittensorNetwork.initialize(args)
+BittensorNetwork.initialize(args, ignore_regs=True)
 MY_HOTKEY = BittensorNetwork.wallet.hotkey.ss58_address
 
 

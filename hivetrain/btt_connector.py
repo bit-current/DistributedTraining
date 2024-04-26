@@ -31,11 +31,11 @@ def initialize_bittensor_objects():
         metagraph = subtensor.metagraph(base_config.netuid)
 
 
-def check_registered(netuid):
+# def check_registered(netuid):
     
-    if not BittensorNetwork.subtensor.is_hotkey_registered(netuid=netuid, hotkey_ss58=BittensorNetwork.wallet.hotkey.ss58_address):
-        print(f"Wallet: {wallet} is not registered on netuid {netuid}. Please register the hotkey before trying again")
-        exit()
+#     if not BittensorNetwork.subtensor.is_hotkey_registered(netuid=netuid, hotkey_ss58=BittensorNetwork.wallet.hotkey.ss58_address):
+#         print(f"Wallet: {wallet} is not registered on netuid {netuid}. Please register the hotkey before trying again")
+#         exit()
 
 def resync_metagraph(lite):
     global metagraph, config, subtensor
@@ -296,9 +296,11 @@ class BittensorNetwork:
                 if not cls.subtensor.is_hotkey_registered(netuid=config.netuid, hotkey_ss58=cls.wallet.hotkey.ss58_address) and not ignore_regs:
                     print(f"Wallet: {config.wallet} is not registered on netuid {config.netuid}. Please register the hotkey before trying again")
                     exit()
-                cls.uid = cls.metagraph.hotkeys.index(
-                    cls.wallet.hotkey.ss58_address
-                )
+                    cls.uid = cls.metagraph.hotkeys.index(
+                        cls.wallet.hotkey.ss58_address
+                    )
+                else:
+                    cls.uid = 0
                 cls.device="cpu"
                 cls.base_scores = torch.zeros(
                     cls.metagraph.n, dtype=torch.float32, device=cls.device
