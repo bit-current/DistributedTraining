@@ -54,14 +54,51 @@ class HFManager:
 
     def push_changes(self, file_to_send):
         """
-        Stages, commits, and pushes changes to the configured repository.
+        Stages, commits, squashes, and pushes changes to the configured repository.
+        Also prunes unnecessary Git LFS objects to free up storage.
         """
         try:
+            # Stage the changes
             self.gradient_repo.git_add(file_to_send)
-            self.gradient_repo.git_commit("Update model gradients")
+            
+            # Squash commits into a single one before pushing
+            self.gradient_repo.git_rebase(
+                rebase_args=["--interactive", "--root", "--autosquash"]
+            )
+            
+            # Commit with a unified message
+            self.gradient_repo.git_commit("Squashed commits - update model gradients")
+            
+            # Prune unneeded Git LFS objects
+            self.gradient_repo.git_lfs_prune()  # Clean up unused LFS objects
+            
+            # Push the changes to the repository
             self.gradient_repo.git_push()
         except Exception as e:
             print(f"Failed to push changes: {e}")
+
+    def push_to_hf_hub(self, path_to_model, commit_message="Pushing model to Hub"):
+        try:
+            # Stage the changes
+            self.model_repo.git_add(path_to_model)
+            
+            # Squash commits into a single one before pushing
+            self.model_repo.git_rebase(
+                rebase_args=["--interactive", "--root", "--autosquash"]
+            )
+            
+            # Commit with a unified message
+            self.model_repo.git_commit("Squashed commits - update model gradients")
+            
+            # Prune unneeded Git LFS objects
+            self.model_repo.git_lfs_prune()  # Clean up unused LFS objects
+            
+            # Push the changes to the repository
+            self.model_repo.git_push()
+        except Exception as e:
+            print(f"Failed to push changes: {e}")
+
+
 
     def get_latest_commit_sha(self, repo):
         """
@@ -119,7 +156,7 @@ class HFManager:
             )
             # Load the gradients directly using torch.load
             miner_weights = torch.load(weights_file_path, map_location=self.device)
-
+            os.remove(weights_file_path)
             return miner_weights
         except Exception as e:
             logging.debug(f"Error receiving gradients from Hugging Face: {e}")
