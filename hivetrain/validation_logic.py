@@ -50,6 +50,9 @@ class ModelValidator:
         self.scores = {
             hotkey: 0.0 for hotkey in self.bittensor_network.metagraph.hotkeys
         }
+        self.normalized_scores = {
+            hotkey: 0.0 for hotkey in self.bittensor_network.metagraph.hotkeys
+        }
         self.chain_manager = chain_manager
         self.hf_manager = hf_manager
         self.last_pull_time = 0
@@ -119,6 +122,7 @@ class ModelValidator:
 
         self.original_state_dict = deepcopy(self.model.state_dict())
 
+        total_scores = 0 
         for uid, hotkey_address in enumerate(self.bittensor_network.metagraph.hotkeys):
             hf_repo = self.chain_manager.retrieve_hf_repo(hotkey_address)
             gradients = self.hf_manager.receive_gradients(hf_repo)
@@ -131,6 +135,7 @@ class ModelValidator:
                 loss, perplexity = self.evaluate_model()
                 loss_score = max(0, self.base_loss - loss)
                 perplexity_score = max(0, self.base_perplexity - perplexity)
+                total_scores += perplexity_score
                 self.model.load_state_dict(self.original_state_dict)
 
                 if MLFLOW_ACTIVE:
@@ -177,8 +182,11 @@ class ModelValidator:
             )
             time.sleep(0.1)
 
+        # normalize scores
+        for uid, hotkey_address in enumerate(self.bittensor_network.metagraph.hotkeys):
+            self.normalized_scores[hotkey_address] = max(0,self.scores[hotkey_address]/total_scores)
         if self.bittensor_network.should_set_weights():
-            self.bittensor_network.set_weights(self.scores)
+            self.bittensor_network.set_weights(self.normalized_scores)
 
     def start_periodic_validation(self):
         while True:
