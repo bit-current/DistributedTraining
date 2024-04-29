@@ -5,7 +5,7 @@ from bittensor import logging
 from dotenv import load_dotenv
 from huggingface_hub import HfApi, Repository
 from huggingface_hub import hf_hub_download
-
+import subprocess
 
 load_dotenv()
 
@@ -54,13 +54,14 @@ class HFManager:
         self.latest_model_commit_sha = self.get_latest_commit_sha(self.model_repo_id)
 
     @staticmethod
-    def git_lfs_prune(repo_path):
+    def git_prune_and_refresh(repo_path):
         """
         Change to the specified repository directory, execute 'git lfs prune', and revert to the original directory.
         """
         original_dir = os.getcwd()
         try:
             os.chdir(repo_path)
+            subprocess.run(['git', 'pull', '--force'], check=True)
             subprocess.run(['git', 'lfs', 'prune'], check=True)
         except subprocess.CalledProcessError as e:
             print(f"Failed to prune Git LFS objects: {e}")
@@ -86,8 +87,9 @@ class HFManager:
             self.gradient_repo.git_push()
 
             self.api.super_squash_history(repo_id=self.model_repo_id)
-            # Prune unneeded Git LFS objects
-            self.git_lfs_prune(self.local_gradient_dir)  # Clean up unused LFS objects
+            
+            # Prune unneeded Git LFS objects and pull the squashed version locally
+            self.git_prune_and_refresh(self.local_gradient_dir)  # Clean up unused LFS objects
             
             
         except Exception as e:
@@ -107,8 +109,8 @@ class HFManager:
 
             self.api.super_squash_history(repo_id=self.my_repo_id)
 
-            # Prune unneeded Git LFS objects
-            self.git_lfs_prune(self.model_dir)
+            # Prune unneeded Git LFS objects and pull the squashed version locally
+            self.git_prune_and_refresh(self.model_dir)
             
             # Push the changes to the repository
             
