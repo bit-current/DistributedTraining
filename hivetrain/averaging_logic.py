@@ -403,9 +403,14 @@ class ParameterizedAverager(DeltaAverager):
                 #try:
                 weight_delta = self.hf_manager.receive_gradients(model_path["repo_id"])
                 false_model_flag = False
-                for name, param in weight_delta.items():
-                    if weight_delta[name].shape != self.model.state_dict()[name].shape:
-                        false_model_flag = True
+                
+                try:
+                    for name, param in weight_delta.items():
+                        if weight_delta[name].shape != self.model.state_dict()[name].shape:
+                            false_model_flag = True
+                except AttributeError:
+                    false_model_flag = True
+
                 if false_model_flag:
                     continue
                 self.store_weight_delta(weight_delta, model_path["hotkey"])
