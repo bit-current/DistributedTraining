@@ -122,7 +122,7 @@ training_loop = DeltaLoop(
     device,
     model_name,
     data_loader,
-    send_interval=300,
+    send_interval=800,
     learning_rate=5e-4,
     hf_manager=hf_manager,
 )
