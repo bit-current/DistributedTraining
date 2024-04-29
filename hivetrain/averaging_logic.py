@@ -482,8 +482,8 @@ class ParameterizedAverager(DeltaAverager):
         """
         Saves the model to the specified local directory.
         """
-        os.makedirs(self.local_dir, exist_ok=True)
-        model_save_path = os.path.join(self.local_dir, "averaged_model.pt")
+        os.makedirs(self.hf_manager.get_local_model_directory(), exist_ok=True)
+        model_save_path = os.path.join(self.hf_manager.get_local_model_directory(), "averaged_model.pt")
         torch.save(self.model.state_dict(), model_save_path)
         logging.info(f"Model saved locally at {model_save_path}.")
 
@@ -574,7 +574,7 @@ class ParameterizedAverager(DeltaAverager):
             self.model = self.meta_learning(val_loader, meta_epochs, lr)
             # self.apply_averaged_gradients(averaged_weights)
             self.save_model()
-            self.push_to_hf_hub(commit_message="Updated model with new gradients")
+            self.hf_manager.push_to_hf_hub(path_to_model= "averaged_model.pt")
 
             elapsed_time = time.time() - start_time
             time_to_wait = max(0, t - elapsed_time)
