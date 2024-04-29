@@ -37,7 +37,7 @@ address_store = ChainMultiAddressStore(
 batch_size = args.batch_size
 epochs = 30_000_000_000_000_000
 learning_rate = 5e-5
-receive_interval = 120  # Every 60 seconds
+receive_interval = 1800  # Every 60 seconds
 
 # Load model and tokenizer
 # Load the Wikitext dataset
