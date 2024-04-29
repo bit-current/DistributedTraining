@@ -61,19 +61,18 @@ class HFManager:
             # Stage the changes
             self.gradient_repo.git_add(file_to_send)
             
-            # Squash commits into a single one before pushing
-            self.gradient_repo.git_rebase(
-                rebase_args=["--interactive", "--root", "--autosquash"]
-            )
             
             # Commit with a unified message
             self.gradient_repo.git_commit("Squashed commits - update model gradients")
             
+            # Push the changes to the repository
+            self.gradient_repo.git_push()
+
+            self.api.super_squash_history(repo_id=self.my_repo_id)
             # Prune unneeded Git LFS objects
             self.gradient_repo.git_lfs_prune()  # Clean up unused LFS objects
             
-            # Push the changes to the repository
-            self.gradient_repo.git_push()
+            
         except Exception as e:
             print(f"Failed to push changes: {e}")
 
