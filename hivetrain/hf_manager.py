@@ -29,6 +29,7 @@ class HFManager:
         self.model_repo_id = averaged_model_repo_id
         self.hf_token = hf_token
         self.device = device
+        #self.local_dir = local_dir
 
         # Define the local directory structure based on repository IDs but only do clone personal repo if miner
         if self.my_repo_id != None:
@@ -52,6 +53,22 @@ class HFManager:
         # Get the latest commit SHA for synchronization checks
         self.latest_model_commit_sha = self.get_latest_commit_sha(self.model_repo_id)
 
+    @staticmethod
+    def git_lfs_prune(repo_path):
+        """
+        Change to the specified repository directory, execute 'git lfs prune', and revert to the original directory.
+        """
+        original_dir = os.getcwd()
+        try:
+            os.chdir(repo_path)
+            subprocess.run(['git', 'lfs', 'prune'], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to prune Git LFS objects: {e}")
+        finally:
+            os.chdir(original_dir)
+
+
+
     def push_changes(self, file_to_send):
         """
         Stages, commits, squashes, and pushes changes to the configured repository.
@@ -68,9 +85,9 @@ class HFManager:
             # Push the changes to the repository
             self.gradient_repo.git_push()
 
-            self.api.super_squash_history(repo_id=self.my_repo_id)
+            self.api.super_squash_history(repo_id=self.model_repo_id)
             # Prune unneeded Git LFS objects
-            self.gradient_repo.git_lfs_prune()  # Clean up unused LFS objects
+            self.git_lfs_prune(self.local_gradient_dir)  # Clean up unused LFS objects
             
             
         except Exception as e:
@@ -82,18 +99,19 @@ class HFManager:
             self.model_repo.git_add(path_to_model)
             
             # Squash commits into a single one before pushing
-            self.model_repo.git_rebase(
-                rebase_args=["--interactive", "--root", "--autosquash"]
-            )
             
             # Commit with a unified message
             self.model_repo.git_commit("Squashed commits - update model gradients")
             
+            self.model_repo.git_push()
+
+            self.api.super_squash_history(repo_id=self.my_repo_id)
+
             # Prune unneeded Git LFS objects
-            self.model_repo.git_lfs_prune()  # Clean up unused LFS objects
+            self.git_lfs_prune(self.model_dir)
             
             # Push the changes to the repository
-            self.model_repo.git_push()
+            
         except Exception as e:
             print(f"Failed to push changes: {e}")
 
