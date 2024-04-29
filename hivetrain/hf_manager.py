@@ -87,7 +87,7 @@ class HFManager:
             # Push the changes to the repository
             self.gradient_repo.git_push()
 
-            self.api.super_squash_history(repo_id=self.model_repo_id)
+            self.api.super_squash_history(repo_id=self.my_repo_id)
             
             # Prune unneeded Git LFS objects and pull the squashed version locally
             self.git_prune_and_refresh(self.local_gradient_dir)  # Clean up unused LFS objects
@@ -108,7 +108,7 @@ class HFManager:
             
             self.model_repo.git_push()
 
-            self.api.super_squash_history(repo_id=self.my_repo_id)
+            self.api.super_squash_history(repo_id=self.model_repo_id)
 
             # Prune unneeded Git LFS objects and pull the squashed version locally
             self.git_prune_and_refresh(self.model_dir)
