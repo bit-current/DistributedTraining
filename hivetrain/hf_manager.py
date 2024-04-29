@@ -61,6 +61,7 @@ class HFManager:
         original_dir = os.getcwd()
         try:
             os.chdir(repo_path)
+            subprocess.run(['git', 'config', 'pull.rebase', 'true'], check=True)   
             subprocess.run(['git', 'pull', '--force'], check=True)
             subprocess.run(['git', 'lfs', 'prune'], check=True)
         except subprocess.CalledProcessError as e:
