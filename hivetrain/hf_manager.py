@@ -53,6 +53,20 @@ class HFManager:
         # Get the latest commit SHA for synchronization checks
         self.latest_model_commit_sha = self.get_latest_commit_sha(self.model_repo_id)
 
+        
+    @staticmethod
+    def clear_hf_cache():
+        # Get the cache directory
+        cache_dir = HfFolder.get_cache_dir()
+
+        # Check if the cache directory exists
+        if os.path.exists(cache_dir):
+            # Remove the entire cache directory
+            shutil.rmtree(cache_dir)
+            logging.info("Cache has been cleared.")
+        else:
+            logging.info("Cache directory not found.")
+
     @staticmethod
     def git_prune_and_refresh(repo_path):
         """

@@ -191,6 +191,7 @@ class ModelValidator:
     def start_periodic_validation(self):
         while True:
             self.validate_and_score()
+            self.hf_manager.clear_hf_cache()
             logging.info(f"One round done sleeping for: {self.interval}")
             time.sleep(self.interval)
 
