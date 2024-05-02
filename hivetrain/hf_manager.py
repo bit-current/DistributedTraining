@@ -3,8 +3,8 @@ import torch
 import hashlib
 from bittensor import logging
 from dotenv import load_dotenv
-from huggingface_hub import HfApi, Repository
-from huggingface_hub import hf_hub_download
+from huggingface_hub import HfApi, Repository, HfFolder
+from huggingface_hub import hf_hub_download, scan_cache_dir
 import subprocess
 
 load_dotenv()
@@ -57,15 +57,18 @@ class HFManager:
     @staticmethod
     def clear_hf_cache():
         # Get the cache directory
-        cache_dir = HfFolder.get_cache_dir()
+        hf_cache_info = scan_cache_dir()
+        commit_hashes = [
+            revision.commit_hash
+            for repo in hf_cache_info.repos
+            for revision in repo.revisions
+        ]
 
         # Check if the cache directory exists
-        if os.path.exists(cache_dir):
-            # Remove the entire cache directory
-            shutil.rmtree(cache_dir)
-            logging.info("Cache has been cleared.")
-        else:
-            logging.info("Cache directory not found.")
+        delete_strategy = scan_cache_dir().delete_revisions(*commit_hashes)
+
+        logging.info("Will free " + delete_strategy.expected_freed_size_str)
+        delete_strategy.execute()
 
     @staticmethod
     def git_prune_and_refresh(repo_path):
@@ -131,8 +134,6 @@ class HFManager:
             
         except Exception as e:
             print(f"Failed to push changes: {e}")
-
-
 
     def get_latest_commit_sha(self, repo):
         """
