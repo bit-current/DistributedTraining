@@ -484,7 +484,7 @@ class BittensorNetwork:
         # Fetch the latest state of the metagraph from the Bittensor network
         print("Resynchronizing metagraph...")
         # Update the metagraph with the latest information from the network
-        metagraph = cls.subtensor.metagraph(cls.config.netuid, lite=lite)
+        cls.metagraph = cls.subtensor.metagraph(cls.config.netuid, lite=lite)
         print("Metagraph resynchronization complete.")
 
     @staticmethod

@@ -125,7 +125,7 @@ class ModelValidator:
         total_scores = 0 
         for uid, hotkey_address in enumerate(self.bittensor_network.metagraph.hotkeys):
             hf_repo = self.chain_manager.retrieve_hf_repo(hotkey_address)
-            gradients = self.hf_manager.receive_gradients(hf_repo)
+            gradients = self.hf_manager.receive_gradients("mekaneeky/test_miner_1")
             if gradients is not None:
                 logging.info(f"Receiving Gradients from: {hotkey_address}")
                 logging.info(f"Updating Model Weights")

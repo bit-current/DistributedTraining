@@ -1,3 +1,4 @@
+import copy
 import os
 import time
 import torch
@@ -107,7 +108,7 @@ class Averager:
         self.miner_gradients = []
         self.miner_weights = []
         self.miner_hotkeys = []
-        for uid, hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
+        for uid, hotkey in tqdm(enumerate(self.bittensor_network.metagraph.hotkeys)):
             try:
                 repo_id = self.chain_manager.retrieve_hf_repo(hotkey)
                 gradient = self.receive_gradients(repo_id=repo_id)
@@ -217,6 +218,15 @@ class DeltaAverager(Averager):
         self.bittensor_network = bittensor_network
         self.chain_manager = chain_manager
         self.hf_manager = hf_manager
+
+        # initialize mlflow
+        if MLFLOW_ACTIVE:
+                initialize_mlflow(
+                    role="averager",
+                    device="cuda",
+                    version=VERSION,
+                    mlflow_ui_url=MLFLOW_UI_URL,
+                    current_model_name=CURRENT_MODEL_NAME)
 
     def average_gradients(self, beta=1.0):
         self.non_none_miner_gradients = [
@@ -362,18 +372,26 @@ class ParameterizedAverager(DeltaAverager):
         self.check_update_interval = check_update_interval
         self.gradients_dir = gradients_dir
 
+
     def get_model_paths(self, gradient_file_name="gradients.pt"):
         self.model_paths = []
+        self.bittensor_network.sync(lite=False)
+        validator_uids = self.bittensor_network.get_validator_uids(
+            vpermit_tao_limit=1024
+        )
+        self.validator_combined_weights = torch.mean(
+                self.bittensor_network.metagraph.W[validator_uids, :], axis=0
+            )
         for uid, hotkey in enumerate(self.bittensor_network.metagraph.hotkeys):
             try:
                 repo_id = self.chain_manager.retrieve_hf_repo(hotkey)
                 # gradient = self.receive_gradients(repo_id=repo_id)
-                if repo_id is not None:
+                if repo_id is not None and self.validator_combined_weights[uid] > 0:
                     self.model_paths.append(
                         {"repo_id": repo_id, "hotkey": hotkey, "uid": uid}
                     )
             except Exception as e:
-                logging.debug(f"Receiving gradients failed due to: {e}")
+                logging.debug(f"Receiving repo failed due to: {e}")
 
     def store_weight_delta(self, weight_delta, hotkey):
         """
@@ -403,9 +421,12 @@ class ParameterizedAverager(DeltaAverager):
                 #try:
                 weight_delta = self.hf_manager.receive_gradients(model_path["repo_id"])
                 false_model_flag = False
-                for name, param in weight_delta.items():
-                    if weight_delta[name].shape != self.model.state_dict()[name].shape:
-                        false_model_flag = True
+                try:
+                    for name, param in weight_delta.items():
+                        if weight_delta[name].shape != self.model.state_dict()[name].shape:
+                            false_model_flag = True
+                except AttributeError:
+                    false_model_flag = True
                 if false_model_flag:
                     continue
                 self.store_weight_delta(weight_delta, model_path["hotkey"])
@@ -421,17 +442,22 @@ class ParameterizedAverager(DeltaAverager):
 
     def get_averaged_params(self):
         if self.weights is None:
-            self.weights = nn.functional.softmax(
-                torch.ones(
+            self.weights = torch.ones(
                     (self.num_models, len(list(self.model.parameters()))),
                     device=self.device,
-                ),
-                dim=0,
-            )
+                )
+            for uid in len(range(self.validator_combined_weights)):
+                self.weights[uid, :] = self.weights[uid, :] * self.validator_combined_weights[uid]
+
+            normalized_weights = nn.functional.softmax(self.weights,dim=0)
+        else:
+            normalized_weights = nn.functional.softmax(self.weights,dim=0)
+
         averaged_gradients = {
             name: torch.zeros_like(grad) for name, grad in self.model.named_parameters()
         }
-        for params, weight in zip(self.lazy_load_params(), self.weights):
+        
+        for params, weight in zip(self.lazy_load_params(), normalized_weights):
             if params is None or torch.all(weight == 0):
                 continue
             for j, (name_reconstructed_model, param_reconstructed_model) in enumerate(
@@ -447,27 +473,50 @@ class ParameterizedAverager(DeltaAverager):
 
         return averaged_gradients
 
+    def check_cached_parameters(self):
+        logging.info("Clearing NaNs")
+        with torch.no_grad():
+            for uid, hotkey in enumerate(self.active_hotkeys):
+                weight_delta = self.load_weight_delta(hotkey)
+                
+                if self.have_nans(weight_delta):
+                    self.active_hotkeys.pop(uid)
+                    self.num_models -= 1
+
+    @staticmethod
+    def have_nans(aggregated_gradients):
+        for tensor in aggregated_gradients.values():
+            if torch.isnan(tensor).any():
+                #logging.debug("NaN values detected in the aggregated gradients.")
+                return True
+        return False
+
     def lazy_load_params(self):
-        for uid, hotkey in enumerate(self.active_hotkeys):
-            weight_delta = self.load_weight_delta(hotkey)
-            # if weight_delta is None:
-            #     yield None
-            #     continue
-            base_model = torch.load(
+        base_model = torch.load(
                 os.path.join(
                     self.hf_manager.get_local_model_directory(), "averaged_model.pt"
                 ),
                 map_location=self.device,
-            )  # self.model.state_dict()
-            for name, delta_param in weight_delta.items():
-                weight_delta[name] = weight_delta[name].to(self.device)
-                base_model[name] = base_model[name].to(self.device)
-                try:
-                    weight_delta[name] = weight_delta[name] + base_model[name]
-                except Exception as e:
-                    #logging.warning(f"Error loading param: {e}")
-                    pass
-            yield weight_delta
+            ) 
+        with torch.no_grad():
+            for uid, hotkey in tqdm(enumerate(self.active_hotkeys)):
+                weight_delta = self.load_weight_delta(hotkey)
+                # if weight_delta is None:
+                #     yield None
+                #     continue
+                # self.model.state_dict()
+                if self.have_nans(weight_delta):
+                    continue
+                for name, delta_param in weight_delta.items():
+                    weight_delta[name] = weight_delta[name].to(self.device)
+                    base_model[name] = base_model[name].to(self.device)
+                    try:
+                        weight_delta[name] = weight_delta[name] + base_model[name]
+                        
+                    except Exception as e:
+                        #logging.warning(f"Error loading param: {e}")
+                        pass
+                yield weight_delta
 
     def get_averaged_model(self):
         averaged_params = self.get_averaged_params()
@@ -487,7 +536,7 @@ class ParameterizedAverager(DeltaAverager):
         torch.save(self.model.state_dict(), model_save_path)
         logging.info(f"Model saved locally at {model_save_path}.")
 
-    def meta_learning(self, val_loader, meta_epochs, lr):
+    def meta_learning(self, val_loader, meta_epochs, lr, accumulation_steps=128):
         criterion = nn.CrossEntropyLoss()
         self.weights = None  # nn.Parameter(nn.functional.softmax(torch.ones(self.num_models, device=self.device), dim=0))
         for epoch in range(meta_epochs):
@@ -509,25 +558,31 @@ class ParameterizedAverager(DeltaAverager):
                     total_samples += batch["input_ids"].size(0)
 
                     val_loss.backward()
-                    with torch.no_grad():
-                        grad_weights = torch.zeros_like(self.weights)
+                    if (batch_count + 1) % accumulation_steps == 0 or batch_count + 1 == len(val_loader):
+                        with torch.no_grad():
+                            softmax_weights = nn.functional.softmax(self.weights, dim=0)
+                            grad_weights = torch.zeros_like(self.weights)
 
-                        for i, model in enumerate(self.lazy_load_params()):
-                            for j, (model_param, main_param) in enumerate(
-                                zip(model.values(), averaged_model.parameters())
-                            ):
-                                if main_param.grad is not None:
-                                    grad_weights[i, j] += torch.sum(
-                                        main_param.grad * (model_param - main_param)
-                                    )
+                            for i, (model, softmax_weights_i) in enumerate(zip(self.lazy_load_params(), softmax_weights)):
+                                for j, (model_param, main_param) in enumerate(zip(model.values(), averaged_model.parameters())):
+                                    if main_param.grad is not None:
+                                        grad_contribution = main_param.grad * (model_param - main_param)
+                                        grad_contribution_sum = torch.sum(grad_contribution)
 
-                        for main_param in averaged_model.parameters():
-                            main_param.grad.zero_()
-                        
-                        #grad_weights = torch.clamp(grad_weights,min=-1,max=1)
-                        self.weights.data -= (lr * grad_weights)
-                        #if (batch_count * epoch+1) % 1000:
-                        #    logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss.item():.4f}, Weights: {torch.mean(self.weights,dim=1)}")
+                                        # Direct vectorized update to grad_weights for all models
+                                        grad_weights[:, j] += grad_contribution_sum * (softmax_weights_i[j] - softmax_weights[:, j] * softmax_weights_i[j])
+
+                                        # Handle the diagonal term separately
+                                        grad_weights[i, j] += grad_contribution_sum * softmax_weights_i[j]
+                            
+                            logging.info(f"Gradient check: {main_param.grad}")
+                            self.weights.data -= (lr / accumulation_steps * grad_weights)
+                            for main_param in averaged_model.parameters():
+                                main_param.grad.zero_()
+                            
+                            #grad_weights = torch.clamp(grad_weights,min=-1,max=1)
+                            if (batch_count * epoch+1) % 1 == 0:
+                                logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss.item():.4f}, Weights: {torch.mean(self.weights,dim=1)}")
 
                 average_loss = total_loss / total_samples
                 perplexity = math.exp(average_loss) 
@@ -541,7 +596,7 @@ class ParameterizedAverager(DeltaAverager):
         return self.get_averaged_model()
     
 
-    def run_periodic_averaging(self, val_loader, meta_epochs, lr, t):
+    def run_periodic_averaging(self, val_loader, meta_epochs, lr, t, accumulation_steps=128):
         while True:
             logging.info("Averaging Beginning")
             start_time = time.time()
@@ -557,9 +612,9 @@ class ParameterizedAverager(DeltaAverager):
                     time.sleep(10)  # just to give enough time for pull
                     self.model = self.hf_manager.update_model(self.model)
                     self.model = self.model.to(self.device)
-                    optimizer = AdamW(
-                        self.model.parameters(), lr=5e-5
-                    )  # Reinitialize the optimizer
+                    #optimizer = AdamW(
+                    #    self.model.parameters(), lr=5e-5
+                    #)  # Reinitialize the optimizer
                     self.base_weights = {
                         name: param.clone()
                         for name, param in self.model.named_parameters()
@@ -567,14 +622,381 @@ class ParameterizedAverager(DeltaAverager):
 
                 self.last_pull_time = time.time()
 
-            self.get_model_paths()
+            # self.get_model_paths()
             # self.num_models = len(self.model_paths)
-            self.cache_params_locally()
+            # self.cache_params_locally()
+            self.bittensor_network.sync(lite=False)
+            validator_uids = self.bittensor_network.get_validator_uids(
+            vpermit_tao_limit=1024
+            )
+            self.validator_combined_weights = torch.mean(
+                self.bittensor_network.metagraph.W[validator_uids, :], axis=0
+            )
+            filenames = os.listdir(self.gradients_dir)
+            self.active_hotkeys = [filename.split('_')[2].split('.')[0] for filename in filenames if filename.startswith('weight_delta')]
+            self.num_models = len(self.active_hotkeys)
+            self.check_cached_parameters()
+            logging.info(f"Total number of models: {self.num_models}")
 
-            self.model = self.meta_learning(val_loader, meta_epochs, lr)
+            self.model = self.meta_learning(val_loader, meta_epochs, lr, accumulation_steps)
             # self.apply_averaged_gradients(averaged_weights)
             self.save_model()
-            self.hf_manager.push_to_hf_hub(path_to_model= "averaged_model.pt")
+            #self.hf_manager.push_to_hf_hub(path_to_model= "averaged_model.pt")
+
+            elapsed_time = time.time() - start_time
+            time_to_wait = max(0, t - elapsed_time)
+            time.sleep(time_to_wait)
+
+            logging.info("Averaging Done")
+
+
+class TopKAverager(DeltaAverager):
+    # __init__(self, model, local_dir, repo_id,hf_manager, chain_manager,bittensor_network, hf_token=os.environ.get("HF_TOKEN"))
+    def __init__(
+        self,
+        model,
+        local_dir,
+        gradients_dir,
+        device,
+        repo_id=None,
+        hf_manager=None,
+        chain_manager=None,
+        bittensor_network=None,
+        hf_token=os.environ.get("HF_TOKEN"),
+        check_update_interval=300,
+    ):
+        DeltaAverager.__init__(
+            self,
+            model,
+            local_dir=local_dir,
+            repo_id=repo_id,
+            hf_manager=hf_manager,
+            chain_manager=chain_manager,
+            bittensor_network=bittensor_network,
+            hf_token=hf_token,
+        )
+        self.device = device
+        self.last_pull_time = 0
+        self.check_update_interval = check_update_interval
+        self.gradients_dir = gradients_dir
+
+
+    def get_model_paths(self, gradient_file_name="gradients.pt"):
+        self.model_paths = []
+        # self.bittensor_network.sync(lite=False)
+        # validator_uids = self.bittensor_network.get_validator_uids(
+        #     vpermit_tao_limit=1024
+        # )
+        # self.validator_combined_weights = torch.mean(
+        #         self.bittensor_network.metagraph.W[validator_uids, :], axis=0
+        #     )
+        for uid, hotkey in tqdm(enumerate(self.bittensor_network.metagraph.hotkeys)):
+            try:
+                repo_id = self.chain_manager.retrieve_hf_repo(hotkey)
+                # gradient = self.receive_gradients(repo_id=repo_id)
+                if repo_id is not None and self.validator_combined_weights[uid] > 0:
+                    self.model_paths.append(
+                        {"repo_id": repo_id, "hotkey": hotkey, "uid": uid, "weight":self.validator_combined_weights[uid] }
+                    )
+            except Exception as e:
+                logging.debug(f"Receiving repo failed due to: {e}")
+
+    def store_weight_delta(self, weight_delta, hotkey):
+        """
+        Save the weight_delta state_dict to a local directory at regular intervals.
+        """
+        os.makedirs(self.gradients_dir, exist_ok=True)
+        save_path = os.path.join(self.gradients_dir, f"weight_delta_{hotkey}.pt")
+        torch.save(weight_delta, save_path)
+
+    def load_weight_delta(self, hotkey):
+        """
+        Load the cached weight_delta state_dict from the local directory.
+        """
+        load_path = os.path.join(self.gradients_dir, f"weight_delta_{hotkey}.pt")
+        if os.path.exists(load_path):
+            return torch.load(load_path, map_location=self.device)
+        else:
+            return None
+
+    
+    def filter_hotkeys_for_nans(self):
+        new_active_hotkeys = []
+        for hotkey in self.active_hotkeys:
+            weight_delta = self.load_weight_delta(hotkey)
+            if not self.have_nans(weight_delta):
+                new_active_hotkeys.append(hotkey)
+            else:
+                logging.info(f"Model with hotkey {hotkey} excluded due to NaNs.")
+        self.active_hotkeys = new_active_hotkeys
+        self.num_models = len(self.active_hotkeys)
+        assert self.num_models > 0
+
+    def get_top_k_models(self, top_k):
+        # Assuming self.model_paths includes model details and associated weights
+        # Sort model paths by weight
+        sorted_model_paths = sorted(self.model_paths, key=lambda x: x['weight'], reverse=True)
+        self.top_k_model_paths = sorted_model_paths[:top_k]
+        
+        # Update active hotkeys to only include those from the top-k models
+        self.active_validator_weights = torch.tensor([model['weight'] for model in self.top_k_model_paths])
+        self.active_hotkeys = [model['hotkey'] for model in self.top_k_model_paths]
+        self.num_models = len(self.active_hotkeys)
+
+
+
+    def cache_params_locally(self):
+        for model_path in self.top_k_model_paths:
+            if model_path is None:
+                continue
+            else:
+                #try:
+                weight_delta = self.hf_manager.receive_gradients(model_path["repo_id"])
+                false_model_flag = False
+                try:
+                    for name, param in weight_delta.items():
+                        if weight_delta[name].shape != self.model.state_dict()[name].shape:
+                            false_model_flag = True
+                except AttributeError:
+                    false_model_flag = True
+                if false_model_flag:
+                    continue
+                self.store_weight_delta(weight_delta, model_path["hotkey"])
+                if weight_delta is None:
+                    raise ValueError(f"Failed to receive gradients at: {model_path['repo_id']}")
+                #self.num_models +=1
+                #self.active_hotkeys.append(model_path["hotkey"])
+                #except Exception as e:
+                #    logging.warning(f"Failed to get model at {model_path['hotkey']}: {e}")
+        if len(self.active_hotkeys) > 0:
+            assert len(self.active_hotkeys) == self.num_models
+        # if time.time() - self.last_cache_time > self.caching_interval:
+
+
+
+    def get_averaged_params(self):
+        if self.weights is None:
+            self.weights = torch.ones(
+                    (self.num_models, len(list(self.model.parameters()))),
+                    device=self.device,
+                )
+
+            for uid in range(self.active_validator_weights.shape[0]):
+                self.weights[uid, :] = self.weights[uid, :] * self.validator_combined_weights[uid]
+
+            normalized_weights = nn.functional.softmax(self.weights,dim=0)
+        else:
+            normalized_weights = nn.functional.softmax(self.weights,dim=0)
+
+        averaged_gradients = {
+            name: torch.zeros_like(grad) for name, grad in self.model.named_parameters()
+        }
+        
+        for params, weight in zip(self.lazy_load_params(), normalized_weights):
+            if params is None or torch.all(weight == 0):
+                continue
+            for j, (name_reconstructed_model, param_reconstructed_model) in enumerate(
+                params.items()
+            ):
+                #param_reconstructed_model = param_reconstructed_model.to(self.device)
+                averaged_gradients[name_reconstructed_model] = averaged_gradients[name_reconstructed_model].to(self.device)
+                try:
+                    averaged_gradients[name_reconstructed_model] += (param_reconstructed_model * weight[j]) #FIXME make weights per param
+                except Exception as e:
+                    #logging.warning(f"Skipping parameter due to: {e}")
+                    pass
+
+        return averaged_gradients
+
+
+    @staticmethod
+    def have_nans(aggregated_gradients):
+        for tensor in aggregated_gradients.values():
+            if torch.isnan(tensor).any():
+                #logging.debug("NaN values detected in the aggregated gradients.")
+                return True
+        return False
+
+    def lazy_load_params(self):
+        
+        with torch.no_grad():
+            for uid, hotkey in tqdm(enumerate(self.active_hotkeys)):
+                weight_delta = self.load_weight_delta(hotkey)
+                # if weight_delta is None:
+                #     yield None
+                #     continue
+                # self.model.state_dict()
+                if self.have_nans(weight_delta):
+                    continue
+                for name, delta_param in weight_delta.items():
+                    weight_delta[name] = weight_delta[name].to(self.device)
+                    # base_model[name] = base_model[name].to(self.device)
+                    # try:
+                    #     weight_delta[name] = weight_delta[name] + base_model[name]
+                        
+                    # except Exception as e:
+                    #     #logging.warning(f"Error loading param: {e}")
+                    #     pass
+                yield weight_delta
+
+    def get_averaged_model(self):
+        base_model = torch.load(
+                os.path.join(
+                    self.hf_manager.get_local_model_directory(), "averaged_model.pt"
+                ),
+                map_location=self.device,
+            ) 
+        averaged_params = self.get_averaged_params()
+
+        for param, averaged_param in zip(
+            base_model, averaged_params.values()
+        ):
+            try:
+                averaged_param[name] = averaged_param[name] + base_model[name]
+                
+            except Exception as e:
+                #logging.warning(f"Error loading param: {e}")
+                pass
+
+        
+        for param, averaged_param in zip(
+            self.model.parameters(), averaged_params.values()
+        ):
+            param.data.copy_(averaged_param.data)
+        self.model.to(self.device)
+        return self.model
+
+    def save_model(self, model):
+        """
+        Saves the model to the specified local directory.
+        """
+        os.makedirs(self.hf_manager.get_local_model_directory(), exist_ok=True)
+        model_save_path = os.path.join(self.hf_manager.get_local_model_directory(), "averaged_model.pt")
+        torch.save(model.state_dict(), model_save_path)
+        logging.info(f"Model saved locally at {model_save_path}.")
+
+    def meta_learning(self, val_loader, meta_epochs, lr, accumulation_steps=128):
+        criterion = nn.CrossEntropyLoss()
+        self.weights = None  # nn.Parameter(nn.functional.softmax(torch.ones(self.num_models, device=self.device), dim=0))
+        best_model = None
+        best_loss = float('inf')
+
+        for epoch in range(meta_epochs):
+            total_loss = 0
+            correct_predictions = 0
+            total_samples = 0
+
+            for batch_count, batch in enumerate(val_loader):
+                averaged_model = self.get_averaged_model()
+
+                outputs = averaged_model(
+                    input_ids=batch["input_ids"].to(self.device),
+                    attention_mask=batch["attention_mask"].to(self.device),
+                    labels=batch["labels"].to(self.device),
+                )
+                val_loss = outputs.loss
+                total_loss += val_loss.item() * batch["input_ids"].size(0)
+                total_samples += batch["input_ids"].size(0)
+
+                val_loss.backward()
+                if (batch_count + 1) % accumulation_steps == 0 or batch_count + 1 == len(val_loader):
+                    with torch.no_grad():
+                        softmax_weights = nn.functional.softmax(self.weights, dim=0)
+                        grad_weights = torch.zeros_like(self.weights)
+
+                        for i, (model, softmax_weights_i) in enumerate(zip(self.lazy_load_params(), softmax_weights)):
+                            for j, (model_param, main_param) in enumerate(zip(model.values(), averaged_model.parameters())):
+                                if main_param.grad is not None:
+                                    grad_contribution = main_param.grad * (model_param - main_param)
+                                    grad_contribution_sum = torch.sum(grad_contribution)
+
+                                    # Direct vectorized update to grad_weights for all models
+                                    grad_weights[:, j] += grad_contribution_sum * (softmax_weights_i[j] - softmax_weights[:, j] * softmax_weights_i[j])
+
+                                    # Handle the diagonal term separately
+                                    grad_weights[i, j] += grad_contribution_sum * softmax_weights_i[j]
+                        
+                        #logging.info(f"Gradient check: {main_param.grad}")
+                        self.weights.data -= (lr / accumulation_steps * grad_weights)
+                        for main_param in averaged_model.parameters():
+                            main_param.grad.zero_()
+                        
+                        #grad_weights = torch.clamp(grad_weights,min=-1,max=1)
+                        #if (batch_count * epoch+1) % 1 == 0:
+                        #    logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {val_loss.item():.4f}, Weights: {torch.mean(self.weights,dim=1)}")
+            try:
+                average_loss = total_loss / total_samples
+                perplexity = math.exp(average_loss) 
+            except:
+                average_loss = 9999
+                perplexity = 99999999
+
+            if average_loss < best_loss:
+                best_loss = average_loss
+                best_model = copy.deepcopy(averaged_model.state_dict())  
+            
+            if MLFLOW_ACTIVE:
+                #step = int(time.time())
+                #log_model_metrics(step=step, loss_averaged = average_loss, perplexity_averaged = perplexity)
+                mlflow.log_metric("loss", average_loss, step=time.time() )
+                mlflow.log_metric("perplexity", average_perplexity, step=time.time() )
+
+            logging.info(f"Meta-Epoch [{epoch+1}/{meta_epochs}], Validation Loss: {average_loss:.4f},Perplexity: {perplexity}, Weights: {torch.mean(self.weights,dim=1)}")
+        
+        if best_model is not None:
+            self.model.load_state_dict(best_model)
+        return self.model
+    
+
+    def run_periodic_averaging(self, val_loader, meta_epochs, lr, t, accumulation_steps=128):
+        while True:
+            logging.info("Averaging Beginning")
+            start_time = time.time()
+
+            if time.time() - self.last_pull_time >= self.check_update_interval:
+                if self.hf_manager.check_for_new_submissions(
+                    self.hf_manager.model_repo_id
+                ):
+                    logging.info(
+                        "Averaged model updated on Hugging Face. Pulling latest model..."
+                    )
+                    self.hf_manager.pull_latest_model()
+                    time.sleep(10)  # just to give enough time for pull
+                    self.model = self.hf_manager.update_model(self.model)
+                    self.model = self.model.to(self.device)
+                    #optimizer = AdamW(
+                    #    self.model.parameters(), lr=5e-5
+                    #)  # Reinitialize the optimizer
+                    self.base_weights = {
+                        name: param.clone()
+                        for name, param in self.model.named_parameters()
+                    }
+
+                self.last_pull_time = time.time()
+            
+            self.bittensor_network.sync(lite=False)
+            validator_uids = self.bittensor_network.get_validator_uids(
+            vpermit_tao_limit=1024
+            )
+            self.validator_combined_weights = torch.mean(
+                self.bittensor_network.metagraph.W[validator_uids, :], axis=0
+            )
+            self.get_model_paths()   
+
+            self.get_top_k_models(5)
+            self.cache_params_locally()
+            self.filter_hotkeys_for_nans()
+            
+            #filenames = os.listdir(self.gradients_dir)
+            #self.active_hotkeys = [filename.split('_')[2].split('.')[0] for filename in filenames if filename.startswith('weight_delta')]
+            #self.num_models = len(self.active_hotkeys)
+            
+            logging.info(f"Total number of models: {self.num_models}")
+
+            model = self.meta_learning(val_loader, meta_epochs, lr, accumulation_steps)
+            # self.apply_averaged_gradients(averaged_weights)
+            self.save_model(model)
+            #self.hf_manager.push_to_hf_hub(path_to_model= "averaged_model.pt")
 
             elapsed_time = time.time() - start_time
             time_to_wait = max(0, t - elapsed_time)

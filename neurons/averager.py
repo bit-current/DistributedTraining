@@ -21,7 +21,7 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from huggingface_hub import Repository, HfFolder
-from hivetrain.averaging_logic import ParameterizedAverager
+from hivetrain.averaging_logic import ParameterizedAverager, TopKAverager
 from hivetrain.btt_connector import BittensorNetwork
 from hivetrain.config import Configurator
 from hivetrain.chain_manager import ChainMultiAddressStore
@@ -99,10 +99,11 @@ test_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=cus
 
 hf_manager = HFManager(my_repo_id = None, averaged_model_repo_id= args.storage.averaged_model_repo_id)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-averager = ParameterizedAverager(model=model,device=device,hf_manager=hf_manager, local_dir=args.storage.model_dir, gradients_dir=args.storage.gradient_dir ,chain_manager=address_store,bittensor_network=BittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
+averager = TopKAverager(model=model,device=device,hf_manager=hf_manager, local_dir=args.storage.model_dir, gradients_dir=args.storage.gradient_dir ,chain_manager=address_store,bittensor_network=BittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
 #averager.run_periodic_averaging(test_loader,20,300)
 #val_loader,meta_epochs, lr, t
 #averager.save_model()
-averager.run_periodic_averaging(test_loader, 7,0.01,1200)
+#averager.run_periodic_averaging(test_loader, 7,0.0000001,1200)
+averager.run_periodic_averaging(test_loader, 7,0.0000001,1200, accumulation_steps=2)
 # # Push the model to the Hugging Face Hub
 # push_to_hf_hub(local_dir=local_dir, repo_id=repo_id, hf_token=args.averager.hf_token, commit_message=f"Updated model SN25 with {222}")#FIXME add block numbers
