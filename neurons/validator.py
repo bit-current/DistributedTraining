@@ -98,10 +98,11 @@ test_set = WikitextDataset(texts, tokenizer)
 test_loader = DataLoader(test_set, batch_size=8, collate_fn=custom_collate_fn)
 # Load your model and other necessary components here
 #    def __init__(self, model, optimizer, data_loader, bittensor_network=None, chain_manager=None, interval=3600, local_gradient_dir="local_gradients"):
+device = "cuda" if torch.cuda.is_available() else "cpu" 
 hf_manager = HFManager(
-    my_repo_id=None, averaged_model_repo_id=args.storage.averaged_model_repo_id
+    my_repo_id=None,device=device, averaged_model_repo_id=args.storage.averaged_model_repo_id
 )
-device = "cuda" if torch.cuda.is_available() else "cpu"
+
 validator = DeltaValidator(
     device=device,
     model=model,

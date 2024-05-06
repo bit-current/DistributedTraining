@@ -108,15 +108,14 @@ data_loader = DataLoader(
 #optimizer = AdamW(model.parameters(), lr=learning_rate)
 
 
-hf_manager = HFManager(my_repo_id = args.storage.my_repo_id, averaged_model_repo_id= args.storage.averaged_model_repo_id)
-#device = "cuda" if torch.cuda.is_available() else "cpu"
-device = args.device
+# hf_manager = HFManager(my_repo_id = args.storage.my_repo_id, averaged_model_repo_id= args.storage.averaged_model_repo_id)
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 hf_manager = HFManager(
+    device=device,
     my_repo_id=args.storage.my_repo_id,
     averaged_model_repo_id=args.storage.averaged_model_repo_id,
-)
-device = args.device
+) 
 model_name = "openai-community/gpt2"
 training_loop = DeltaLoop(
     device,
