@@ -2,8 +2,6 @@
 
 # Distributed Training Framework
 
-(WARNING: IN ACTIVE DEVELOPMENT. FOR TESTING ADD --subtensor.network test AND SET --netuid to 100)
-
 ## Introduction
 
 This project introduces a cutting-edge approach to distributed deep learning, utilizing the Bittensor network. Our method incentivizes participants by rewarding the generation of optimal weights that contribute significantly to minimizing the overall loss of the base model.
