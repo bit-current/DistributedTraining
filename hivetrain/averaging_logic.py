@@ -482,7 +482,7 @@ class ParameterizedAverager(DeltaAverager):
         """
         Saves the model to the specified local directory.
         """
-        os.makedirs(self.hf_manager.get_local_model_directory(), exist_ok=True)
+        # os.makedirs(self.hf_manager.get_local_model_directory(), exist_ok=True)
         model_save_path = os.path.join(self.hf_manager.get_local_model_directory(), "averaged_model.pt")
         torch.save(self.model.state_dict(), model_save_path)
         logging.info(f"Model saved locally at {model_save_path}.")
@@ -542,6 +542,13 @@ class ParameterizedAverager(DeltaAverager):
     
 
     def run_periodic_averaging(self, val_loader, meta_epochs, lr, t):
+        # Check if initial base averaged model is provided          
+        model_path = os.path.join(self.hf_manager.get_local_model_directory(), "averaged_model.pt")
+        if not os.path.exists(model_path): 
+            print(f"Averaged_model.pt not found in the repository,. Saving Initial base model")
+            self.save_model()
+            self.hf_manager.push_to_hf_hub(path_to_model= "averaged_model.pt")
+                
         while True:
             logging.info("Averaging Beginning")
             start_time = time.time()

@@ -93,16 +93,10 @@ def custom_collate_fn(batch):
 wikitext_dataset = WikitextDataset(texts, tokenizer)
 test_loader = DataLoader(wikitext_dataset, batch_size=batch_size, collate_fn=custom_collate_fn)
 
-
-#__init__(self, model, local_dir, bittensor_network=None)
-#model, device, chain_manager=None,bittensor_network=None, hf_token=hf_token 
-
-hf_manager = HFManager(my_repo_id = None, averaged_model_repo_id= args.storage.averaged_model_repo_id)
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+hf_manager = HFManager(my_repo_id = None, device=device, averaged_model_repo_id= args.storage.averaged_model_repo_id)
+
 averager = ParameterizedAverager(model=model,device=device,hf_manager=hf_manager, local_dir=args.storage.model_dir, gradients_dir=args.storage.gradient_dir ,chain_manager=address_store,bittensor_network=BittensorNetwork, hf_token=os.environ.get("HF_TOKEN"))
-#averager.run_periodic_averaging(test_loader,20,300)
-#val_loader,meta_epochs, lr, t
-#averager.save_model()
+
 averager.run_periodic_averaging(test_loader, 7,0.01,1200)
-# # Push the model to the Hugging Face Hub
-# push_to_hf_hub(local_dir=local_dir, repo_id=repo_id, hf_token=args.averager.hf_token, commit_message=f"Updated model SN25 with {222}")#FIXME add block numbers

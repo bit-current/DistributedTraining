@@ -125,47 +125,51 @@ class ModelValidator:
         total_scores = 0 
         for uid, hotkey_address in enumerate(self.bittensor_network.metagraph.hotkeys):
             hf_repo = self.chain_manager.retrieve_hf_repo(hotkey_address)
-            gradients = self.hf_manager.receive_gradients(hf_repo)
-            if gradients is not None:
-                logging.info(f"Receiving Gradients from: {hotkey_address}")
-                logging.info(f"Updating Model Weights")
-                self.update_model_weights(gradients)
-                logging.info(f"The model hash: {self.calculate_model_hash()}")
-                logging.info(f"Evaluating model")
-                loss, perplexity = self.evaluate_model()
-                loss_score = max(0, self.base_loss - loss)
-                perplexity_score = max(0, self.base_perplexity - perplexity)
-                total_scores += perplexity_score
-                self.model.load_state_dict(self.original_state_dict)
-
-                if MLFLOW_ACTIVE:
-                    metrics = {
-                        f"loss_{hotkey_address}": loss.item(),
-                        f"perplexity_{hotkey_address}": perplexity,
-                        f"loss_score_{hotkey_address}": loss_score,
-                        f"perplexity_score_{hotkey_address}": perplexity_score,
-                    }
-
-                    # Log metrics with dynamic names
-                    log_model_metrics(step=int(current_time), **metrics)
-
+            # Miners have hf_repos
+            if hf_repo is None:
+                continue
             else:
-                loss = 99999999.0
-                perplexity = 99999999.0
-                loss_score = 0.0
-                perplexity_score = 0.0
+                gradients = self.hf_manager.receive_gradients(hf_repo)
+                if gradients is not None:
+                    logging.info(f"Receiving Gradients from: {hotkey_address}")
+                    logging.info(f"Updating Model Weights")
+                    self.update_model_weights(gradients)
+                    logging.info(f"The model hash: {self.calculate_model_hash()}")
+                    logging.info(f"Evaluating model")
+                    loss, perplexity = self.evaluate_model()
+                    loss_score = max(0, self.base_loss - loss)
+                    perplexity_score = max(0, self.base_perplexity - perplexity)
+                    total_scores += perplexity_score
+                    self.model.load_state_dict(self.original_state_dict)
 
-                current_time = int(time.time())
-                if MLFLOW_ACTIVE:
-                    metrics = {
-                        f"loss_{hotkey_address}": loss,
-                        f"perplexity_{hotkey_address}": perplexity,
-                        f"loss_score_{hotkey_address}": loss_score,
-                        f"perplexity_score_{hotkey_address}": perplexity_score,
-                    }
-                    log_model_metrics(step=int(current_time), **metrics)
+                    if MLFLOW_ACTIVE:
+                        metrics = {
+                            f"loss_{hotkey_address}": loss.item(),
+                            f"perplexity_{hotkey_address}": perplexity,
+                            f"loss_score_{hotkey_address}": loss_score,
+                            f"perplexity_score_{hotkey_address}": perplexity_score,
+                        }
 
-            self.scores[hotkey_address] = perplexity_score
+                        # Log metrics with dynamic names
+                        log_model_metrics(step=int(current_time), **metrics)
+
+                else:
+                    loss = 99999999.0
+                    perplexity = 99999999.0
+                    loss_score = 0.0
+                    perplexity_score = 0.0
+
+                    current_time = int(time.time())
+                    if MLFLOW_ACTIVE:
+                        metrics = {
+                            f"loss_{hotkey_address}": loss,
+                            f"perplexity_{hotkey_address}": perplexity,
+                            f"loss_score_{hotkey_address}": loss_score,
+                            f"perplexity_score_{hotkey_address}": perplexity_score,
+                        }
+                        log_model_metrics(step=int(current_time), **metrics)
+
+                self.scores[hotkey_address] = perplexity_score
             # log validator performance
 
             if uid == 1:
@@ -184,7 +188,9 @@ class ModelValidator:
 
         # normalize scores
         for uid, hotkey_address in enumerate(self.bittensor_network.metagraph.hotkeys):
-            self.normalized_scores[hotkey_address] = max(0,self.scores[hotkey_address]/total_scores)
+            # self.scores[hotkey_address] is only for miners. And miners have hf_repos.
+            if self.chain_manager.retrieve_hf_repo(hotkey_address) is not None:
+                self.normalized_scores[hotkey_address] = max(0,self.scores[hotkey_address]/total_scores)
         if self.bittensor_network.should_set_weights():
             self.bittensor_network.set_weights(self.normalized_scores)
 
